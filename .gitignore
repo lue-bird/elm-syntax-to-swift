@@ -1,0 +1,33 @@
+node_modules
+elm-stuff
+VerifyExamples
+zombie
+package-lock.json
+elm.js
+main.js
+elmMain.js
+dist
+
+build
+.build
+target
+*.wasm
+
+# swift
+.DS_Store
+/.build
+/Packages
+xcuserdata/
+DerivedData/
+.swiftpm/configuration/registries.json
+.swiftpm/xcode/package.xcworkspace/contents.xcworkspacedata
+.netrc
+
+
+# editors
+.idea/
+ElmjutsuDumMyM0DuL3.elm
+.vscode
+.editorconfig
+
+.fake
