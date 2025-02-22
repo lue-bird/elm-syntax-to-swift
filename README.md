@@ -35,7 +35,7 @@ To try it out, you can
 run [this node script](https://github.com/lue-bird/elm-syntax-to-swift/tree/main/node-elm-to-swift).
 
 ### why swift?
--   it's pretty much a superset of elm which makes transpiling easy (good type inference, choice types, records, value-ish semantics)
+-   it's pretty much a superset of elm which makes transpiling easy (choice types, records, value-ish semantics)
 -   it can run decently fast natively or as wasm
 
 ### be aware
@@ -52,7 +52,7 @@ run [this node script](https://github.com/lue-bird/elm-syntax-to-swift/tree/main
     - `List.minimum`, `List.maximum`, `Basics.min`, `Basics.max` will only work with numbers.
     -   potential future candidates: `Basics.clamp`, `Basics.degrees`, `Basics.turns`,
         `Basics.radians`, `Basics.logBase`, `Basics.toPolar`, `Basics.fromPolar`, `Basics.never`, `Basics.sin`, `Basics.cos`, `Basics.tan`, `Basics.asin`, `Basics.acos`, `Basics.atan`, `Basics.atan2`, `Basics.e`, `Basics.pi`,
-        `List.map3/4/5`, `List.head`, `List.tail`, `List.partition`, `Char.toLocaleLower`, `Char.toLocaleUpper`, `Char.isAlpha`, `Char.isAlphaNum`, `Char.isDigit`, `Char.isOctDigit`, `Char.isHexDigit`, `Bitwise`, `Array`.
+        `List.map3/4/5`, `List.head`, `List.tail`, `List.partition`, `Char.toLocaleLower`, `Char.toLocaleUpper`, `Char.isAlpha`, `Char.isAlphaNum`, `Char.isDigit`, `Char.isOctDigit`, `Bitwise`, `Array`.
         Any help appreciated!
 -   no checks are performed before transpiling to swift. So if you don't add a compile check of your elm input,
     you might e.g. get a running program that circumvents an elm opaque type or phantom type, or a swift program that can't be run
