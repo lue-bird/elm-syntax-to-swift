@@ -4,6 +4,7 @@ VerifyExamples
 zombie
 package-lock.json
 elm.js
+elm.swift
 main.js
 elmMain.js
 dist
