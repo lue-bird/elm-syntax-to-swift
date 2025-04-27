@@ -31,4 +31,9 @@ ElmjutsuDumMyM0DuL3.elm
 .vscode
 .editorconfig
 
+
+# for now, while experimenting
+tests
+
+
 .fake
