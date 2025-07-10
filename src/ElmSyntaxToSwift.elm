@@ -106,13 +106,8 @@ type SwiftExpression
         , onTrue : SwiftExpression
         , onFalse : SwiftExpression
         }
-    | SwiftExpressionListLiteral (List SwiftExpression)
     | SwiftExpressionArrayLiteral (List SwiftExpression)
     | SwiftExpressionRecord (FastDict.Dict String SwiftExpression)
-    | SwiftExpressionRecordUpdate
-        { originalRecordVariable : String
-        , fields : FastDict.Dict String SwiftExpression
-        }
     | SwiftExpressionCall
         { called : SwiftExpression
         , arguments : List SwiftExpression
@@ -151,10 +146,21 @@ type SwiftStatement
     | SwiftStatementLetValueDeclarationUninitialized
         { name : String
 
-        -- TODO check if necessary , resultType : SwiftType
+        -- TODO check if necessary , type_ : SwiftType
         }
-    | SwiftStatementAssignment
+    | SwiftStatementVarDeclaration
         { name : String
+        , value : SwiftExpression
+
+        -- TODO check if necessary , type_ : SwiftType
+        }
+    | SwiftStatementBindingAssignment
+        { name : String
+        , assignedValue : SwiftExpression
+        }
+    | SwiftStatementRecordFieldAssignment
+        { recordBindingName : String
+        , fieldName : String
         , assignedValue : SwiftExpression
         }
     | SwiftStatementSwitch
@@ -509,11 +515,6 @@ swiftExpressionUsedLocalReferences swiftExpression =
                             swiftExpressionUsedLocalReferences
                     )
 
-        SwiftExpressionListLiteral elements ->
-            elements
-                |> listMapToFastSetsAndUnify
-                    swiftExpressionUsedLocalReferences
-
         SwiftExpressionArrayLiteral elements ->
             elements
                 |> listMapToFastSetsAndUnify
@@ -523,12 +524,6 @@ swiftExpressionUsedLocalReferences swiftExpression =
             fields
                 |> fastDictMapToFastSetsAndUnify
                     (\_ fieldValue -> fieldValue |> swiftExpressionUsedLocalReferences)
-
-        SwiftExpressionRecordUpdate recordUpdate ->
-            recordUpdate.fields
-                |> fastDictMapToFastSetsAndUnify
-                    (\_ fieldValue -> fieldValue |> swiftExpressionUsedLocalReferences)
-                |> FastSet.insert recordUpdate.originalRecordVariable
 
         SwiftExpressionIfElse ifThenElse ->
             ifThenElse.condition
@@ -4343,7 +4338,7 @@ printSwiftExpressionRecord swiftRecordFields =
                                         )
                                 )
                         )
-                        printLinebreakIndentedSemicolonSpace
+                        printLinebreakIndentedCommaSpace
         in
         printExactlyParenOpening
             |> Print.followedBy fieldsPrint
@@ -6712,8 +6707,16 @@ expression context expressionTypedNode =
                         elements
                             |> List.concatMap .statements
                     , result =
-                        SwiftExpressionListLiteral
-                            (elements |> List.map .result)
+                        -- check if slow. If yes, replace with .List_Cons | .List_Empty
+                        SwiftExpressionCall
+                            { called =
+                                SwiftExpressionReference
+                                    { moduleOrigin = Nothing, name = "Array_toList" }
+                            , arguments =
+                                [ SwiftExpressionArrayLiteral
+                                    (elements |> List.map .result)
+                                ]
+                            }
                     }
                 )
                 (elementNodes
@@ -6769,31 +6772,52 @@ expression context expressionTypedNode =
                 )
 
         ElmSyntaxTypeInfer.ExpressionRecordUpdate recordUpdate ->
+            let
+                originalRecordVariable : String
+                originalRecordVariable =
+                    referenceToSwiftName
+                        { moduleOrigin = recordUpdate.recordVariable.value.moduleOrigin
+                        , name =
+                            recordUpdate.recordVariable.value.name
+                        }
+                        |> variableNameDisambiguateFromSwiftKeywords
+
+                generatedUpdatedRecordVarName : String
+                generatedUpdatedRecordVarName =
+                    "generated_updated_"
+                        ++ originalRecordVariable
+                        ++ "_"
+                        ++ (context.path |> String.join "_")
+            in
             Result.map
                 (\fields ->
                     { statements =
-                        fields
+                        (fields
                             |> List.concatMap
                                 (\( _, fieldValue ) ->
                                     fieldValue.statements
                                 )
-                    , result =
-                        SwiftExpressionRecordUpdate
-                            { originalRecordVariable =
-                                referenceToSwiftName
-                                    { moduleOrigin = recordUpdate.recordVariable.value.moduleOrigin
-                                    , name =
-                                        recordUpdate.recordVariable.value.name
+                        )
+                            ++ (SwiftStatementVarDeclaration
+                                    { name = generatedUpdatedRecordVarName
+                                    , value =
+                                        SwiftExpressionReference
+                                            { moduleOrigin = Nothing, name = originalRecordVariable }
                                     }
-                                    |> variableNameDisambiguateFromSwiftKeywords
-                            , fields =
-                                fields
-                                    |> List.map
-                                        (\( fieldName, fieldValue ) ->
-                                            ( fieldName, fieldValue.result )
-                                        )
-                                    |> FastDict.fromList
-                            }
+                                    :: (fields
+                                            |> List.map
+                                                (\( fieldName, fieldValue ) ->
+                                                    SwiftStatementRecordFieldAssignment
+                                                        { recordBindingName = generatedUpdatedRecordVarName
+                                                        , fieldName = fieldName
+                                                        , assignedValue = fieldValue.result
+                                                        }
+                                                )
+                                       )
+                               )
+                    , result =
+                        SwiftExpressionReference
+                            { moduleOrigin = Nothing, name = generatedUpdatedRecordVarName }
                     }
                 )
                 ((recordUpdate.field0 :: recordUpdate.field1Up)
@@ -7286,7 +7310,34 @@ condenseExpressionCall call =
                         }
 
         SwiftExpressionReference reference ->
-            case callAsArrayFromList reference call.argument of
+            case
+                case reference.name of
+                    "Array_fromList" ->
+                        case call.argument of
+                            SwiftExpressionCall argumentCall ->
+                                case argumentCall.called of
+                                    SwiftExpressionReference argumentReference ->
+                                        case argumentReference.name of
+                                            "Array_toList" ->
+                                                case argumentCall.arguments of
+                                                    [ SwiftExpressionArrayLiteral elements ] ->
+                                                        Just elements
+
+                                                    _ ->
+                                                        Nothing
+
+                                            _ ->
+                                                Nothing
+
+                                    _ ->
+                                        Nothing
+
+                            _ ->
+                                Nothing
+
+                    _ ->
+                        Nothing
+            of
                 Just elements ->
                     SwiftExpressionArrayLiteral elements
 
@@ -7344,12 +7395,6 @@ condenseExpressionCall call =
                 , arguments = [ call.argument ]
                 }
 
-        SwiftExpressionListLiteral _ ->
-            SwiftExpressionCall
-                { called = call.called
-                , arguments = [ call.argument ]
-                }
-
         SwiftExpressionArrayLiteral _ ->
             SwiftExpressionCall
                 { called = call.called
@@ -7361,79 +7406,6 @@ condenseExpressionCall call =
                 { called = call.called
                 , arguments = [ call.argument ]
                 }
-
-        SwiftExpressionRecordUpdate _ ->
-            SwiftExpressionCall
-                { called = call.called
-                , arguments = [ call.argument ]
-                }
-
-
-callAsArrayFromList :
-    { moduleOrigin : Maybe String, name : String }
-    -> SwiftExpression
-    -> Maybe (List SwiftExpression)
-callAsArrayFromList reference argument =
-    case reference.name of
-        "fromList" ->
-            case reference.moduleOrigin of
-                Nothing ->
-                    Nothing
-
-                Just moduleOrigin ->
-                    case moduleOrigin of
-                        "Array" ->
-                            case argument of
-                                SwiftExpressionListLiteral elements ->
-                                    Just elements
-
-                                SwiftExpressionArrayLiteral _ ->
-                                    Nothing
-
-                                SwiftExpressionDouble _ ->
-                                    Nothing
-
-                                SwiftExpressionUnicodeScalar _ ->
-                                    Nothing
-
-                                SwiftExpressionStringLiteral _ ->
-                                    Nothing
-
-                                SwiftExpressionReference _ ->
-                                    Nothing
-
-                                SwiftExpressionVariant _ ->
-                                    Nothing
-
-                                SwiftExpressionNegateOperation _ ->
-                                    Nothing
-
-                                SwiftExpressionRecordAccess _ ->
-                                    Nothing
-
-                                SwiftExpressionTuple _ ->
-                                    Nothing
-
-                                SwiftExpressionIfElse _ ->
-                                    Nothing
-
-                                SwiftExpressionRecord _ ->
-                                    Nothing
-
-                                SwiftExpressionRecordUpdate _ ->
-                                    Nothing
-
-                                SwiftExpressionCall _ ->
-                                    Nothing
-
-                                SwiftExpressionLambda _ ->
-                                    Nothing
-
-                        _ ->
-                            Nothing
-
-        _ ->
-            Nothing
 
 
 case_ :
@@ -7488,7 +7460,7 @@ case_ context syntaxCase =
                     |> swiftStatementsPrependLetDeclarationsForVariableAsPatternAliases
                         casePattern.variableAsPatternAliases
                 )
-                    ++ [ SwiftStatementAssignment
+                    ++ [ SwiftStatementBindingAssignment
                             { name = syntaxCase.localResultVariableToInitialize
                             , assignedValue = result.result
                             }
@@ -7827,66 +7799,6 @@ expressionOperatorToSwiftFunctionReference operator =
 
         unknownOrUnsupportedOperator ->
             Err ("unknown/unsupported operator " ++ unknownOrUnsupportedOperator)
-
-
-type IntOrFloat
-    = IntNotFloat
-    | FloatNotInt
-
-
-inferredTypeCheckOrGuessIntOrFloat : ElmSyntaxTypeInfer.Type -> IntOrFloat
-inferredTypeCheckOrGuessIntOrFloat inferredType =
-    case inferredType of
-        ElmSyntaxTypeInfer.TypeVariable inputTypeVariable ->
-            if inputTypeVariable.name |> String.startsWith "number" then
-                -- assume Float
-                FloatNotInt
-
-            else
-                -- assume Int
-                IntNotFloat
-
-        ElmSyntaxTypeInfer.TypeNotVariable inferredTypeNotVariable ->
-            case inferredTypeNotVariable of
-                ElmSyntaxTypeInfer.TypeConstruct typeConstruct ->
-                    case typeConstruct.moduleOrigin of
-                        "Basics" ->
-                            case typeConstruct.name of
-                                "Float" ->
-                                    FloatNotInt
-
-                                "Int" ->
-                                    IntNotFloat
-
-                                _ ->
-                                    IntNotFloat
-
-                        _ ->
-                            IntNotFloat
-
-                ElmSyntaxTypeInfer.TypeUnit ->
-                    -- incorrect type inference, assume Float
-                    IntNotFloat
-
-                ElmSyntaxTypeInfer.TypeTuple _ ->
-                    -- incorrect type inference, assume Float
-                    IntNotFloat
-
-                ElmSyntaxTypeInfer.TypeTriple _ ->
-                    -- incorrect type inference, assume Float
-                    IntNotFloat
-
-                ElmSyntaxTypeInfer.TypeRecord _ ->
-                    -- incorrect type inference, assume Float
-                    IntNotFloat
-
-                ElmSyntaxTypeInfer.TypeRecordExtension _ ->
-                    -- incorrect type inference, assume Float
-                    IntNotFloat
-
-                ElmSyntaxTypeInfer.TypeFunction _ ->
-                    -- incorrect type inference, assume Float
-                    IntNotFloat
 
 
 okReferencePow : Result error_ { moduleOrigin : Maybe String, name : String }
@@ -10353,16 +10265,10 @@ swiftExpressionIsSpaceSeparated swiftExpression =
         SwiftExpressionIfElse _ ->
             True
 
-        SwiftExpressionListLiteral _ ->
-            False
-
         SwiftExpressionArrayLiteral _ ->
             False
 
         SwiftExpressionRecord _ ->
-            False
-
-        SwiftExpressionRecordUpdate _ ->
             False
 
         SwiftExpressionCall _ ->
@@ -10413,9 +10319,6 @@ printSwiftExpressionNotParenthesized swiftExpression =
         SwiftExpressionRecord fields ->
             printSwiftExpressionRecord fields
 
-        SwiftExpressionListLiteral elements ->
-            printSwiftExpressionListLiteral elements
-
         SwiftExpressionArrayLiteral elements ->
             printSwiftExpressionArrayLiteral elements
 
@@ -10435,9 +10338,6 @@ printSwiftExpressionNotParenthesized swiftExpression =
                     (Print.exactly
                         ("." ++ syntaxRecordAccess.field)
                     )
-
-        SwiftExpressionRecordUpdate syntaxRecordUpdate ->
-            printSwiftExpressionRecordUpdate syntaxRecordUpdate
 
 
 printExactlyMinus : Print
@@ -10606,7 +10506,7 @@ printSwiftExpressionArrayLiteral elements =
                             printSwiftExpressionNotParenthesized
                             printExactlySemicolonLinebreakIndented
             in
-            printExactlyAngledOpeningVerticalBarSpace
+            printExactlyAngledOpeningSpace
                 |> Print.followedBy
                     (Print.withIndentIncreasedBy 2
                         elementsPrint
@@ -10616,63 +10516,12 @@ printSwiftExpressionArrayLiteral elements =
                         (elementsPrint |> Print.lineSpread)
                     )
                 |> Print.followedBy
-                    printExactlyVerticalBarAngledClosing
+                    printExactlyAngledClosing
 
 
 printSwiftExpressionArrayLiteralEmpty : Print
 printSwiftExpressionArrayLiteralEmpty =
-    Print.exactly "[||]"
-
-
-printExactlyAngledOpeningVerticalBarSpace : Print
-printExactlyAngledOpeningVerticalBarSpace =
-    Print.exactly "[| "
-
-
-printExactlyVerticalBarAngledClosing : Print
-printExactlyVerticalBarAngledClosing =
-    Print.exactly "|]"
-
-
-printSwiftExpressionRecordUpdate :
-    { originalRecordVariable : String
-    , fields : FastDict.Dict String SwiftExpression
-    }
-    -> Print
-printSwiftExpressionRecordUpdate syntaxRecordUpdate =
-    -- TODO create var, update the necessary fields
-    printExactlyCurlyOpeningSpace
-        |> Print.followedBy
-            (Print.withIndentIncreasedBy 2
-                (Print.exactly syntaxRecordUpdate.originalRecordVariable)
-            )
-        |> Print.followedBy
-            (Print.withIndentAtNextMultipleOf4
-                (printLinebreakIndentedSpaceWith
-                    |> Print.followedBy
-                        (Print.withIndentAtNextMultipleOf4
-                            (Print.linebreakIndented
-                                |> Print.followedBy
-                                    (syntaxRecordUpdate.fields
-                                        |> FastDict.toList
-                                        |> Print.listMapAndIntersperseAndFlatten
-                                            (\( fieldName, fieldValue ) ->
-                                                Print.exactly (fieldName ++ " =")
-                                                    |> Print.followedBy
-                                                        (Print.withIndentAtNextMultipleOf4
-                                                            (Print.linebreakIndented
-                                                                |> Print.followedBy
-                                                                    (printSwiftExpressionNotParenthesized fieldValue)
-                                                            )
-                                                        )
-                                            )
-                                            printLinebreakIndentedSemicolonSpace
-                                    )
-                            )
-                        )
-                )
-            )
-        |> Print.followedBy printLinebreakIndentedCurlyClosing
+    Print.exactly "[]"
 
 
 printExactlyCurlyOpening : Print
@@ -10683,27 +10532,6 @@ printExactlyCurlyOpening =
 printExactlyCurlyOpeningSpace : Print
 printExactlyCurlyOpeningSpace =
     Print.exactly "{ "
-
-
-printLinebreakIndentedSpaceWith : Print
-printLinebreakIndentedSpaceWith =
-    Print.linebreakIndented
-        |> Print.followedBy
-            (Print.exactly " with")
-
-
-printLinebreakIndentedSemicolonSpace : Print
-printLinebreakIndentedSemicolonSpace =
-    Print.linebreakIndented
-        |> Print.followedBy
-            (Print.exactly "; ")
-
-
-printLinebreakIndentedCurlyClosing : Print
-printLinebreakIndentedCurlyClosing =
-    Print.linebreakIndented
-        |> Print.followedBy
-            printExactlyCurlyClosing
 
 
 patternIsSpaceSeparated : SwiftPattern -> Bool
@@ -11039,13 +10867,51 @@ printSwiftStatement swiftStatement =
         SwiftStatementLetValueDeclarationUninitialized letValueDeclarationUnassigned ->
             Print.exactly ("let " ++ letValueDeclarationUnassigned.name ++ ";")
 
-        SwiftStatementAssignment assignment ->
+        SwiftStatementVarDeclaration varDeclarationInitialized ->
+            let
+                assignedValuePrint : Print
+                assignedValuePrint =
+                    printSwiftExpressionNotParenthesized
+                        varDeclarationInitialized.value
+            in
+            Print.exactly ("var " ++ varDeclarationInitialized.name ++ " =")
+                |> Print.followedBy
+                    (Print.withIndentAtNextMultipleOf4
+                        (Print.spaceOrLinebreakIndented
+                            (assignedValuePrint |> Print.lineSpread)
+                            |> Print.followedBy
+                                assignedValuePrint
+                        )
+                    )
+
+        SwiftStatementBindingAssignment assignment ->
             let
                 assignedValuePrint : Print
                 assignedValuePrint =
                     printSwiftExpressionNotParenthesized assignment.assignedValue
             in
             Print.exactly (assignment.name ++ " =")
+                |> Print.followedBy
+                    (Print.withIndentAtNextMultipleOf4
+                        (Print.spaceOrLinebreakIndented
+                            (assignedValuePrint |> Print.lineSpread)
+                            |> Print.followedBy
+                                assignedValuePrint
+                        )
+                    )
+
+        SwiftStatementRecordFieldAssignment assignment ->
+            let
+                assignedValuePrint : Print
+                assignedValuePrint =
+                    printSwiftExpressionNotParenthesized assignment.assignedValue
+            in
+            Print.exactly
+                (assignment.recordBindingName
+                    ++ "."
+                    ++ assignment.fieldName
+                    ++ " ="
+                )
                 |> Print.followedBy
                     (Print.withIndentAtNextMultipleOf4
                         (Print.spaceOrLinebreakIndented
@@ -11063,89 +10929,6 @@ printLinebreakIndentedLinebreakIndented : Print
 printLinebreakIndentedLinebreakIndented =
     Print.linebreakIndented
         |> Print.followedBy Print.linebreakIndented
-
-
-swiftStatementUsedLocalReferences : SwiftStatement -> FastSet.Set String
-swiftStatementUsedLocalReferences swiftStatement =
-    case swiftStatement of
-        SwiftStatementLetDestructuring swiftLetDestructuring ->
-            swiftLetDestructuring.expression
-                |> swiftExpressionUsedLocalReferences
-
-        SwiftStatementFuncDeclaration swiftLetValueOrFunction ->
-            swiftLetValueOrFunction.result
-                |> swiftExpressionUsedLocalReferences
-
-        SwiftStatementLetDeclaration swiftLetDeclaration ->
-            swiftLetDeclaration.result
-                |> swiftExpressionUsedLocalReferences
-
-        SwiftStatementLetValueDeclarationUninitialized _ ->
-            FastSet.empty
-
-        SwiftStatementAssignment assignment ->
-            assignment.assignedValue
-                |> swiftExpressionUsedLocalReferences
-
-        SwiftStatementSwitch matchWith ->
-            matchWith.matched
-                |> swiftExpressionUsedLocalReferences
-                |> FastSet.union
-                    (matchWith.case0.statements
-                        |> listMapToFastSetsAndUnify
-                            swiftStatementUsedLocalReferences
-                    )
-                |> FastSet.union
-                    (matchWith.case1Up
-                        |> listMapToFastSetsAndUnify
-                            (\swiftCase ->
-                                swiftCase.statements
-                                    |> listMapToFastSetsAndUnify
-                                        swiftStatementUsedLocalReferences
-                            )
-                    )
-
-
-swiftPatternContainedVariables : SwiftPattern -> FastSet.Set String
-swiftPatternContainedVariables swiftPattern =
-    -- IGNORE TCO
-    case swiftPattern of
-        SwiftPatternIgnore ->
-            FastSet.empty
-
-        SwiftPatternBool _ ->
-            FastSet.empty
-
-        SwiftPatternInt64 _ ->
-            FastSet.empty
-
-        SwiftPatternUnicodeScalar _ ->
-            FastSet.empty
-
-        SwiftPatternStringLiteral _ ->
-            FastSet.empty
-
-        SwiftPatternVariable variable ->
-            FastSet.singleton variable
-
-        SwiftPatternTuple partPatterns ->
-            FastSet.union
-                (partPatterns.part0 |> swiftPatternContainedVariables)
-                (FastSet.union
-                    (partPatterns.part1 |> swiftPatternContainedVariables)
-                    (partPatterns.part2Up
-                        |> listMapToFastSetsAndUnify swiftPatternContainedVariables
-                    )
-                )
-
-        SwiftPatternVariant patternVariant ->
-            patternVariant.values
-                |> listMapToFastSetsAndUnify swiftPatternContainedVariables
-
-        SwiftPatternRecord recordPatternInexhaustiveFieldNames ->
-            recordPatternInexhaustiveFieldNames
-                |> FastDict.values
-                |> listMapToFastSetsAndUnify swiftPatternContainedVariables
 
 
 swiftStatementsPrependLetDeclarationsForVariableAsPatternAliases :

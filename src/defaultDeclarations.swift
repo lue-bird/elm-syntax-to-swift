@@ -564,12 +564,12 @@ public enum Elm {
     }
 
     public static func String_lines(_ string: String) -> List_List<String> {
-        arrayToList_List(string.components(separatedBy: .newlines))
+        Array_toList(string.components(separatedBy: .newlines))
     }
 
     public static func String_split(_ separator: String) -> (String) -> List_List<String> {
         { string in
-            arrayToList_List(
+            Array_toList(
                 string.split(separator: separator)
                     .map({ sub in String(sub) }))
         }
@@ -800,7 +800,7 @@ public enum Elm {
         }
     }
 
-    private static func arrayToList_List<a>(_ array: [a]) -> List_List<a> {
+    private static func Array_toList<a>(_ array: [a]) -> List_List<a> {
         var soFar: List_List<a> = .List_Empty
         for element in array.reversed() {
             soFar = .List_Cons(element, soFar)
@@ -808,7 +808,7 @@ public enum Elm {
         return soFar
     }
 
-    private static func List_ListToArray<a>(_ fullList: List_List<a>) -> [a] {
+    private static func Array_fromList<a>(_ fullList: List_List<a>) -> [a] {
         var soFar: [a] = Array()
         var remainingList = fullList
         while true {
@@ -965,14 +965,14 @@ public enum Elm {
             while remainingCountToTake >= 1 {
                 switch remainingList {
                 case .List_Empty:
-                    return arrayToList_List(takenElementsArraySoFar)
+                    return Array_toList(takenElementsArraySoFar)
                 case .List_Cons(let head, let tail):
                     takenElementsArraySoFar.append(head)
                     remainingList = tail
                     remainingCountToTake -= 1
                 }
             }
-            return arrayToList_List(takenElementsArraySoFar)
+            return Array_toList(takenElementsArraySoFar)
         }
     }
 
@@ -1041,7 +1041,7 @@ public enum Elm {
                     remainingBList = bTail
                     combinedArraySoFar.append(combineAb(aHead)(bHead))
                 }
-                return arrayToList_List(combinedArraySoFar)
+                return Array_toList(combinedArraySoFar)
             }
         }
     }
@@ -1209,9 +1209,9 @@ public enum Elm {
         -> (List_List<a>) -> List_List<a>
     {
         { list in
-            var asArray = List_ListToArray(list)
+            var asArray = Array_fromList(list)
             asArray.sort(by: { (a, b) in elementCompare(a)(b) == .Basics_LT })  // mutate
-            return arrayToList_List(asArray)
+            return Array_toList(asArray)
         }
     }
 
@@ -1220,18 +1220,18 @@ public enum Elm {
     ) -> (List_List<element>) -> List_List<element>
     where comparable: Comparable {
         { list in
-            var asArray = List_ListToArray(list)
+            var asArray = Array_fromList(list)
             asArray.sort(by: { (a, b) in elementToComparable(a) < elementToComparable(b) })  // mutate
-            return arrayToList_List(asArray)
+            return Array_toList(asArray)
         }
     }
 
     public static func List_sort<comparable>(_ list: List_List<comparable>)
         -> List_List<comparable>
     where comparable: Comparable {
-        var asArray = List_ListToArray(list)
+        var asArray = Array_fromList(list)
         asArray.sort(by: { (a, b) in a < b })  // mutate
-        return arrayToList_List(asArray)
+        return Array_toList(asArray)
     }
 
 }
