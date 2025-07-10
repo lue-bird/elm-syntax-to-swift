@@ -136,7 +136,12 @@ type SwiftStatement
         , -- TODO check if necessary patternType : SwiftType
           expression : SwiftExpression
         }
-    | SwiftStatementLetDeclarationValueOrFunction
+    | SwiftStatementLetDeclaration
+        { name : String
+        , result : SwiftExpression
+        , resultType : SwiftType
+        }
+    | SwiftStatementFuncDeclaration
         { name : String
         , parameters : List { name : String, type_ : SwiftType }
         , statements : List SwiftStatement
@@ -5786,6 +5791,7 @@ valueOrFunctionDeclaration moduleContext syntaxDeclarationValueOrFunction =
                         { moduleInfo = moduleContext
                         , variablesFromWithinDeclarationInScope =
                             FastSet.empty
+                        , path = []
                         }
                 )
 
@@ -5881,6 +5887,7 @@ valueOrFunctionDeclaration moduleContext syntaxDeclarationValueOrFunction =
                         , variablesFromWithinDeclarationInScope =
                             parameterTypedPatterns
                                 |> listMapToFastSetsAndUnify .introducedVariables
+                        , path = [ "declarationResult" ]
                         }
                 )
 
@@ -5969,59 +5976,6 @@ swiftKeywords =
         ]
 
 
-{-| TODO replace by explicit constructor
--}
-expressionContextAddVariablesInScope :
-    FastSet.Set String
-    ->
-        { variablesFromWithinDeclarationInScope : FastSet.Set String
-        , moduleInfo :
-            FastDict.Dict
-                {- module origin -} String
-                { portsIncoming : FastSet.Set String
-                , portsOutgoing : FastSet.Set String
-                , valueAndFunctionAnnotations :
-                    FastDict.Dict
-                        String
-                        ElmSyntaxTypeInfer.Type
-                , typeAliases :
-                    FastDict.Dict
-                        String
-                        { parameters : List String
-                        , recordFieldOrder : Maybe (List String)
-                        , type_ : ElmSyntaxTypeInfer.Type
-                        }
-                }
-        }
-    ->
-        { variablesFromWithinDeclarationInScope : FastSet.Set String
-        , moduleInfo :
-            FastDict.Dict
-                {- module origin -} String
-                { portsIncoming : FastSet.Set String
-                , portsOutgoing : FastSet.Set String
-                , valueAndFunctionAnnotations :
-                    FastDict.Dict
-                        String
-                        ElmSyntaxTypeInfer.Type
-                , typeAliases :
-                    FastDict.Dict
-                        String
-                        { parameters : List String
-                        , recordFieldOrder : Maybe (List String)
-                        , type_ : ElmSyntaxTypeInfer.Type
-                        }
-                }
-        }
-expressionContextAddVariablesInScope additionalVariablesInScope context =
-    { moduleInfo = context.moduleInfo
-    , variablesFromWithinDeclarationInScope =
-        FastSet.union
-            additionalVariablesInScope
-            context.variablesFromWithinDeclarationInScope
-    }
-
-
 expression :
     { variablesFromWithinDeclarationInScope : FastSet.Set String
     , moduleInfo :
@@ -6041,6 +5995,7 @@ expression :
                     , type_ : ElmSyntaxTypeInfer.Type
                     }
             }
+    , path : List String
     }
     ->
         ElmSyntaxTypeInfer.TypedNode
@@ -6088,17 +6043,12 @@ expression context expressionTypedNode =
         ElmSyntaxTypeInfer.ExpressionRecordAccessFunction fieldName ->
             case expressionTypedNode.type_ of
                 ElmSyntaxTypeInfer.TypeNotVariable (ElmSyntaxTypeInfer.TypeFunction typeFunction) ->
-                    let
-                        recordVariableName : String
-                        recordVariableName =
-                            "generated_record"
-                    in
                     Ok
                         { statements = []
                         , result =
                             SwiftExpressionLambda
                                 { parameters =
-                                    [ { name = recordVariableName
+                                    [ { name = generatedAccessedRecordVariableName
                                       , type_ = typeFunction.input |> type_
                                       }
                                     ]
@@ -6108,7 +6058,7 @@ expression context expressionTypedNode =
                                         { record =
                                             SwiftExpressionReference
                                                 { moduleOrigin = Nothing
-                                                , name = recordVariableName
+                                                , name = generatedAccessedRecordVariableName
                                                 }
                                         , field =
                                             fieldName
@@ -6158,11 +6108,36 @@ expression context expressionTypedNode =
                                 )
                     }
                 )
-                (call.called |> expression context)
-                (call.argument0 |> expression context)
+                (call.called
+                    |> expression
+                        { moduleInfo = context.moduleInfo
+                        , variablesFromWithinDeclarationInScope =
+                            context.variablesFromWithinDeclarationInScope
+                        , path = "called" :: context.path
+                        }
+                )
+                (call.argument0
+                    |> expression
+                        { moduleInfo = context.moduleInfo
+                        , variablesFromWithinDeclarationInScope =
+                            context.variablesFromWithinDeclarationInScope
+                        , path = "argument0" :: context.path
+                        }
+                )
                 (call.argument1Up
+                    |> List.indexedMap (\index argument -> ( index + 1, argument ))
                     |> listMapAndCombineOk
-                        (\argument -> argument |> expression context)
+                        (\( argumentIndex, argument ) ->
+                            argument
+                                |> expression
+                                    { moduleInfo = context.moduleInfo
+                                    , variablesFromWithinDeclarationInScope =
+                                        context.variablesFromWithinDeclarationInScope
+                                    , path =
+                                        ("argument" ++ (argumentIndex |> String.fromInt))
+                                            :: context.path
+                                    }
+                        )
                 )
 
         ElmSyntaxTypeInfer.ExpressionInfixOperation infixOperation ->
@@ -6180,8 +6155,22 @@ expression context expressionTypedNode =
                                     }
                             }
                         )
-                        (infixOperation.left |> expression context)
-                        (infixOperation.right |> expression context)
+                        (infixOperation.left
+                            |> expression
+                                { moduleInfo = context.moduleInfo
+                                , variablesFromWithinDeclarationInScope =
+                                    context.variablesFromWithinDeclarationInScope
+                                , path = "left" :: context.path
+                                }
+                        )
+                        (infixOperation.right
+                            |> expression
+                                { moduleInfo = context.moduleInfo
+                                , variablesFromWithinDeclarationInScope =
+                                    context.variablesFromWithinDeclarationInScope
+                                , path = "right" :: context.path
+                                }
+                        )
 
                 "<|" ->
                     Result.map2
@@ -6196,8 +6185,22 @@ expression context expressionTypedNode =
                                     }
                             }
                         )
-                        (infixOperation.left |> expression context)
-                        (infixOperation.right |> expression context)
+                        (infixOperation.left
+                            |> expression
+                                { moduleInfo = context.moduleInfo
+                                , variablesFromWithinDeclarationInScope =
+                                    context.variablesFromWithinDeclarationInScope
+                                , path = "left" :: context.path
+                                }
+                        )
+                        (infixOperation.right
+                            |> expression
+                                { moduleInfo = context.moduleInfo
+                                , variablesFromWithinDeclarationInScope =
+                                    context.variablesFromWithinDeclarationInScope
+                                , path = "right" :: context.path
+                                }
+                        )
 
                 "++" ->
                     Result.map2
@@ -6234,8 +6237,22 @@ expression context expressionTypedNode =
                                         }
                             }
                         )
-                        (infixOperation.left |> expression context)
-                        (infixOperation.right |> expression context)
+                        (infixOperation.left
+                            |> expression
+                                { moduleInfo = context.moduleInfo
+                                , variablesFromWithinDeclarationInScope =
+                                    context.variablesFromWithinDeclarationInScope
+                                , path = "left" :: context.path
+                                }
+                        )
+                        (infixOperation.right
+                            |> expression
+                                { moduleInfo = context.moduleInfo
+                                , variablesFromWithinDeclarationInScope =
+                                    context.variablesFromWithinDeclarationInScope
+                                , path = "right" :: context.path
+                                }
+                        )
 
                 _ ->
                     Result.map3
@@ -6257,8 +6274,22 @@ expression context expressionTypedNode =
                         (expressionOperatorToSwiftFunctionReference
                             infixOperation.operator
                         )
-                        (infixOperation.left |> expression context)
-                        (infixOperation.right |> expression context)
+                        (infixOperation.left
+                            |> expression
+                                { moduleInfo = context.moduleInfo
+                                , variablesFromWithinDeclarationInScope =
+                                    context.variablesFromWithinDeclarationInScope
+                                , path = "left" :: context.path
+                                }
+                        )
+                        (infixOperation.right
+                            |> expression
+                                { moduleInfo = context.moduleInfo
+                                , variablesFromWithinDeclarationInScope =
+                                    context.variablesFromWithinDeclarationInScope
+                                , path = "right" :: context.path
+                                }
+                        )
 
         ElmSyntaxTypeInfer.ExpressionReferenceVariant reference ->
             let
@@ -6294,8 +6325,8 @@ expression context expressionTypedNode =
                             let
                                 generatedValueParameterName : Int -> String
                                 generatedValueParameterName valueIndex =
-                                    "generated_"
-                                        ++ (valueIndex |> String.fromInt)
+                                    ("generated_" ++ (valueIndex |> String.fromInt) ++ "_")
+                                        ++ (context.path |> String.join "_")
                             in
                             (valueType0 :: valueType1Up)
                                 |> List.indexedMap
@@ -6368,7 +6399,7 @@ expression context expressionTypedNode =
                                 , result =
                                     List.map2
                                         (\fieldName fieldType ->
-                                            { parameterName = fieldValueParameterName fieldName
+                                            { name = fieldValueParameterName fieldName
                                             , type_ = fieldType
                                             }
                                         )
@@ -6378,7 +6409,7 @@ expression context expressionTypedNode =
                                             (\parameter resultSoFar ->
                                                 SwiftExpressionLambda
                                                     { parameters =
-                                                        [ { name = parameter.parameterName
+                                                        [ { name = parameter.name
                                                           , type_ = parameter.type_
                                                           }
                                                         ]
@@ -6550,9 +6581,30 @@ expression context expressionTypedNode =
                             }
                     }
                 )
-                (ifThenElse.condition |> expression context)
-                (ifThenElse.onTrue |> expression context)
-                (ifThenElse.onFalse |> expression context)
+                (ifThenElse.condition
+                    |> expression
+                        { moduleInfo = context.moduleInfo
+                        , variablesFromWithinDeclarationInScope =
+                            context.variablesFromWithinDeclarationInScope
+                        , path = "condition" :: context.path
+                        }
+                )
+                (ifThenElse.onTrue
+                    |> expression
+                        { moduleInfo = context.moduleInfo
+                        , variablesFromWithinDeclarationInScope =
+                            context.variablesFromWithinDeclarationInScope
+                        , path = "onTrue" :: context.path
+                        }
+                )
+                (ifThenElse.onFalse
+                    |> expression
+                        { moduleInfo = context.moduleInfo
+                        , variablesFromWithinDeclarationInScope =
+                            context.variablesFromWithinDeclarationInScope
+                        , path = "onFalse" :: context.path
+                        }
+                )
 
         ElmSyntaxTypeInfer.ExpressionParenthesized inParens ->
             inParens |> expression context
@@ -6596,8 +6648,22 @@ expression context expressionTypedNode =
                             }
                     }
                 )
-                (parts.part0 |> expression context)
-                (parts.part1 |> expression context)
+                (parts.part0
+                    |> expression
+                        { moduleInfo = context.moduleInfo
+                        , variablesFromWithinDeclarationInScope =
+                            context.variablesFromWithinDeclarationInScope
+                        , path = "part0" :: context.path
+                        }
+                )
+                (parts.part1
+                    |> expression
+                        { moduleInfo = context.moduleInfo
+                        , variablesFromWithinDeclarationInScope =
+                            context.variablesFromWithinDeclarationInScope
+                        , path = "part1" :: context.path
+                        }
+                )
 
         ElmSyntaxTypeInfer.ExpressionTriple parts ->
             Result.map3
@@ -6614,9 +6680,30 @@ expression context expressionTypedNode =
                             }
                     }
                 )
-                (parts.part0 |> expression context)
-                (parts.part1 |> expression context)
-                (parts.part2 |> expression context)
+                (parts.part0
+                    |> expression
+                        { moduleInfo = context.moduleInfo
+                        , variablesFromWithinDeclarationInScope =
+                            context.variablesFromWithinDeclarationInScope
+                        , path = "part0" :: context.path
+                        }
+                )
+                (parts.part1
+                    |> expression
+                        { moduleInfo = context.moduleInfo
+                        , variablesFromWithinDeclarationInScope =
+                            context.variablesFromWithinDeclarationInScope
+                        , path = "part1" :: context.path
+                        }
+                )
+                (parts.part2
+                    |> expression
+                        { moduleInfo = context.moduleInfo
+                        , variablesFromWithinDeclarationInScope =
+                            context.variablesFromWithinDeclarationInScope
+                        , path = "part2" :: context.path
+                        }
+                )
 
         ElmSyntaxTypeInfer.ExpressionList elementNodes ->
             Result.map
@@ -6630,8 +6717,17 @@ expression context expressionTypedNode =
                     }
                 )
                 (elementNodes
+                    |> List.indexedMap Tuple.pair
                     |> listMapAndCombineOk
-                        (\element -> element |> expression context)
+                        (\( elementIndex, element ) ->
+                            element
+                                |> expression
+                                    { moduleInfo = context.moduleInfo
+                                    , variablesFromWithinDeclarationInScope =
+                                        context.variablesFromWithinDeclarationInScope
+                                    , path = (elementIndex |> String.fromInt) :: context.path
+                                    }
+                        )
                 )
 
         ElmSyntaxTypeInfer.ExpressionRecord fieldNodes ->
@@ -6661,7 +6757,14 @@ expression context expressionTypedNode =
                                     , fieldValue
                                     )
                                 )
-                                (field.value |> expression context)
+                                (field.value
+                                    |> expression
+                                        { moduleInfo = context.moduleInfo
+                                        , variablesFromWithinDeclarationInScope =
+                                            context.variablesFromWithinDeclarationInScope
+                                        , path = field.name :: context.path
+                                        }
+                                )
                         )
                 )
 
@@ -6702,7 +6805,14 @@ expression context expressionTypedNode =
                                     , fieldValue
                                     )
                                 )
-                                (field.value |> expression context)
+                                (field.value
+                                    |> expression
+                                        { moduleInfo = context.moduleInfo
+                                        , variablesFromWithinDeclarationInScope =
+                                            context.variablesFromWithinDeclarationInScope
+                                        , path = field.name :: context.path
+                                        }
+                                )
                         )
                 )
 
@@ -6719,7 +6829,8 @@ expression context expressionTypedNode =
 
                 parameterNameForIndex : Int -> String
                 parameterNameForIndex parameterIndex =
-                    "generated_" ++ (parameterIndex |> String.fromInt)
+                    ("generated_" ++ (parameterIndex |> String.fromInt) ++ "_")
+                        ++ (context.path |> String.join "_")
             in
             Result.map
                 (\result ->
@@ -6780,6 +6891,7 @@ expression context expressionTypedNode =
                                             |> listMapToFastSetsAndUnify .introducedVariables
                                         )
                                     )
+                        , path = "result" :: context.path
                         }
                 )
 
@@ -6787,7 +6899,7 @@ expression context expressionTypedNode =
             let
                 switchLocalResultVariableToInitialize : String
                 switchLocalResultVariableToInitialize =
-                    generatedLocalReturnResult
+                    generatedLocalReturnResult context.path
             in
             Result.map3
                 (\matched case0 case1Up ->
@@ -6806,21 +6918,44 @@ expression context expressionTypedNode =
                             }
                     }
                 )
-                (caseOf.matched |> expression context)
+                (caseOf.matched
+                    |> expression
+                        { moduleInfo = context.moduleInfo
+                        , variablesFromWithinDeclarationInScope =
+                            context.variablesFromWithinDeclarationInScope
+                        , path = "matched" :: context.path
+                        }
+                )
                 ({ pattern = caseOf.case0.pattern
                  , result = caseOf.case0.result
                  , localResultVariableToInitialize = switchLocalResultVariableToInitialize
                  }
-                    |> case_ context
+                    |> case_
+                        { moduleInfo = context.moduleInfo
+                        , variablesFromWithinDeclarationInScope =
+                            context.variablesFromWithinDeclarationInScope
+                        , path = "case0" :: context.path
+                        }
                 )
                 (caseOf.case1Up
+                    |> List.indexedMap
+                        (\laterCaseIndex laterCase ->
+                            ( laterCaseIndex + 1, laterCase )
+                        )
                     |> listMapAndCombineOk
-                        (\laterCase ->
+                        (\( caseIndex, laterCase ) ->
                             { pattern = laterCase.pattern
                             , result = laterCase.result
                             , localResultVariableToInitialize = switchLocalResultVariableToInitialize
                             }
-                                |> case_ context
+                                |> case_
+                                    { moduleInfo = context.moduleInfo
+                                    , variablesFromWithinDeclarationInScope =
+                                        context.variablesFromWithinDeclarationInScope
+                                    , path =
+                                        ("case" ++ (caseIndex |> String.fromInt))
+                                            :: context.path
+                                    }
                         )
                 )
 
@@ -6848,6 +6983,7 @@ expression context expressionTypedNode =
                 (\declaration0 declaration1Up result ->
                     -- TODO cleaner would be bubbling the declarations
                     -- up as statements but we cant guarantee no name clashes
+                    -- so we need to prefix all declarations and their uses with context.path
                     { statements = []
                     , result =
                         SwiftExpressionCall
@@ -6866,29 +7002,49 @@ expression context expressionTypedNode =
                 )
                 (letIn.declaration0.declaration
                     |> letDeclaration
-                        (context
-                            |> expressionContextAddVariablesInScope
-                                variablesForWholeLetIn
-                        )
+                        { moduleInfo = context.moduleInfo
+                        , variablesFromWithinDeclarationInScope =
+                            context.variablesFromWithinDeclarationInScope
+                                |> FastSet.union
+                                    variablesForWholeLetIn
+                        , path = "declaration0" :: context.path
+                        }
                 )
                 (letIn.declaration1Up
+                    |> List.indexedMap
+                        (\laterIndex laterDeclaration ->
+                            ( laterIndex + 1, laterDeclaration )
+                        )
                     |> listMapAndCombineOk
-                        (\letDecl ->
+                        (\( letDeclarationIndex, letDecl ) ->
                             letDecl.declaration
                                 |> letDeclaration
-                                    (context
-                                        |> expressionContextAddVariablesInScope
-                                            variablesForWholeLetIn
-                                    )
+                                    { moduleInfo = context.moduleInfo
+                                    , variablesFromWithinDeclarationInScope =
+                                        context.variablesFromWithinDeclarationInScope
+                                            |> FastSet.union
+                                                variablesForWholeLetIn
+                                    , path =
+                                        ("letDeclaration" ++ (letDeclarationIndex |> String.fromInt))
+                                            :: context.path
+                                    }
                         )
                 )
                 (letIn.result
                     |> expression
-                        (context
-                            |> expressionContextAddVariablesInScope
-                                variablesForWholeLetIn
-                        )
+                        { moduleInfo = context.moduleInfo
+                        , variablesFromWithinDeclarationInScope =
+                            context.variablesFromWithinDeclarationInScope
+                                |> FastSet.union
+                                    variablesForWholeLetIn
+                        , path = "letResult" :: context.path
+                        }
                 )
+
+
+generatedAccessedRecordVariableName : String
+generatedAccessedRecordVariableName =
+    "generated_record"
 
 
 okResultSwiftExpressionUnitStatementsEmpty :
@@ -7299,6 +7455,7 @@ case_ :
                     , type_ : ElmSyntaxTypeInfer.Type
                     }
             }
+    , path : List String
     }
     ->
         { pattern :
@@ -7340,10 +7497,13 @@ case_ context syntaxCase =
         )
         (syntaxCase.result
             |> expression
-                (context
-                    |> expressionContextAddVariablesInScope
-                        casePattern.introducedVariables
-                )
+                { moduleInfo = context.moduleInfo
+                , variablesFromWithinDeclarationInScope =
+                    context.variablesFromWithinDeclarationInScope
+                        |> FastSet.union
+                            casePattern.introducedVariables
+                , path = "caseResult" :: context.path
+                }
         )
 
 
@@ -7366,6 +7526,7 @@ letDeclaration :
                     , type_ : ElmSyntaxTypeInfer.Type
                     }
             }
+    , path : List String
     }
     -> ElmSyntaxTypeInfer.LetDeclaration
     ->
@@ -7393,13 +7554,18 @@ letDeclaration context syntaxLetDeclaration =
                                     destructuringPattern.variableAsPatternAliases
                            )
                 )
-                (letDestructuring.expression |> expression context)
+                (letDestructuring.expression
+                    |> expression
+                        { moduleInfo = context.moduleInfo
+                        , variablesFromWithinDeclarationInScope =
+                            context.variablesFromWithinDeclarationInScope
+                        , path = "destructuredExpression" :: context.path
+                        }
+                )
 
         ElmSyntaxTypeInfer.LetValueOrFunctionDeclaration letValueOrFunction ->
             Result.map
-                (\declaration ->
-                    [ SwiftStatementLetDeclarationValueOrFunction declaration ]
-                )
+                (\declaration -> [ declaration ])
                 (letValueOrFunction
                     |> letValueOrFunctionDeclaration context
                 )
@@ -7424,6 +7590,7 @@ letValueOrFunctionDeclaration :
                     , type_ : ElmSyntaxTypeInfer.Type
                     }
             }
+    , path : List String
     }
     ->
         { signature :
@@ -7439,29 +7606,35 @@ letValueOrFunctionDeclaration :
         , result : ElmSyntaxTypeInfer.TypedNode ElmSyntaxTypeInfer.Expression
         , type_ : ElmSyntaxTypeInfer.Type
         }
-    ->
-        Result
-            String
-            { name : String
-            , parameters : List { name : String, type_ : SwiftType }
-            , statements : List SwiftStatement
-            , result : SwiftExpression
-            , resultType : SwiftType
-            }
+    -> Result String SwiftStatement
 letValueOrFunctionDeclaration context syntaxLetDeclarationValueOrFunction =
     case syntaxLetDeclarationValueOrFunction.parameters of
         [] ->
             Result.map
                 (\result ->
-                    { name =
-                        syntaxLetDeclarationValueOrFunction.name
-                            |> variableNameDisambiguateFromSwiftKeywords
-                    , parameters = []
-                    , statements = result.statements
-                    , result = result.result
-                    , resultType =
-                        syntaxLetDeclarationValueOrFunction.type_ |> type_
-                    }
+                    SwiftStatementLetDeclaration
+                        { name =
+                            syntaxLetDeclarationValueOrFunction.name
+                                |> variableNameDisambiguateFromSwiftKeywords
+                        , result =
+                            case result.statements of
+                                [] ->
+                                    result.result
+
+                                statement0 :: statement1Up ->
+                                    -- TODO preferably lift to parent level
+                                    SwiftExpressionCall
+                                        { called =
+                                            SwiftExpressionLambda
+                                                { parameters = []
+                                                , statements = statement0 :: statement1Up
+                                                , result = result.result
+                                                }
+                                        , arguments = []
+                                        }
+                        , resultType =
+                            syntaxLetDeclarationValueOrFunction.type_ |> type_
+                        }
                 )
                 (syntaxLetDeclarationValueOrFunction.result
                     |> expression context
@@ -7488,71 +7661,76 @@ letValueOrFunctionDeclaration context syntaxLetDeclarationValueOrFunction =
                     let
                         parameterNameForIndex : Int -> String
                         parameterNameForIndex parameterIndex =
-                            "generated_" ++ (parameterIndex |> String.fromInt)
+                            ("generated_" ++ (parameterIndex |> String.fromInt) ++ "_")
+                                ++ (context.path |> String.join "_")
                     in
-                    { name =
-                        syntaxLetDeclarationValueOrFunction.name
-                            |> variableNameDisambiguateFromSwiftKeywords
-                    , parameters =
-                        [ { name = parameterNameForIndex 0
-                          , type_ = parameter0TypedPattern.type_
-                          }
-                        ]
-                    , statements =
-                        result.statements
-                            |> swiftStatementsPrependLetDeclarationsForVariableAsPatternAliases
-                                (parameterTypedPatterns
-                                    |> listMapToFastDictsAndUnify .variableAsPatternAliases
-                                    |> FastDict.union
-                                        (parameterTypedPatterns
-                                            |> List.indexedMap
-                                                (\parameterIndex parameter ->
-                                                    ( parameterNameForIndex parameterIndex
-                                                    , parameter.pattern
+                    SwiftStatementFuncDeclaration
+                        { name =
+                            syntaxLetDeclarationValueOrFunction.name
+                                |> variableNameDisambiguateFromSwiftKeywords
+                        , parameters =
+                            [ { name = parameterNameForIndex 0
+                              , type_ = parameter0TypedPattern.type_
+                              }
+                            ]
+                        , statements =
+                            result.statements
+                                |> swiftStatementsPrependLetDeclarationsForVariableAsPatternAliases
+                                    (parameterTypedPatterns
+                                        |> listMapToFastDictsAndUnify .variableAsPatternAliases
+                                        |> FastDict.union
+                                            (parameterTypedPatterns
+                                                |> List.indexedMap
+                                                    (\parameterIndex parameter ->
+                                                        ( parameterNameForIndex parameterIndex
+                                                        , parameter.pattern
+                                                        )
                                                     )
-                                                )
-                                            |> FastDict.fromList
-                                        )
-                                )
-                    , result =
-                        parameter1UpTypedPatterns
-                            |> List.indexedMap
-                                (\parameterIndex parameter ->
-                                    { index = parameterIndex + 1, type_ = parameter.type_ }
-                                )
-                            |> List.foldr
-                                (\parameter resultSoFar ->
-                                    SwiftExpressionLambda
-                                        { parameters =
-                                            [ { name = parameterNameForIndex parameter.index
-                                              , type_ = parameter.type_
-                                              }
-                                            ]
-                                        , statements = []
-                                        , result = resultSoFar
-                                        }
-                                )
-                                result.result
-                    , resultType =
-                        parameter1UpTypedPatterns
-                            |> List.foldr
-                                (\parameter outputTypeSoFar ->
-                                    SwiftTypeFunction
-                                        { input = parameter.type_
-                                        , output = outputTypeSoFar
-                                        }
-                                )
-                                (syntaxLetDeclarationValueOrFunction.result.type_ |> type_)
-                    }
+                                                |> FastDict.fromList
+                                            )
+                                    )
+                        , result =
+                            parameter1UpTypedPatterns
+                                |> List.indexedMap
+                                    (\parameterIndex parameter ->
+                                        { index = parameterIndex + 1, type_ = parameter.type_ }
+                                    )
+                                |> List.foldr
+                                    (\parameter resultSoFar ->
+                                        SwiftExpressionLambda
+                                            { parameters =
+                                                [ { name = parameterNameForIndex parameter.index
+                                                  , type_ = parameter.type_
+                                                  }
+                                                ]
+                                            , statements = []
+                                            , result = resultSoFar
+                                            }
+                                    )
+                                    result.result
+                        , resultType =
+                            parameter1UpTypedPatterns
+                                |> List.foldr
+                                    (\parameter outputTypeSoFar ->
+                                        SwiftTypeFunction
+                                            { input = parameter.type_
+                                            , output = outputTypeSoFar
+                                            }
+                                    )
+                                    (syntaxLetDeclarationValueOrFunction.result.type_ |> type_)
+                        }
                 )
                 (syntaxLetDeclarationValueOrFunction.result
                     |> expression
-                        (context
-                            |> expressionContextAddVariablesInScope
-                                (parameterTypedPatterns
-                                    |> listMapToFastSetsAndUnify .introducedVariables
-                                )
-                        )
+                        { moduleInfo = context.moduleInfo
+                        , variablesFromWithinDeclarationInScope =
+                            context.variablesFromWithinDeclarationInScope
+                                |> FastSet.union
+                                    (parameterTypedPatterns
+                                        |> listMapToFastSetsAndUnify .introducedVariables
+                                    )
+                        , path = "letDeclarationResult" :: context.path
+                        }
                 )
 
 
@@ -8082,7 +8260,7 @@ swiftTypeContainedVariables swiftType =
                 (typeFunction.output |> swiftTypeContainedVariables)
 
 
-printSwiftLocalLetValueOrFunctionDeclaration :
+printSwiftLocalFuncDeclaration :
     { name : String
     , parameters : List { name : String, type_ : SwiftType }
     , statements : List SwiftStatement
@@ -8090,123 +8268,124 @@ printSwiftLocalLetValueOrFunctionDeclaration :
     , resultType : SwiftType
     }
     -> Print
-printSwiftLocalLetValueOrFunctionDeclaration swiftValueOrFunctionDeclaration =
+printSwiftLocalFuncDeclaration swiftValueOrFunctionDeclaration =
     -- TODO are generics necessary/allowed
     let
         resultTypePrint : Print
         resultTypePrint =
             printSwiftTypeNotParenthesized TypeOutgoing
                 swiftValueOrFunctionDeclaration.resultType
-    in
-    case swiftValueOrFunctionDeclaration.parameters of
-        parameter0 :: parameter1Up ->
-            let
-                parameterPrints : List Print
-                parameterPrints =
-                    (parameter0 :: parameter1Up)
-                        |> List.map
-                            (\parameter ->
-                                let
-                                    parameterTypePrint : Print
-                                    parameterTypePrint =
-                                        printSwiftTypeNotParenthesized TypeIncoming
-                                            parameter.type_
-                                in
-                                printParenthesized
-                                    (Print.exactly ("_ " ++ parameter.name)
-                                        |> Print.followedBy printExactlyColon
-                                        |> Print.followedBy
-                                            (Print.withIndentAtNextMultipleOf4
-                                                (Print.spaceOrLinebreakIndented
-                                                    (parameterTypePrint |> Print.lineSpread)
-                                                    |> Print.followedBy
-                                                        parameterTypePrint
-                                                )
-                                            )
-                                    )
-                            )
 
-                headerLineSpread : Print.LineSpread
-                headerLineSpread =
-                    resultTypePrint
-                        |> Print.lineSpread
-                        |> Print.lineSpreadMergeWith
-                            (\() ->
-                                parameterPrints
-                                    |> Print.lineSpreadListMapAndCombine
-                                        Print.lineSpread
-                            )
-            in
-            Print.exactly
-                ("func " ++ swiftValueOrFunctionDeclaration.name)
-                |> Print.followedBy
-                    (Print.withIndentIncreasedBy 4
-                        (parameterPrints
-                            |> Print.listMapAndIntersperseAndFlatten
-                                (\parameterPrint ->
-                                    Print.spaceOrLinebreakIndented headerLineSpread
-                                        |> Print.followedBy parameterPrint
-                                )
-                                Print.empty
-                            |> Print.followedBy
-                                (Print.spaceOrLinebreakIndented headerLineSpread)
-                            |> Print.followedBy printExactlyMinusGreaterThanSpace
-                            |> Print.followedBy
-                                (Print.withIndentIncreasedBy 3
-                                    resultTypePrint
-                                )
-                            |> Print.followedBy printExactlySpaceCurlyOpening
-                            |> Print.followedBy
-                                (case swiftValueOrFunctionDeclaration.statements of
-                                    [] ->
-                                        printSwiftExpressionNotParenthesized
-                                            swiftValueOrFunctionDeclaration.result
-
-                                    statement0 :: statement1Up ->
-                                        printSwiftStatements
-                                            (statement0 :: statement1Up)
-                                            |> Print.followedBy Print.linebreakIndented
+        parameterPrints : List Print
+        parameterPrints =
+            swiftValueOrFunctionDeclaration.parameters
+                |> List.map
+                    (\parameter ->
+                        let
+                            parameterTypePrint : Print
+                            parameterTypePrint =
+                                printSwiftTypeNotParenthesized TypeIncoming
+                                    parameter.type_
+                        in
+                        printParenthesized
+                            (Print.exactly ("_ " ++ parameter.name)
+                                |> Print.followedBy printExactlyColon
+                                |> Print.followedBy
+                                    (Print.withIndentAtNextMultipleOf4
+                                        (Print.spaceOrLinebreakIndented
+                                            (parameterTypePrint |> Print.lineSpread)
                                             |> Print.followedBy
-                                                (printSwiftReturn
-                                                    swiftValueOrFunctionDeclaration.result
-                                                )
-                                )
-                        )
+                                                parameterTypePrint
+                                        )
+                                    )
+                            )
                     )
-                |> Print.followedBy Print.linebreakIndented
-                |> Print.followedBy printExactlyCurlyClosing
 
-        [] ->
-            Print.exactly
-                ("let " ++ swiftValueOrFunctionDeclaration.name)
-                |> Print.followedBy
-                    (Print.withIndentAtNextMultipleOf4
-                        ((printExactlyColon
-                            |> Print.followedBy
-                                (Print.withIndentAtNextMultipleOf4
-                                    (Print.spaceOrLinebreakIndented
-                                        (resultTypePrint |> Print.lineSpread)
-                                        |> Print.followedBy resultTypePrint
-                                    )
-                                )
-                         )
-                            |> Print.followedBy printExactlySpaceEqualsLinebreakIndented
-                            |> Print.followedBy
-                                (printSwiftExpressionParenthesizedIfSpaceSeparated
-                                    -- TODO preferably lift to parent level
-                                    (SwiftExpressionCall
-                                        { called =
-                                            SwiftExpressionLambda
-                                                { parameters = []
-                                                , statements = swiftValueOrFunctionDeclaration.statements
-                                                , result = swiftValueOrFunctionDeclaration.result
-                                                }
-                                        , arguments = [ swiftExpressionUnit ]
-                                        }
-                                    )
-                                )
-                        )
+        headerLineSpread : Print.LineSpread
+        headerLineSpread =
+            resultTypePrint
+                |> Print.lineSpread
+                |> Print.lineSpreadMergeWith
+                    (\() ->
+                        parameterPrints
+                            |> Print.lineSpreadListMapAndCombine
+                                Print.lineSpread
                     )
+    in
+    Print.exactly
+        ("func " ++ swiftValueOrFunctionDeclaration.name)
+        |> Print.followedBy
+            (Print.withIndentIncreasedBy 4
+                (parameterPrints
+                    |> Print.listMapAndIntersperseAndFlatten
+                        (\parameterPrint ->
+                            Print.spaceOrLinebreakIndented headerLineSpread
+                                |> Print.followedBy parameterPrint
+                        )
+                        Print.empty
+                    |> Print.followedBy
+                        (Print.spaceOrLinebreakIndented headerLineSpread)
+                    |> Print.followedBy printExactlyMinusGreaterThanSpace
+                    |> Print.followedBy
+                        (Print.withIndentIncreasedBy 3
+                            resultTypePrint
+                        )
+                    |> Print.followedBy printExactlySpaceCurlyOpening
+                    |> Print.followedBy
+                        (case swiftValueOrFunctionDeclaration.statements of
+                            [] ->
+                                printSwiftExpressionNotParenthesized
+                                    swiftValueOrFunctionDeclaration.result
+
+                            statement0 :: statement1Up ->
+                                printSwiftStatements
+                                    (statement0 :: statement1Up)
+                                    |> Print.followedBy Print.linebreakIndented
+                                    |> Print.followedBy
+                                        (printSwiftReturn
+                                            swiftValueOrFunctionDeclaration.result
+                                        )
+                        )
+                )
+            )
+        |> Print.followedBy Print.linebreakIndented
+        |> Print.followedBy printExactlyCurlyClosing
+
+
+printSwiftLocalLetDeclaration :
+    { name : String
+    , result : SwiftExpression
+    , resultType : SwiftType
+    }
+    -> Print
+printSwiftLocalLetDeclaration swiftLetDeclaration =
+    let
+        resultTypePrint : Print
+        resultTypePrint =
+            printSwiftTypeNotParenthesized TypeOutgoing
+                swiftLetDeclaration.resultType
+    in
+    -- TODO are generics necessary/allowed
+    Print.exactly
+        ("let " ++ swiftLetDeclaration.name)
+        |> Print.followedBy
+            (Print.withIndentAtNextMultipleOf4
+                ((printExactlyColon
+                    |> Print.followedBy
+                        (Print.withIndentAtNextMultipleOf4
+                            (Print.spaceOrLinebreakIndented
+                                (resultTypePrint |> Print.lineSpread)
+                                |> Print.followedBy resultTypePrint
+                            )
+                        )
+                 )
+                    |> Print.followedBy printExactlySpaceEqualsLinebreakIndented
+                    |> Print.followedBy
+                        (printSwiftExpressionParenthesizedIfSpaceSeparated
+                            swiftLetDeclaration.result
+                        )
+                )
+            )
 
 
 printExactlySpaceEqualsLinebreakIndented : Print
@@ -10572,9 +10751,10 @@ printSwiftPatternParenthesizedIfSpaceSeparated swiftPattern =
         notParenthesizedPrint
 
 
-generatedLocalReturnResult : String
-generatedLocalReturnResult =
-    "generated_localReturnResult"
+generatedLocalReturnResult : List String -> String
+generatedLocalReturnResult path =
+    "generated_localReturnResult_"
+        ++ (path |> String.join "_")
 
 
 printSwiftExpressionLambda :
@@ -10850,8 +11030,11 @@ printSwiftStatement swiftStatement =
         SwiftStatementLetDestructuring letDestructuring ->
             letDestructuring |> printSwiftLetDestructuring
 
-        SwiftStatementLetDeclarationValueOrFunction letValueOrFunction ->
-            letValueOrFunction |> printSwiftLocalLetValueOrFunctionDeclaration
+        SwiftStatementFuncDeclaration letValueOrFunction ->
+            letValueOrFunction |> printSwiftLocalFuncDeclaration
+
+        SwiftStatementLetDeclaration swiftLetDeclaration ->
+            swiftLetDeclaration |> printSwiftLocalLetDeclaration
 
         SwiftStatementLetValueDeclarationUninitialized letValueDeclarationUnassigned ->
             Print.exactly ("let " ++ letValueDeclarationUnassigned.name ++ ";")
@@ -10883,14 +11066,18 @@ printLinebreakIndentedLinebreakIndented =
 
 
 swiftStatementUsedLocalReferences : SwiftStatement -> FastSet.Set String
-swiftStatementUsedLocalReferences swiftLetDeclaration =
-    case swiftLetDeclaration of
+swiftStatementUsedLocalReferences swiftStatement =
+    case swiftStatement of
         SwiftStatementLetDestructuring swiftLetDestructuring ->
             swiftLetDestructuring.expression
                 |> swiftExpressionUsedLocalReferences
 
-        SwiftStatementLetDeclarationValueOrFunction swiftLetValueOrFunction ->
+        SwiftStatementFuncDeclaration swiftLetValueOrFunction ->
             swiftLetValueOrFunction.result
+                |> swiftExpressionUsedLocalReferences
+
+        SwiftStatementLetDeclaration swiftLetDeclaration ->
+            swiftLetDeclaration.result
                 |> swiftExpressionUsedLocalReferences
 
         SwiftStatementLetValueDeclarationUninitialized _ ->
