@@ -10941,10 +10941,9 @@ swiftStatementsPrependLetDeclarationsForVariableAsPatternAliases variableAsPatte
             (\variable aliasedPattern resultSoFar ->
                 -- TODO check if swift inference is good enough in all cases
                 SwiftStatementLetDestructuring
-                    { pattern = aliasedPattern
+                    { pattern = SwiftPatternVariable variable
                     , expression =
-                        SwiftExpressionReference
-                            { moduleOrigin = Nothing, name = variable }
+                        aliasedPattern |> swiftPatternAsExpression
                     }
                     :: resultSoFar
             )
