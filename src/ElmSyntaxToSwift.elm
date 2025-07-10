@@ -992,18 +992,21 @@ printSwiftTypeFunction position typeFunction =
                 "@Sendable @escaping "
 
             TypeOutgoing ->
-                -- TODO is Sendable necessary
-                "@Sendable "
+                -- TODO is "@Sendable " necessary?
+                ""
         )
         |> Print.followedBy
-            ((input0Print :: input1UpPrints)
-                ++ [ outputPrint ]
-                |> Print.listIntersperseAndFlatten
-                    (printExactlySpaceMinusGreaterThan
-                        |> Print.followedBy
-                            (Print.withIndentAtNextMultipleOf4
-                                (Print.spaceOrLinebreakIndented fullLineSpread)
+            (input0Print
+                |> Print.followedBy
+                    ((input1UpPrints ++ [ outputPrint ])
+                        |> Print.listMapAndIntersperseAndFlatten
+                            (\typePrint ->
+                                Print.spaceOrLinebreakIndented fullLineSpread
+                                    |> Print.followedBy printExactlyMinusGreaterThanSpace
+                                    |> Print.followedBy
+                                        (Print.withIndentIncreasedBy 3 typePrint)
                             )
+                            Print.empty
                     )
             )
 
@@ -8058,13 +8061,19 @@ printSwiftValueOrFunctionDeclaration swiftValueOrFunctionDeclaration =
                             |> Print.followedBy printExactlySpaceCurlyOpening
                             |> Print.followedBy Print.linebreakIndented
                             |> Print.followedBy
-                                (printSwiftStatements
-                                    swiftValueOrFunctionDeclaration.statements
-                                )
-                            |> Print.followedBy Print.linebreakIndented
-                            |> Print.followedBy
-                                (printSwiftReturn
-                                    swiftValueOrFunctionDeclaration.result
+                                (case swiftValueOrFunctionDeclaration.statements of
+                                    [] ->
+                                        printSwiftExpressionParenthesizedIfSpaceSeparated
+                                            swiftValueOrFunctionDeclaration.result
+
+                                    statement0 :: statement1Up ->
+                                        printSwiftStatements
+                                            (statement0 :: statement1Up)
+                                            |> Print.followedBy Print.linebreakIndented
+                                            |> Print.followedBy
+                                                (printSwiftReturn
+                                                    swiftValueOrFunctionDeclaration.result
+                                                )
                                 )
                         )
                     )
