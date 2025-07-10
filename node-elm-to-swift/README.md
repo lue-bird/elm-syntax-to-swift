@@ -1,7 +1,9 @@
 Transpile all elm modules in the current project
 (source-directories + dependencies)
-into a bundled `Sources/elm.swift` file that exposes every value/function declaration
-(e.g. `main_runOnString` for `Main.runOnString`)
+into a bundled `src/Elm.swift` file that exposes every value/function declaration
+(e.g. `Main_runOnString` for `Main.runOnString`)
+
+Be aware that no compile checks are performed before transpiling to swift
 
 
 ```bash
@@ -13,3 +15,5 @@ To instead run it once
 ```bash
 npm run start
 ```
+
+See also [how to use the transpiled output](https://github.com/lue-bird/elm-syntax-to-swift/tree/main#how-do-i-use-the-transpiled-output).

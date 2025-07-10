@@ -6,6 +6,7 @@ import Ansi.Font
 import Bytes exposing (Bytes)
 import Bytes.Decode
 import Bytes.Encode
+import Dict
 import Elm.Package
 import Elm.Parser
 import Elm.Project
@@ -24,7 +25,9 @@ import Node
 
 
 type State
-    = WaitingForElmJson
+    = WaitingForElmHomeDirectory
+    | WaitingForNodeHomeDirectoryBecauseElmHomeIsNotDefined
+    | WaitingForElmJson { elmHomeDirectory : String }
     | Running RunningState
     | ElmJsonReadFailed String
     | Finished (Result { code : String, message : String } ())
@@ -41,22 +44,44 @@ type alias RunningState =
 
 initialState : State
 initialState =
-    WaitingForElmJson
+    WaitingForElmHomeDirectory
 
 
-packageSourceDirectoryPath : { name : String, version : String } -> String
-packageSourceDirectoryPath packageMeta =
-    "/home/pascal/.elm/0.19.1/packages/"
-        ++ packageMeta.name
+packageSourceDirectoryPath :
+    { elmHomeDirectory : String, packageName : String, packageVersion : String }
+    -> String
+packageSourceDirectoryPath info =
+    info.elmHomeDirectory
+        ++ "/0.19.1/packages/"
+        ++ info.packageName
         ++ "/"
-        ++ packageMeta.version
+        ++ info.packageVersion
         ++ "/src"
 
 
 interface : State -> Node.Interface State
 interface state =
     case state of
-        WaitingForElmJson ->
+        WaitingForElmHomeDirectory ->
+            Node.environmentVariablesRequest
+                |> Node.interfaceFutureMap
+                    (\environmentVariables ->
+                        case environmentVariables |> Dict.get "ELM_HOME" of
+                            Just homeDirectory ->
+                                WaitingForElmJson { elmHomeDirectory = homeDirectory }
+
+                            Nothing ->
+                                WaitingForNodeHomeDirectoryBecauseElmHomeIsNotDefined
+                    )
+
+        WaitingForNodeHomeDirectoryBecauseElmHomeIsNotDefined ->
+            Node.homeDirectoryPathRequest
+                |> Node.interfaceFutureMap
+                    (\homeDirectory ->
+                        WaitingForElmJson { elmHomeDirectory = homeDirectory ++ "/.elm" }
+                    )
+
+        WaitingForElmJson homeDirectory ->
             nodeElmJsonRequest
                 |> Node.interfaceFutureMap
                     (\elmJsonBytesOrError ->
@@ -73,23 +98,12 @@ interface state =
                                                     ++ ((application.depsDirect
                                                             ++ application.depsIndirect
                                                         )
-                                                            |> List.filter
-                                                                (\( dependencyName, _ ) ->
-                                                                    case dependencyName |> Elm.Package.toString of
-                                                                        "rtfeldman/elm-hex" ->
-                                                                            False
-
-                                                                        "stil4m/structured-writer" ->
-                                                                            False
-
-                                                                        _ ->
-                                                                            True
-                                                                )
                                                             |> List.map
                                                                 (\( dependencyName, dependencyVersion ) ->
                                                                     packageSourceDirectoryPath
-                                                                        { name = dependencyName |> Elm.Package.toString
-                                                                        , version = dependencyVersion |> Elm.Version.toString
+                                                                        { elmHomeDirectory = homeDirectory.elmHomeDirectory
+                                                                        , packageName = dependencyName |> Elm.Package.toString
+                                                                        , packageVersion = dependencyVersion |> Elm.Version.toString
                                                                         }
                                                                 )
                                                        )
@@ -111,11 +125,11 @@ interface state =
         Finished result ->
             case result of
                 Err error ->
-                    errorInterface "Failed to write the bundled code into Sources/elm.swift."
+                    errorInterface "Failed to write the bundled code into src/Elm.swift."
 
                 Ok () ->
                     Node.standardOutWrite
-                        "Successfully wrote the bundled code into Sources/elm.swift.\n"
+                        "Successfully wrote the bundled code into src/Elm.swift.\n"
 
         ElmJsonReadFailed elmJsonDecodeError ->
             errorInterface elmJsonDecodeError
@@ -165,23 +179,29 @@ runningInterface state =
         (state.sourceDirectoriesToRead |> FastSet.isEmpty)
             && (state.sourceFilesToRead |> FastSet.isEmpty)
       then
-        let transpiledDeclarationsAndErrors = state.parsedModules
+        let
+            transpiledDeclarationsAndErrors =
+                state.parsedModules
                     |> ElmSyntaxToSwift.modules
         in
-        [ Node.standardOutWrite (
-                (transpiledDeclarationsAndErrors.errors
-                |> List.filter (\error ->
-                    -- TODO remove filter for production use
-                    error /= "could not find module origin of the type reference Decoder"
-                    && error /= "could not find module origin of the type reference Value"
-                )
-                |> String.join "\n")
-                ++ "\n")
+        [ Node.standardOutWrite
+            ((transpiledDeclarationsAndErrors.errors
+                |> String.join "\n"
+             )
+                ++ "\n"
+            )
         , Node.fileWrite
-            { path = "Sources/elm.swift"
+            { path = "src/Elm.swift"
             , content =
                 transpiledDeclarationsAndErrors.declarations
-                    |> ElmSyntaxToSwift.swiftDeclarationsToFileString
+                    |> ElmSyntaxToSwift.swiftDeclarationsToModuleString
+                    |> -- TODO remove for general use
+                       String.replace
+                        "ListExtra_uniqueHelp<'a>"
+                        "ListExtra_uniqueHelp<'a when 'a: equality>"
+                    |> String.replace
+                        "ListExtra_unique<'a>"
+                        "ListExtra_unique<'a when 'a: equality>"
                     |> Bytes.Encode.string
                     |> Bytes.Encode.encode
             }
@@ -216,23 +236,13 @@ runningInterface state =
                                                 |> FastSet.remove sourceDirectoryPath
                                         , sourceFilesToRead =
                                             subPaths
-                                                |> List.filter
+                                                |> List.filterMap
                                                     (\subPath ->
-                                                        (subPath |> String.endsWith ".elm")
-                                                            && -- TODO remove this filter for general use
-                                                               Basics.not
-                                                                ((sourceDirectoryPath |> String.contains "stil4m/elm-syntax")
-                                                                    && ((subPath |> String.contains "Elm/Writer")
-                                                                            || (subPath |> String.contains "Elm/Processing")
-                                                                            || (subPath |> String.contains "Elm/RawFile")
-                                                                            || (subPath |> String.contains "Elm/Parser")
-                                                                            || (subPath |> String.contains "ParserFast")
-                                                                            || (subPath |> String.contains "ParserWithComments")
-                                                                            || (subPath |> String.contains "Rope")
-                                                                            || (subPath |> String.contains "Elm/Interface")
-                                                                            || (subPath |> String.contains "Elm/Internal/RawFile")
-                                                                       )
-                                                                )
+                                                        if Basics.not (subPath |> String.endsWith ".elm") then
+                                                            Nothing
+
+                                                        else
+                                                            Just subPath
                                                     )
                                                 |> List.foldl
                                                     (\subPath soFar ->

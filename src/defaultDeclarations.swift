@@ -1,7 +1,13 @@
 import Foundation
 
-// using enum to create a namespace can't be instantiated or extend
+// using enum to create a namespace can't be instantiated
 public enum Elm {
+    public enum Basics_Order: Sendable {
+        case Basics_LT
+        case Basics_EQ
+        case Basics_GT
+    }
+
     // in theory Optional.none and Optional.some exist
     // and they even correctly say
     //     Optional<Optional<Int>>.none == Optional.some(Optional<Int>.none))
@@ -10,851 +16,1214 @@ public enum Elm {
     //   - both displayed as nil
     //   - Optional.some(x) has the same type as x (hand-wave)
     // I'm a bit worried about how shaky to use they might be though
-    public enum Maybe_Maybe<A: Sendable>: Sendable {
-        case Nothing
-        case Just(_ value: A)
+    public enum Maybe_Maybe<a: Sendable>: Sendable {
+        case Maybe_Nothing
+        case Maybe_Just(_ value: a)
     }
 
-    public indirect enum List_List<A: Sendable>: Sendable {
-        case Empty
-        case Cons(_ head: A, _ tail: List_List<A>)
+    // needed because
+    // swift Result type requires the error to be : Error
+    public enum Result_Result<error: Sendable, success: Sendable>: Sendable {
+        case Result_Err(error)
+        case Result_Ok(success)
     }
 
-    public enum Basics_Order: Sendable {
-        case LT
-        case EQ
-        case GT
+    // somewhat needed because
+    // swift array does not support pattern matching
+    public indirect enum List_List<a: Sendable>: Sendable {
+        case List_Empty
+        case List_Cons(_ head: a, _ tail: List_List<a>)
     }
 
-    static func debug_toString<A>(_ data: A) -> String {
+    public typealias Basics_Never = Never
+
+    static func Debug_toString<a>(_ data: a) -> String {
         String(reflecting: data)
     }
 
-    static func debug_log<A>(_ tag: String, _ data: A) -> A {
-        print(tag, data)
-        return data
+    static func Debug_log<a>(_ tag: String) -> (a) -> a {
+        { data in
+            print(tag, data)
+            return data
+        }
     }
 
-    static func debug_todo<A>(_ message: String) -> A {
+    static func Debug_todo<a>(_ message: String) -> a {
         fatalError("TODO " + message)
     }
 
-    static func basics_identity<A>(_ a: A) -> A {
+    static func Basics_identity<a>(_ a: a) -> a {
         a
     }
 
-    static func basics_always<Ignored, Kept>(_ kept: Kept, _: Ignored) -> Kept {
-        kept
+    static func Basics_always<Ignored, Kept>(_ kept: Kept) -> (Ignored) -> Kept {
+        { _ in kept }
     }
 
-    static func basics_not(_ bool: Bool) -> Bool {
+    static func Basics_never<a>(_: Never) -> a {
+    }
+
+    static func Basics_not(_ bool: Bool) -> Bool {
         !bool
     }
 
-    static func basics_or(_ a: Bool, _ b: Bool) -> Bool {
-        a || b
+    static func Basics_or(_ a: Bool) -> (Bool) -> Bool {
+        { b in a || b }
     }
 
-    static func basics_and(_ a: Bool, _ b: Bool) -> Bool {
-        a && b
+    static func Basics_and(_ a: Bool) -> (Bool) -> Bool {
+        { b in a && b }
     }
 
-    static func basics_eq<A>(_ a: A, _ b: A) -> Bool {
-        if let a = a as? AnyHashable,
-            let b = b as? AnyHashable
-        {
-            return a == b
-        } else {
-            fatalError("== on non-AnyHashable types")
-        }
-
+    static func Basics_eq<a: Equatable>(_ a: a) -> (a) -> Bool {
+        { b in a == b }
     }
-
-    static func basics_neq<A>(_ a: A, _ b: A) -> Bool {
-        guard let a = a as? AnyHashable,
-            let b = b as? AnyHashable
-        else { fatalError("== on non-AnyHashable types") }
-        return a != b
-    }
-
-    static func basics_lt(_ a: Double, _ b: Double) -> Bool {
-        a < b
-    }
-
-    static func basics_gt(_ a: Double, _ b: Double) -> Bool {
-        a > b
-    }
-
-    static func basics_le(_ a: Double, _ b: Double) -> Bool {
-        a <= b
-    }
-
-    static func basics_ge(_ a: Double, _ b: Double) -> Bool {
-        a >= b
-    }
-
-    static func basics_compare<A: Comparable>(_ a: A, _ b: A) -> Basics_Order {
-        if a < b {
-            .LT
-        } else if a > b {
-            .GT
-        } else {
-            .EQ
-        }
-    }
-
-    static func basics_compare<T: RawRepresentable>(_ a: T, _ b: T) -> Basics_Order
-    where T.RawValue: Comparable {
-        if a.rawValue < b.rawValue {
-            .LT
-        } else if a.rawValue > b.rawValue {
-            .GT
-        } else {
-            .EQ
-        }
-    }
-
-    static func basics_compare<A: Comparable>(_ aList: List_List<A>, _ bList: List_List<A>)
-        -> Basics_Order
-    {
-        switch (aList, bList) {
-        case (.Empty, .Empty): .EQ
-        case (.Empty, .Cons(_, _)): .LT
-        case (.Cons(_, _), .Empty): .GT
-        case let (.Cons(aHead, aTail), .Cons(bHead, bTail)):
-            if aHead < bHead {
-                .LT
-            } else if aHead > bHead {
-                .GT
+    static func Basics_eq<a>(_ a: a) -> (a) -> Bool {
+        { b in
+            if let a = a as? AnyHashable,
+                let b = b as? AnyHashable
+            {
+                a == b
             } else {
-                basics_compare(aTail, bTail)
+                fatalError("== on non-AnyHashable types")
             }
         }
     }
 
-    static func basics_min(_ a: Double, _ b: Double) -> Double {
-        Double.minimum(a, b)
+    static func Basics_neq<a: Equatable>(_ a: a) -> (a) -> Bool {
+        { b in a != b }
+    }
+    static func Basics_neq<a>(_ a: a) -> (a) -> Bool {
+        { b in
+            if let a = a as? AnyHashable,
+                let b = b as? AnyHashable
+            {
+                a != b
+            } else {
+                fatalError("/= on non-AnyHashable types")
+            }
+        }
     }
 
-    static func basics_max(_ a: Double, _ b: Double) -> Double {
-        Double.maximum(a, b)
+    static func Basics_lt<a: Comparable>(_ a: a) -> (a) -> Bool {
+        { b in a < b }
     }
 
-    static func basics_negate(_ float: Double) -> Double {
+    static func Basics_gt<a: Comparable>(_ a: a) -> (a) -> Bool {
+        { b in a > b }
+    }
+
+    static func Basics_le<a: Comparable>(_ a: a) -> (a) -> Bool {
+        { b in a <= b }
+    }
+
+    static func Basics_ge<a: Comparable>(_ a: a) -> (a) -> Bool {
+        { b in a >= b }
+    }
+
+    static func Basics_compare<a: Comparable>(_ a: a) -> (a) -> Basics_Order {
+        { b in
+            if a < b {
+                .Basics_LT
+            } else if a > b {
+                .Basics_GT
+            } else {
+                .Basics_EQ
+            }
+        }
+    }
+
+    // TODO is this overload necessary?
+    static func Basics_compare<comparable: RawRepresentable>(_ a: comparable) -> (comparable) ->
+        Basics_Order
+    where comparable.RawValue: Comparable {
+        { b in
+            if a.rawValue < b.rawValue {
+                .Basics_LT
+            } else if a.rawValue > b.rawValue {
+                .Basics_GT
+            } else {
+                .Basics_EQ
+            }
+        }
+    }
+
+    static func Basics_compare<a: Comparable>(_ aList: List_List<a>) -> (List_List<a>) ->
+        Basics_Order
+    {
+        { bList in
+            switch (aList, bList) {
+            case (.List_Empty, .List_Empty): .Basics_EQ
+            case (.List_Empty, .List_Cons(_, _)): .Basics_LT
+            case (.List_Cons(_, _), .List_Empty): .Basics_GT
+            case let (.List_Cons(aHead, aTail), .List_Cons(bHead, bTail)):
+                if aHead < bHead {
+                    .Basics_LT
+                } else if aHead > bHead {
+                    .Basics_GT
+                } else {
+                    Basics_compare(aTail)(bTail)
+                }
+            }
+        }
+    }
+
+    static func Basics_min<a: Comparable>(_ a: a) -> (a) -> a {
+        { b in if a < b { a } else { b } }
+    }
+
+    static func Basics_max<a: Comparable>(_ a: a) -> (a) -> a {
+        { b in if a > b { a } else { b } }
+    }
+
+    static func Basics_clamp(low: Double) -> (Double) -> (Double) -> Double {
+        { high in
+            { number in
+                if number < low { low } else if number > high { high } else { number }
+            }
+        }
+    }
+
+    static func Basics_negate(_ float: Double) -> Double {
         -float
     }
 
-    static func basics_abs(_ float: Double) -> Double {
+    static func Basics_abs(_ float: Double) -> Double {
         abs(float)
     }
 
-    static func basics_sqrt(_ float: Double) -> Double {
-        float.squareRoot()
-    }
-
-    static func basics_truncate(_ float: Double) -> Double {
+    static func Basics_truncate(_ float: Double) -> Double {
         float.rounded(.towardZero)
     }
 
-    static func basics_round(_ float: Double) -> Double {
+    static func Basics_round(_ float: Double) -> Double {
         float.rounded()
     }
 
-    static func basics_floor(_ float: Double) -> Double {
+    static func Basics_floor(_ float: Double) -> Double {
         float.rounded(.down)
     }
 
-    static func basics_ceiling(_ float: Double) -> Double {
+    static func Basics_ceiling(_ float: Double) -> Double {
         float.rounded(.up)
     }
 
-    static func basics_isInfinite(_ float: Double) -> Bool {
+    static func Basics_isInfinite(_ float: Double) -> Bool {
         float.isInfinite
     }
 
-    static func basics_isNaN(_ float: Double) -> Bool {
+    static func Basics_isNaN(_ float: Double) -> Bool {
         float.isNaN
     }
 
-    static func basics_add(_ a: Double, _ b: Double) -> Double {
-        a + b
+    static func Basics_add(_ a: Double) -> (Double) -> Double {
+        { b in a + b }
     }
 
-    static func basics_sub(_ base: Double, _ toSubtract: Double) -> Double {
-        base - toSubtract
+    static func Basics_sub(_ base: Double) -> (Double) -> Double {
+        { toSubtract in base - toSubtract }
     }
 
-    static func basics_mul(_ a: Double, _ b: Double) -> Double {
-        a * b
+    static func Basics_mul(_ a: Double) -> (Double) -> Double {
+        { b in a * b }
     }
 
-    static func basics_idiv(_ toDivide: Double, _ divisor: Double) -> Double {
-        (toDivide / divisor).rounded(.towardZero)
+    static func Basics_idiv(_ toDivide: Double) -> (Double) -> Double {
+        { divisor in (toDivide / divisor).rounded(.towardZero) }
     }
 
-    static func basics_fdiv(_ toDivide: Double, _ divisor: Double) -> Double {
-        toDivide / divisor
+    static func Basics_fdiv(_ toDivide: Double) -> (Double) -> Double {
+        { divisor in toDivide / divisor }
     }
 
-    static func basics_remainderBy(_ divisor: Double, _ toDivide: Double) -> Double {
-        toDivide.truncatingRemainder(dividingBy: divisor)
+    static func Basics_remainderBy(_ divisor: Double) -> (Double) -> Double {
+        { toDivide in toDivide.truncatingRemainder(dividingBy: divisor) }
     }
 
-    static func basics_modBy(_ divisor: Double, _ toDivide: Double) -> Double {
-        toDivide.remainder(dividingBy: divisor)
+    static func Basics_modBy(_ divisor: Double) -> (Double) -> Double {
+        { toDivide in toDivide.remainder(dividingBy: divisor) }
     }
 
-    static func basics_pow(_ base: Double, _ exponent: Double) -> Double {
-        pow(base, exponent)
+    static func Basics_pow(_ base: Double) -> (Double) -> Double {
+        { exponent in pow(base, exponent) }
+    }
+    static func Basics_logBase(_ base: Double) -> (Double) -> Double {
+        { float in log(float) / log(base) }
+    }
+    static func Basics_degrees(_ angleInDegrees: Double) -> Double {
+        (angleInDegrees * Double.pi) / 180
+    }
+    static func Basics_turns(_ angleInTurns: Double) -> Double {
+        angleInTurns * Double.pi * 2
+    }
+    static func Basics_fromPolar(_ polar: (Double, Double)) -> (Double, Double) {
+        let (radius, theta) = polar
+        return (radius * (cos(theta)), radius * (sin(theta)))
+    }
+    static func Basics_toPolar(_ coordinates: (Double, Double)) -> (Double, Double) {
+        let (x, y) = coordinates
+        return (sqrt((x * x) + (y * y)), atan2(y, x))
     }
 
-    static func char_toCode(_ char: Character) -> Double {
-        if let code = char.utf16.first {
-            Double(code)
-        } else {
-            Double.nan
-        }
+    static func Basics_atan2(_ y: Double) -> (Double) -> Double {
+        { x in atan2(y, x) }
     }
 
-    static func char_fromCode(_ charCode: Double) -> Character {
-        return if let scalar = UnicodeScalar(Int(charCode)) {
-            Character(scalar)
-        } else {
-            "\0"
-        }
+    static func Bitwise_complement(_ int: Double) -> Double {
+        Double(~(Int32(int)))
     }
-
-    static func char_isHexDigit(_ char: Character) -> Bool {
-        char.isHexDigit
+    static func Bitwise_and(_ a: Double) -> (Double) -> Double {
+        { b in Double(Int32(a) & Int32(b)) }
     }
-
-    static func char_toUpper(_ char: Character) -> Character {
-        if let uppercasedChar = char.uppercased().first {
-            uppercasedChar
-        } else {
-            "\0"
-        }
+    static func Bitwise_or(_ a: Double) -> (Double) -> Double {
+        { b in Double(Int32(a) | Int32(b)) }
     }
-
-    static func char_toLower(_ char: Character) -> Character {
-        if let lowercasedChar = char.lowercased().first {
-            lowercasedChar
-        } else {
-            "\0"
-        }
+    static func Bitwise_xor(_ a: Double) -> (Double) -> Double {
+        { b in Double(Int32(a) ^ Int32(b)) }
     }
-
-    static func string_fromChar(_ char: Character) -> String {
-        String(char)
+    static func Bitwise_shiftLeftBy(_ shifts: Double) -> (Double) -> Double {
+        { float in Double(Int32(float) << Int32(shifts)) }
     }
-
-    static func string_fromFloat(_ float: Double) -> String {
-        String(float)
+    static func Bitwise_shiftRightBy(_ shifts: Double) -> (Double) -> Double {
+        { float in Double(Int32(float) >> Int32(shifts)) }
     }
-
-    static func string_toInt(_ str: String) -> Maybe_Maybe<Double> {
-        if let parseResult = Int(str) {
-            .Just(Double(parseResult))
-        } else {
-            .Nothing
-        }
-    }
-
-    static func string_toFloat(_ str: String) -> Maybe_Maybe<Double> {
-        if let parseResult = Double(str) {
-            .Just(parseResult)
-        } else {
-            .Nothing
-        }
-    }
-
-    static func string_toList(_ str: String) -> List_List<Character> {
-        var chars: List_List<Character> = .Empty
-        for char in str.reversed() {
-            chars = .Cons(char, chars)
-        }
-        return chars
-    }
-
-    static func string_fromList(_ chars: List_List<Character>) -> String {
-        var remainingChars = chars
-        var stringBuffer = String()
-        while true {
-            switch remainingChars {
-            case .Empty:
-                return stringBuffer
-            case .Cons(let head, let tail):
-                stringBuffer.append(head)
-                remainingChars = tail
-            }
-        }
-    }
-
-    static func string_length(_ str: String) -> Double {
-        Double(str.utf16.count)
-    }
-
-    static func string_isEmpty(_ str: String) -> Bool {
-        str.isEmpty
-    }
-
-    static func string_cons(_ headChar: Character, _ tailString: String) -> String {
-        String(headChar) + tailString
-    }
-
-    static func string_append(_ earlier: String, _ later: String) -> String {
-        earlier + later
-    }
-
-    static func string_contains(_ sub: String, _ str: String) -> Bool {
-        str.contains(sub)
-    }
-
-    static func string_startsWith(_ start: String, _ str: String) -> Bool {
-        str.hasPrefix(start)
-    }
-
-    static func string_endsWith(_ end: String, _ str: String) -> Bool {
-        str.hasSuffix(end)
-    }
-
-    static func string_concat(_ segments: List_List<String>) -> String {
-        var remainingSegments = segments
-        var stringBuffer = String()
-        while true {
-            switch remainingSegments {
-            case .Empty:
-                return stringBuffer
-            case .Cons(let head, let tail):
-                stringBuffer.append(contentsOf: head)
-                remainingSegments = tail
-            }
-        }
-    }
-
-    static func string_join(_ inBetween: String, _ segments: List_List<String>) -> String {
-        switch segments {
-        case .Empty:
-            return ""
-        case .Cons(let headSegment, let tailSegments):
-            var remainingCharacters = tailSegments
-            var stringBuffer = String()
-            stringBuffer.append(contentsOf: headSegment)
-            while true {
-                switch remainingCharacters {
-                case .Empty:
-                    return stringBuffer
-                case .Cons(let head, let tail):
-                    stringBuffer.append(contentsOf: inBetween)
-                    stringBuffer.append(contentsOf: head)
-                    remainingCharacters = tail
-                }
-            }
-        }
-    }
-
-    static func string_reverse(_ str: String) -> String {
-        String(decoding: Array(str.utf16).reversed(), as: UTF16.self)
-    }
-
-    static func string_dropLeft(_ countToSkip: Double, _ str: String) -> String {
-        String(decoding: Array(str.utf16.dropFirst(Int(countToSkip))), as: UTF16.self)
-    }
-
-    static func string_dropRight(_ countToSkip: Double, _ str: String) -> String {
-        String(decoding: Array(str.utf16.dropLast(Int(countToSkip))), as: UTF16.self)
-    }
-
-    static func string_left(_ countToTake: Double, _ str: String) -> String {
-        String(decoding: Array(str.utf16.prefix(Int(countToTake))), as: UTF16.self)
-    }
-
-    static func string_right(_ countToTake: Double, _ str: String) -> String {
-        String(decoding: Array(str.utf16.suffix(Int(countToTake))), as: UTF16.self)
-    }
-
-    static func string_padRight(_ desiredLength: Double, _ padChar: String, _ str: String) -> String
-    {
-        str + String(repeating: padChar, count: Int(desiredLength) - str.utf16.count)
-    }
-
-    static func string_padLeft(_ desiredLength: Double, _ padChar: String, _ str: String) -> String
-    {
-        String(repeating: padChar, count: max(0, Int(desiredLength) - str.utf16.count)) + str
-    }
-
-    static func string_repeat(_ count: Double, _ segment: String) -> String {
-        String(repeating: segment, count: Int(count))
-    }
-
-    static func string_replace(_ toReplace: String, _ replacement: String, _ str: String) -> String
-    {
-        str.replacing(toReplace, with: replacement)
-    }
-
-    static func string_toLower(_ str: String) -> String {
-        str.lowercased()
-    }
-
-    static func string_toUpper(_ str: String) -> String {
-        str.uppercased()
-    }
-
-    static func string_trimLeft(_ str: String) -> String {
-        String(
-            str.trimmingPrefix(while: { character in
-                character.isWhitespace || character.isNewline
-            })
-        )
-    }
-
-    static func string_trimRight(_ str: String) -> String {
-        let startToRestoreAfterTrimming =
-            str.prefix(while: { character in
-                character.isWhitespace || character.isNewline
-            })
-        return String(startToRestoreAfterTrimming)
-            + String(str.trimmingCharacters(in: .whitespacesAndNewlines))
-    }
-
-    static func string_trim(_ str: String) -> String {
-        str.trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-
-    static func string_map(_ characterChange: (Character) -> Character, _ str: String) -> String {
-        String(str.map(characterChange))
-    }
-
-    static func string_filter(_ keepCharacter: (Character) -> Bool, _ str: String) -> String {
-        str.filter(keepCharacter)
-    }
-
-    static func string_lines(_ str: String) -> List_List<String> {
-        arrayToList_List(str.components(separatedBy: .newlines))
-    }
-
-    static func string_split(_ separator: String, _ str: String) -> List_List<String> {
-        arrayToList_List(str.split(separator: separator).map({ sub in String(sub) }))
-    }
-
-    static func string_all(_ isExpected: (Character) -> Bool, _ str: String) -> Bool {
-        str.allSatisfy(isExpected)
-    }
-
-    static func string_any(_ isOdd: (Character) -> Bool, _ str: String) -> Bool {
-        return str.contains(where: isOdd)
-    }
-
-    static func string_slice(_ start: Double, _ end: Double, _ str: String) -> String {
-        if start >= 0 && start + 1 == end {
-            return String(
-                str.utf16[
-                    str.utf16.index(
-                        str.utf16.startIndex, offsetBy: Int(start))
-                ])
-        } else {
-            // likely slow. Check, then find something faster
-            let realStartIndexInclusive =
-                if start >= 0 {
-                    Int(start)
-                } else {
-                    str.count + Int(start)
-                }
-            let realEndIndexExclusive =
-                if end >= 0 {
-                    Int(end)
-                } else {
-                    str.count + Int(end)
-                }
-            return String(
-                decoding: str.utf16[
-                    str.utf16.index(
-                        str.utf16.startIndex, offsetBy: realStartIndexInclusive
-                    )..<str.utf16.index(
-                        str.utf16.startIndex, offsetBy: realEndIndexExclusive
-                    )
-                ],
-                as: UTF16.self
+    static func Bitwise_shiftRightZfBy(_ shifts: Double) -> (Double) -> Double {
+        { float in
+            Double(
+                UInt32(bitPattern: Int32(float))
+                    >> UInt32(bitPattern: Int32(shifts))
             )
         }
     }
 
-    static func string_foldl<Folded>(
-        _ reduce: (Character, Folded) -> Folded,
-        _ initialFolded: Folded,
-        _ str: String
-    ) -> Folded {
-        str.reduce(
-            initialFolded,
-            { (soFar, char) in
-                reduce(char, soFar)
+    static func Char_toCode(_ char: UnicodeScalar) -> Double {
+        Double(char.value)
+    }
+
+    static func Char_fromCode(_ charCode: Double) -> UnicodeScalar {
+        return if let scalar = UnicodeScalar(Int(charCode)) {
+            scalar
+        } else {
+            "\0"
+        }
+    }
+
+    static func Char_isHexDigit(_ char: UnicodeScalar) -> Bool {
+        (0x30 <= char.value && char.value <= 0x39)
+            || (0x41 <= char.value && char.value <= 0x46)
+            || (0x61 <= char.value && char.value <= 0x66)
+    }
+    static func Char_isDigit(_ char: UnicodeScalar) -> Bool {
+        char.value <= 0x39 && 0x30 <= char.value
+    }
+    static func Char_isUpper(_ char: UnicodeScalar) -> Bool {
+        char.value <= 0x5A && 0x41 <= char.value
+    }
+    static func Char_isLower(_ char: UnicodeScalar) -> Bool {
+        0x61 <= char.value && char.value <= 0x7A
+    }
+    static func Char_isAlpha(_ char: UnicodeScalar) -> Bool {
+        Char_isLower(char) || Char_isUpper(char)
+    }
+    static func Char_isAlphaNum(_ char: UnicodeScalar) -> Bool {
+        Char_isAlpha(char) || Char_isDigit(char)
+    }
+
+    static func Char_toUpper(_ char: UnicodeScalar) -> UnicodeScalar {
+        if let uppercasedChar = Character(char).uppercased().unicodeScalars.first {
+            uppercasedChar
+        } else {
+            char
+        }
+    }
+    static func Char_toLocaleUpper(_ char: UnicodeScalar) -> UnicodeScalar {
+        // Character does not have uppercased(with: Locale)
+        if let uppercasedChar = String(char).uppercased(with: Locale.current).unicodeScalars.first {
+            uppercasedChar
+        } else {
+            char
+        }
+    }
+
+    static func Char_toLower(_ char: UnicodeScalar) -> UnicodeScalar {
+        // Character does not have lowercased(with: Locale)
+        if let uppercasedChar = Character(char).lowercased().unicodeScalars.first {
+            uppercasedChar
+        } else {
+            char
+        }
+    }
+    static func Char_toLocaleLower(_ char: UnicodeScalar) -> UnicodeScalar {
+        if let uppercasedChar = String(char).lowercased(with: Locale.current).unicodeScalars.first {
+            uppercasedChar
+        } else {
+            char
+        }
+    }
+
+    static func String_fromChar(_ char: UnicodeScalar) -> String {
+        String(char)
+    }
+
+    static func String_fromFloat(_ float: Double) -> String {
+        String(float)
+    }
+
+    static func String_toInt(_ string: String) -> Maybe_Maybe<Double> {
+        switch Int64(string) {
+        case .some(let parseResult):
+            .Maybe_Just(Double(parseResult))
+        case .none:
+            .Maybe_Nothing
+        }
+    }
+
+    static func String_toFloat(_ string: String) -> Maybe_Maybe<Double> {
+        switch Double(string) {
+        case .some(let parseResult):
+            .Maybe_Just(parseResult)
+        case .none:
+            .Maybe_Nothing
+        }
+    }
+
+    static func String_toList(_ string: String) -> List_List<UnicodeScalar> {
+        var chars: List_List<UnicodeScalar> = .List_Empty
+        for char in string.unicodeScalars.reversed() {
+            chars = .List_Cons(char, chars)
+        }
+        return chars
+    }
+
+    static func String_fromList(_ chars: List_List<UnicodeScalar>) -> String {
+        var remainingChars = chars
+        var stringBuffer = String()
+        while case .List_Cons(let head, let tail) = remainingChars {
+            stringBuffer.append(Character(head))
+            remainingChars = tail
+        }
+        return stringBuffer
+    }
+
+    static func String_length(_ string: String) -> Double {
+        Double(string.utf16.count)
+    }
+
+    static func String_isEmpty(_ string: String) -> Bool {
+        string.isEmpty
+    }
+
+    static func String_cons(_ headChar: UnicodeScalar) -> (String) -> String {
+        { tailString in String(headChar) + tailString }
+    }
+
+    static func String_append(_ earlier: String) -> (String) -> String {
+        { later in earlier + later }
+    }
+
+    static func String_contains(_ sub: String) -> (String) -> Bool {
+        { string in string.contains(sub) }
+    }
+
+    static func String_startsWith(_ start: String) -> (String) -> Bool {
+        { string in string.hasPrefix(start) }
+    }
+
+    static func String_endsWith(_ end: String) -> (String) -> Bool {
+        { string in string.hasSuffix(end) }
+    }
+
+    static func String_concat(_ segments: List_List<String>) -> String {
+        var remainingSegments = segments
+        var stringBuffer = String()
+        while case .List_Cons(let head, let tail) = remainingSegments {
+            stringBuffer.append(contentsOf: head)
+            remainingSegments = tail
+        }
+        return stringBuffer
+    }
+
+    static func String_join(_ inBetween: String) -> (List_List<String>) -> String {
+        { segments in
+            switch segments {
+            case .List_Empty:
+                return ""
+            case .List_Cons(let headSegment, let tailSegments):
+                var remainingSegments = tailSegments
+                var stringBuffer = String()
+                stringBuffer.append(contentsOf: headSegment)
+                while case .List_Cons(let head, let tail) = remainingSegments {
+                    stringBuffer.append(contentsOf: inBetween)
+                    stringBuffer.append(contentsOf: head)
+                    remainingSegments = tail
+                }
+                return stringBuffer
             }
+        }
+    }
+
+    static func String_reverse(_ string: String) -> String {
+        String(decoding: Array(string.utf16).reversed(), as: UTF16.self)
+    }
+
+    static func String_dropLeft(_ countToSkip: Double) -> (String) -> String {
+        { string in
+            String(decoding: Array(string.utf16.dropFirst(Int(countToSkip))), as: UTF16.self)
+        }
+    }
+
+    static func String_dropRight(_ countToSkip: Double) -> (String) -> String {
+        { string in String(decoding: Array(string.utf16.dropLast(Int(countToSkip))), as: UTF16.self)
+        }
+    }
+
+    static func String_left(_ countToTake: Double) -> (String) -> String {
+        { string in String(decoding: Array(string.utf16.prefix(Int(countToTake))), as: UTF16.self)
+        }
+    }
+
+    static func String_right(_ countToTake: Double) -> (String) -> String {
+        { string in String(decoding: Array(string.utf16.suffix(Int(countToTake))), as: UTF16.self)
+        }
+    }
+
+    static func String_padRight(_ desiredLength: Double) -> (String) -> (String)
+        -> String
+    {
+        { padChar in
+            { string in
+                string + String(repeating: padChar, count: Int(desiredLength) - string.utf16.count)
+            }
+        }
+    }
+
+    static func String_padLeft(_ desiredLength: Double) -> (String) -> (String) -> String {
+        { string in
+            { padChar in
+                String(repeating: padChar, count: max(0, Int(desiredLength) - string.utf16.count))
+                    + string
+            }
+        }
+    }
+
+    static func String_repeat(_ count: Double) -> (String) -> String {
+        { segment in String(repeating: segment, count: Int(count)) }
+    }
+
+    static func String_replace(_ toReplace: String) -> (String) -> (String)
+        -> String
+    {
+        { replacement in { string in string.replacing(toReplace, with: replacement) } }
+    }
+
+    static func String_toLower(_ string: String) -> String {
+        string.lowercased()
+    }
+
+    static func String_toUpper(_ string: String) -> String {
+        string.uppercased()
+    }
+
+    static func String_trimLeft(_ string: String) -> String {
+        String(
+            string.trimmingPrefix(while: { character in
+                character.isWhitespace || character.isNewline
+            })
         )
     }
 
-    static func string_foldr<Folded>(
-        _ reduce: (Character, Folded) -> Folded,
-        _ initialFolded: Folded,
-        _ str: String
-    ) -> Folded {
-        str.reversed().reduce(
-            initialFolded,
-            { (soFar, char) in
-                reduce(char, soFar)
-            }
-        )
+    static func String_trimRight(_ string: String) -> String {
+        let startToRestoreAfterTrimming =
+            string.prefix(while: { character in
+                character.isWhitespace || character.isNewline
+            })
+        return startToRestoreAfterTrimming
+            + string.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    private static func arrayToList_List<A>(_ array: [A]) -> List_List<A> {
-        var soFar: List_List<A> = .Empty
+    static func String_trim(_ string: String) -> String {
+        string.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    static func String_map(_ characterChange: @escaping (UnicodeScalar) -> UnicodeScalar) -> (
+        String
+    ) -> String {
+        { string in
+            String(String.UnicodeScalarView(string.unicodeScalars.map(characterChange)))
+        }
+    }
+
+    static func String_filter(_ keepCharacter: @escaping (UnicodeScalar) -> Bool) -> (String) ->
+        String
+    {
+        { string in
+            String(String.UnicodeScalarView(string.unicodeScalars.filter(keepCharacter)))
+        }
+    }
+
+    static func String_lines(_ string: String) -> List_List<String> {
+        arrayToList_List(string.components(separatedBy: .newlines))
+    }
+
+    static func String_split(_ separator: String) -> (String) -> List_List<String> {
+        { string in
+            arrayToList_List(
+                string.split(separator: separator)
+                    .map({ sub in String(sub) }))
+        }
+    }
+
+    static func String_all(_ isExpected: @escaping (UnicodeScalar) -> Bool) -> (String) -> Bool {
+        { string in string.unicodeScalars.allSatisfy(isExpected) }
+    }
+
+    static func String_any(_ isOdd: @escaping (UnicodeScalar) -> Bool) -> (String) -> Bool {
+        { string in string.unicodeScalars.contains(where: isOdd) }
+    }
+
+    static func String_slice(_ start: Double) -> (Double) -> (String) -> String {
+        { end in
+            { string in
+                if (start >= 0) && (start + 1 == end) {
+                    return String(
+                        string.utf16[
+                            string.utf16.index(
+                                string.utf16.startIndex, offsetBy: Int(start))
+                        ])
+                } else {
+                    // likely slow. Check, then find something faster
+                    let realStartIndexInclusive: Int =
+                        if start >= 0 {
+                            Int(start)
+                        } else {
+                            string.count + Int(start)
+                        }
+                    let realEndIndexExclusive: Int =
+                        if end >= 0 {
+                            Int(end)
+                        } else {
+                            string.count + Int(end)
+                        }
+                    return String(
+                        decoding: string.utf16[
+                            string.utf16.index(
+                                string.utf16.startIndex, offsetBy: realStartIndexInclusive
+                            )..<string.utf16.index(
+                                string.utf16.startIndex, offsetBy: realEndIndexExclusive
+                            )
+                        ],
+                        as: UTF16.self
+                    )
+                }
+            }
+        }
+    }
+
+    static func String_foldl<Folded>(
+        _ reduce: @escaping (UnicodeScalar) -> (Folded) -> Folded
+    ) -> (Folded) -> (String) -> Folded {
+        { initialFolded in
+            { string in
+                string.unicodeScalars.reduce(
+                    initialFolded,
+                    { (soFar, char) in
+                        reduce(char)(soFar)
+                    }
+                )
+            }
+        }
+    }
+
+    static func String_foldr<Folded>(
+        _ reduce: @escaping (UnicodeScalar) -> (Folded) -> Folded
+    ) -> (Folded) -> (String) -> Folded {
+        { initialFolded in
+            { string in
+                string.unicodeScalars.reversed().reduce(
+                    initialFolded,
+                    { (soFar, char) in
+                        reduce(char)(soFar)
+                    }
+                )
+            }
+        }
+    }
+
+    static func Maybe_withDefault<a>(valueOnNothing: a) -> (Maybe_Maybe<a>) -> a {
+        { maybe in
+            switch maybe {
+            case .Maybe_Nothing: valueOnNothing
+            case .Maybe_Just(let value): value
+            }
+        }
+    }
+    static func Maybe_map<a, b>(valueChange: @escaping (a) -> b) -> (Maybe_Maybe<a>) ->
+        Maybe_Maybe<b>
+    {
+        { maybe in
+            switch maybe {
+            case .Maybe_Nothing: .Maybe_Nothing
+            case .Maybe_Just(let value): .Maybe_Just(valueChange(value))
+            }
+        }
+    }
+    static func Maybe_map2<a, b, combined>(valueCombine: @escaping (a) -> (b) -> combined)
+        -> (Maybe_Maybe<a>) -> (Maybe_Maybe<b>) -> Maybe_Maybe<combined>
+    {
+        { aMaybe in
+            { bMaybe in
+                switch aMaybe {
+                case .Maybe_Nothing: .Maybe_Nothing
+                case .Maybe_Just(let aValue):
+                    switch bMaybe {
+                    case .Maybe_Nothing: .Maybe_Nothing
+                    case .Maybe_Just(let bValue):
+                        .Maybe_Just(valueCombine(aValue)(bValue))
+                    }
+                }
+            }
+        }
+    }
+    static func Maybe_map3<a, b, c, combined>(valueCombine: @escaping (a) -> (b) -> (c) -> combined)
+        -> (Maybe_Maybe<a>) -> (Maybe_Maybe<b>) -> (Maybe_Maybe<c>) -> Maybe_Maybe<combined>
+    {
+        { aMaybe in
+            { bMaybe in
+                { cMaybe in
+                    switch aMaybe {
+                    case .Maybe_Nothing: .Maybe_Nothing
+                    case .Maybe_Just(let aValue):
+                        switch bMaybe {
+                        case .Maybe_Nothing: .Maybe_Nothing
+                        case .Maybe_Just(let bValue):
+                            switch cMaybe {
+                            case .Maybe_Nothing: .Maybe_Nothing
+                            case .Maybe_Just(let cValue):
+                                .Maybe_Just(valueCombine(aValue)(bValue)(cValue))
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    static func Maybe_map4<a, b, c, d, combined>(
+        valueCombine: @escaping (a) -> (b) -> (c) -> (d) -> combined
+    )
+        -> (Maybe_Maybe<a>) -> (Maybe_Maybe<b>) -> (Maybe_Maybe<c>) -> (Maybe_Maybe<d>) ->
+        Maybe_Maybe<combined>
+    {
+        { aMaybe in
+            { bMaybe in
+                { cMaybe in
+                    { dMaybe in
+                        switch aMaybe {
+                        case .Maybe_Nothing: .Maybe_Nothing
+                        case .Maybe_Just(let aValue):
+                            switch bMaybe {
+                            case .Maybe_Nothing: .Maybe_Nothing
+                            case .Maybe_Just(let bValue):
+                                switch cMaybe {
+                                case .Maybe_Nothing: .Maybe_Nothing
+                                case .Maybe_Just(let cValue):
+                                    switch dMaybe {
+                                    case .Maybe_Nothing: .Maybe_Nothing
+                                    case .Maybe_Just(let dValue):
+                                        .Maybe_Just(valueCombine(aValue)(bValue)(cValue)(dValue))
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    static func Maybe_map5<a, b, c, d, e, combined>(
+        valueCombine: @escaping (a) -> (b) -> (c) -> (d) -> (e) -> combined
+    )
+        -> (Maybe_Maybe<a>) -> (Maybe_Maybe<b>) -> (Maybe_Maybe<c>) -> (Maybe_Maybe<d>) -> (
+            Maybe_Maybe<e>
+        ) ->
+        Maybe_Maybe<combined>
+    {
+        { aMaybe in
+            { bMaybe in
+                { cMaybe in
+                    { dMaybe in
+                        { eMaybe in
+                            switch aMaybe {
+                            case .Maybe_Nothing: .Maybe_Nothing
+                            case .Maybe_Just(let aValue):
+                                switch bMaybe {
+                                case .Maybe_Nothing: .Maybe_Nothing
+                                case .Maybe_Just(let bValue):
+                                    switch cMaybe {
+                                    case .Maybe_Nothing: .Maybe_Nothing
+                                    case .Maybe_Just(let cValue):
+                                        switch dMaybe {
+                                        case .Maybe_Nothing: .Maybe_Nothing
+                                        case .Maybe_Just(let dValue):
+                                            switch eMaybe {
+                                            case .Maybe_Nothing: .Maybe_Nothing
+                                            case .Maybe_Just(let eValue):
+                                                .Maybe_Just(
+                                                    valueCombine(aValue)(bValue)(cValue)(dValue)(
+                                                        eValue)
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    static func Maybe_andThen<a, b>(valueToMaybe: @escaping (a) -> Maybe_Maybe<b>)
+        -> (Maybe_Maybe<a>) -> Maybe_Maybe<b>
+    {
+        { maybe in
+            switch maybe {
+            case .Maybe_Nothing: .Maybe_Nothing
+            case .Maybe_Just(let value): valueToMaybe(value)
+            }
+        }
+    }
+
+    private static func arrayToList_List<a>(_ array: [a]) -> List_List<a> {
+        var soFar: List_List<a> = .List_Empty
         for element in array.reversed() {
-            soFar = .Cons(element, soFar)
+            soFar = .List_Cons(element, soFar)
         }
         return soFar
     }
 
-    private static func list_ListToArray<A>(_ fullList: List_List<A>) -> [A] {
-        var soFar: [A] = Array()
+    private static func List_ListToArray<a>(_ fullList: List_List<a>) -> [a] {
+        var soFar: [a] = Array()
         var remainingList = fullList
         while true {
             switch remainingList {
-            case .Empty:
+            case .List_Empty:
                 return soFar
-            case .Cons(let remainingHead, let remainingTail):
+            case .List_Cons(let remainingHead, let remainingTail):
                 soFar.append(remainingHead)
                 remainingList = remainingTail
             }
         }
     }
 
-    static func list_singleton<A>(_ onlyElement: A) -> List_List<A> {
-        .Cons(onlyElement, .Empty)
+    static func List_singleton<a>(_ onlyElement: a) -> List_List<a> {
+        .List_Cons(onlyElement, .List_Empty)
     }
 
-    static func list_isEmpty<A>(_ list: List_List<A>) -> Bool {
+    static func List_cons<a>(_ newHead: a) -> (List_List<a>) -> List_List<a> {
+        { tail in List_List.List_Cons(newHead, tail) }
+    }
+
+    static func List_isEmpty<a>(_ list: List_List<a>) -> Bool {
         switch list {
-        case .Empty: true
-        case .Cons(_, _): false
+        case .List_Empty: true
+        case .List_Cons(_, _): false
         }
     }
 
-    static func list_length<A>(_ list: List_List<A>) -> Double {
-        list_foldl({ (_, soFar) in soFar + 1 }, 0, list)
+    static func List_head<a>(_ list: List_List<a>) -> Maybe_Maybe<a> {
+        switch list {
+        case .List_Empty: .Maybe_Nothing
+        case .List_Cons(let head, _): .Maybe_Just(head)
+        }
+    }
+    static func List_tail<a>(_ list: List_List<a>) -> Maybe_Maybe<List_List<a>> {
+        switch list {
+        case .List_Empty: .Maybe_Nothing
+        case .List_Cons(_, let tail): .Maybe_Just(tail)
+        }
     }
 
-    static func list_foldl<A, Folded>(
-        _ reduce: (A, Folded) -> Folded,
+    static func List_length<a>(_ list: List_List<a>) -> Double {
+        Double(List_foldl({ (_, soFar) in soFar + 1 }, 0, list))
+    }
+
+    private static func List_foldl<a, Folded>(
+        _ reduce: (a, Folded) -> Folded,
         _ initialFolded: Folded,
-        _ list: List_List<A>
+        _ list: List_List<a>
     ) -> Folded {
         var foldedSoFar = initialFolded
         var remainingList = list
         while true {
             switch remainingList {
-            case .Empty:
+            case .List_Empty:
                 return foldedSoFar
-            case .Cons(let head, let tail):
+            case .List_Cons(let head, let tail):
                 foldedSoFar = reduce(head, initialFolded)
                 remainingList = tail
             }
         }
     }
+    static func List_foldl<a, Folded>(
+        _ reduce: @escaping (a) -> (Folded) -> Folded
+    ) -> (Folded) -> (List_List<a>) -> Folded {
+        { initialFolded in
+            { list in
+                var foldedSoFar = initialFolded
+                var remainingList = list
+                while true {
+                    switch remainingList {
+                    case .List_Empty:
+                        return foldedSoFar
+                    case .List_Cons(let head, let tail):
+                        foldedSoFar = reduce(head)(foldedSoFar)
+                        remainingList = tail
+                    }
+                }
+            }
+        }
+    }
 
-    static func list_foldr<A, Folded>(
-        _ reduce: (A, Folded) -> Folded,
+    private static func List_foldr<a, Folded>(
+        _ reduce: (a, Folded) -> Folded,
         _ initialFolded: Folded,
-        _ list: List_List<A>
+        _ list: List_List<a>
     ) -> Folded {
-        list_foldl(reduce, initialFolded, list_reverse(list))
+        List_foldl(reduce, initialFolded, List_reverse(list))
+    }
+    static func List_foldr<a, Folded>(
+        _ reduce: @escaping (a) -> (Folded) -> Folded,
+    ) -> (Folded) -> (List_List<a>) -> Folded {
+        { initialFolded in { list in List_foldl(reduce)(initialFolded)(List_reverse(list)) } }
     }
 
-    static func list_reverse<A>(_ list: List_List<A>) -> List_List<A> {
-        list_foldl(List_List.Cons, .Empty, list)
+    static func List_reverse<a>(_ list: List_List<a>) -> List_List<a> {
+        List_foldl(List_List.List_Cons, .List_Empty, list)
     }
 
-    static func list_all<A>(_ isExpected: (A) -> Bool, _ list: List_List<A>) -> Bool {
-        var remainingList = list
-        while true {
-            switch remainingList {
-            case .Empty:
-                return true
-            case .Cons(let head, let tail):
+    static func List_all<a>(_ isExpected: @escaping (a) -> Bool) -> (List_List<a>) -> Bool {
+        { list in
+            var remainingList = list
+            while case .List_Cons(let head, let tail) = remainingList {
                 if !isExpected(head) {
                     return false
                 } else {
                     remainingList = tail
                 }
             }
+            return true
         }
     }
 
-    static func list_any<A>(_ isOdd: (A) -> Bool, _ list: List_List<A>) -> Bool {
-        var remainingList = list
-        while true {
-            switch remainingList {
-            case .Empty:
-                return false
-            case .Cons(let head, let tail):
+    static func List_any<a>(_ isOdd: @escaping (a) -> Bool) -> (List_List<a>) -> Bool {
+        { list in
+            var remainingList = list
+            while case .List_Cons(let head, let tail) = remainingList {
                 if isOdd(head) {
                     return true
                 } else {
                     remainingList = tail
                 }
             }
+            return false
         }
     }
 
-    static func list_member<A>(_ needle: (A), _ list: List_List<A>) -> Bool {
-        list_any({ element in basics_eq(element, needle) }, list)
+    static func List_member<a>(_ needle: (a)) -> (List_List<a>) -> Bool {
+        List_any({ element in Basics_eq(element)(needle) })
     }
 
-    static func list_drop<A>(_ countToSkip: Double, _ list: List_List<A>) -> List_List<A> {
-        var remainingCountToSkip = countToSkip
-        var remainingList = list
-        while remainingCountToSkip >= 1 {
-            switch remainingList {
-            case .Empty:
-                return remainingList
-            case .Cons(_, let tail):
-                remainingList = tail
-                remainingCountToSkip -= 1
+    static func List_drop<a>(_ countToSkip: Double) -> (List_List<a>) -> List_List<a> {
+        { list in
+            var remainingCountToSkip = countToSkip
+            var remainingList = list
+            while remainingCountToSkip >= 1 {
+                switch remainingList {
+                case .List_Empty:
+                    return remainingList
+                case .List_Cons(_, let tail):
+                    remainingList = tail
+                    remainingCountToSkip -= 1
+                }
+            }
+            return remainingList
+        }
+    }
+
+    static func List_take<a>(_ countToTake: Double) -> (List_List<a>) -> List_List<a> {
+        { list in
+            var remainingCountToTake = countToTake
+            var remainingList = list
+            var takenElementsArraySoFar: [a] = []
+            while remainingCountToTake >= 1 {
+                switch remainingList {
+                case .List_Empty:
+                    return arrayToList_List(takenElementsArraySoFar)
+                case .List_Cons(let head, let tail):
+                    takenElementsArraySoFar.append(head)
+                    remainingList = tail
+                    remainingCountToTake -= 1
+                }
+            }
+            return arrayToList_List(takenElementsArraySoFar)
+        }
+    }
+
+    static func List_intersperse<a>(_ inBetween: a) -> (List_List<a>) -> List_List<a> {
+        { list in
+            switch list {
+            case .List_Empty: .List_Empty
+            case .List_Cons(let head, let tail):
+                List_foldr(
+                    { (element, soFar) in
+                        .List_Cons(element, .List_Cons(inBetween, soFar))
+                    },
+                    List_singleton(head),
+                    tail
+                )
             }
         }
-        return remainingList
     }
 
-    static func list_take<A>(_ countToTake: Double, _ list: List_List<A>) -> List_List<A> {
-        var remainingCountToTake = countToTake
-        var remainingList = list
-        var takenElementsArraySoFar: [A] = []
-        while remainingCountToTake >= 1 {
-            switch remainingList {
-            case .Empty:
-                return arrayToList_List(takenElementsArraySoFar)
-            case .Cons(let head, let tail):
-                takenElementsArraySoFar.append(head)
-                remainingList = tail
-                remainingCountToTake -= 1
-            }
-        }
-        return arrayToList_List(takenElementsArraySoFar)
-    }
-
-    static func list_intersperse<A>(_ inBetween: A, _ list: List_List<A>) -> List_List<A> {
-        switch list {
-        case .Empty: .Empty
-        case .Cons(let head, let tail):
-            list_foldr(
+    static func List_map<a, b>(_ elementChange: @escaping (a) -> b) -> (List_List<a>)
+        -> List_List<b>
+    {
+        { list in
+            // TODO mutating version
+            List_foldr(
                 { (element, soFar) in
-                    .Cons(element, .Cons(inBetween, soFar))
+                    .List_Cons(elementChange(element), soFar)
+
                 },
-                list_singleton(head),
-                tail
+                .List_Empty,
+                list
             )
         }
     }
 
-    static func list_map<A, B>(_ elementChange: (A) -> B, _ list: List_List<A>) -> List_List<B> {
-        list_foldr(
-            { (element, soFar) in
-                .Cons(elementChange(element), soFar)
-            },
-            .Empty,
-            list
-        )
-    }
-
-    static func list_indexedMap<A, B>(
-        _ indexedElementChange: (Double, A) -> B,
-        _ list: List_List<A>
-    )
-        -> List_List<B>
-    {
-        list_foldr(
-            { (element, soFar: (index: Double, list: List_List<B>)) in
-                (
-                    index: soFar.index + 1,
-                    list: .Cons(indexedElementChange(soFar.index, element), soFar.list)
-                )
-            },
-            (index: list_length(list), list: .Empty),
-            list
-        ).list
-    }
-
-    static func list_map2<A, B, C>(
-        _ combineAb: (A, B) -> C,
-        _ aList: List_List<A>,
-        _ bList: List_List<B>
-    ) -> List_List<C> {
-        var remainingAList = aList
-        var remainingBList = bList
-        var combinedArraySoFar: [C] = []
-        while true {
-            switch (a: remainingAList, b: remainingBList) {
-            case (a: .Empty, b: .Empty):
-                return arrayToList_List(combinedArraySoFar)
-            case (a: .Empty, b: .Cons(_, _)):
-                return arrayToList_List(combinedArraySoFar)
-            case (a: .Cons(_, _), b: .Empty):
-                return arrayToList_List(combinedArraySoFar)
-            case (a: .Cons(let aHead, let aTail), b: .Cons(let bHead, let bTail)):
-                remainingAList = aTail
-                remainingBList = bTail
-                combinedArraySoFar.append(combineAb(aHead, bHead))
-            }
+    static func List_indexedMap<a, b>(
+        _ indexedElementChange: @escaping (Double) -> (a) -> b,
+    ) -> (List_List<a>) -> List_List<b> {
+        { list in
+            // TODO mutating version
+            List_foldr(
+                { (element, soFar: (index: Double, list: List_List<b>)) in
+                    (
+                        index: soFar.index + 1,
+                        list: .List_Cons(indexedElementChange(soFar.index)(element), soFar.list)
+                    )
+                },
+                (index: List_length(list), list: .List_Empty),
+                list
+            ).list
         }
     }
 
-    static func list_zip<A, B>(_ aList: List_List<A>, _ bList: List_List<B>)
-        -> List_List<(first: A, second: B)>
+    static func List_map2<a, b, c>(
+        _ combineAb: @escaping (a) -> (b) -> c,
+    ) -> (List_List<a>) -> (List_List<b>) -> List_List<c> {
+        { aList in
+            { bList in
+                var remainingAList = aList
+                var remainingBList = bList
+                var combinedArraySoFar: [c] = []
+                while case (
+                    a: .List_Cons(let aHead, let aTail), b: .List_Cons(let bHead, let bTail)
+                ) = (remainingAList, remainingBList) {
+                    remainingAList = aTail
+                    remainingBList = bTail
+                    combinedArraySoFar.append(combineAb(aHead)(bHead))
+                }
+                return arrayToList_List(combinedArraySoFar)
+            }
+        }
+    }
+    static func List_zip<a, b>(_ aList: List_List<a>) -> (List_List<b>)
+        -> List_List<(first: a, second: b)>
     {
-        list_map2({ (a, b) in (first: a, second: b) }, aList, bList)
+        { bList in List_map2({ a in { b in (first: a, second: b) } })(aList)(bList) }
     }
 
-    static func list_unzip<A, B>(_ abList: List_List<(first: A, second: B)>)
-        -> (first: List_List<A>, second: List_List<B>)
+    static func List_unzip<a, b>(_ abList: List_List<(first: a, second: b)>)
+        -> (first: List_List<a>, second: List_List<b>)
     {
         (
-            first: list_map({ ab in ab.first }, abList),
-            second: list_map({ ab in ab.second }, abList)
+            first: List_map({ ab in ab.first })(abList),
+            second: List_map({ ab in ab.second })(abList)
         )
     }
 
-    static func list_filter<A>(_ keepElement: (A) -> Bool, _ list: List_List<A>) -> List_List<A> {
-        list_foldr(
-            { (element, soFar) in
-                if keepElement(element) {
-                    soFar
-                } else {
-                    .Cons(element, soFar)
-                }
-            },
-            .Empty,
-            list
-        )
+    static func List_filter<a>(_ keepElement: @escaping (a) -> Bool) -> (List_List<a>) -> List_List<
+        a
+    > {
+        { list in
+            // TODO mutating version
+            List_foldr(
+                { (element, soFar) in
+                    if keepElement(element) {
+                        soFar
+                    } else {
+                        .List_Cons(element, soFar)
+                    }
+                },
+                .List_Empty,
+                list
+            )
+        }
     }
 
-    static func list_filterMap<A, B>(
-        _ element_toMaybe_Maybe: (A) -> Maybe_Maybe<B>,
-        _ list: List_List<A>
-    ) -> List_List<B> {
-        list_foldr(
-            { (element, soFar) in
-                switch element_toMaybe_Maybe(element) {
-                case .Nothing:
-                    soFar
-                case .Just(let value):
-                    .Cons(value, soFar)
-                }
-            },
-            .Empty,
-            list
-        )
+    static func List_filterMap<a, b>(
+        _ element_toMaybe_Maybe: @escaping (a) -> Maybe_Maybe<b>,
+    ) -> (List_List<a>) -> List_List<b> {
+        { list in
+            List_foldr(
+                { (element, soFar) in
+                    switch element_toMaybe_Maybe(element) {
+                    case .Maybe_Nothing:
+                        soFar
+                    case .Maybe_Just(let value):
+                        .List_Cons(value, soFar)
+                    }
+                },
+                .List_Empty,
+                list
+            )
+        }
     }
 
-    static func list_append<A>(_ earlier: List_List<A>, _ later: List_List<A>) -> List_List<A> {
-        list_foldr(
-            { (earlierElement, soFar) in
-                .Cons(earlierElement, soFar)
-            },
-            later,
-            earlier
-        )
+    static func List_append<a>(_ earlier: List_List<a>) -> (List_List<a>) -> List_List<a> {
+        { later in
+            // TODO mutating version
+            List_foldr(
+                { (earlierElement, soFar) in
+                    .List_Cons(earlierElement, soFar)
+                },
+                later,
+                earlier
+            )
+        }
     }
 
-    static func list_concatMap<A, B>(_ elementToList: (A) -> List_List<B>, _ list: List_List<A>)
-        -> List_List<B>
+    static func List_concatMap<a, b>(_ elementToList: @escaping (a) -> List_List<b>) -> (
+        List_List<a>
+    )
+        -> List_List<b>
     {
-        return list_foldr(
+        { list in
+            // TODO mutating version
+            List_foldr(
+                { (element, soFar) in
+                    List_append(elementToList(element))(soFar)
+                },
+                .List_Empty,
+                list
+            )
+        }
+    }
+
+    static func List_concat<a>(_ list: List_List<List_List<a>>) -> List_List<a> {
+        // TODO mutating versions
+        List_foldr(
             { (element, soFar) in
-                list_append(elementToList(element), soFar)
+                List_append(element)(soFar)
             },
-            .Empty,
+            .List_Empty,
             list
         )
     }
 
-    static func list_concat<A>(_ list: List_List<List_List<A>>) -> List_List<A> {
-        list_foldr(
-            { (element, soFar) in
-                list_append(element, soFar)
-            },
-            .Empty,
-            list
-        )
-    }
-
-    static func list_repeat<A>(_ count: Double, _ element: A) -> List_List<A> {
-        if count <= 0 {
-            return .Empty
-        } else {
-            var soFar = List_List<A>.Empty
-            for _ in 1...Int(count) {
-                soFar = .Cons(element, soFar)
+    static func List_repeat<a>(_ count: Double) -> (a) -> List_List<a> {
+        { element in
+            if count <= 0 {
+                return .List_Empty
+            } else {
+                var soFar = List_List<a>.List_Empty
+                for _ in 1...Int(count) {
+                    soFar = .List_Cons(element, soFar)
+                }
+                return soFar
             }
-            return soFar
         }
     }
 
-    static func list_range(_ start: Double, _ end: Double) -> List_List<Double> {
-        if start > end {
-            return .Empty
-        } else {
-            var soFar: List_List<Double> = .Empty
-            for i in (Int(end)...Int(start)).reversed() {
-                soFar = .Cons(Double(i), soFar)
+    static func List_range(_ start: Double) -> (Double) -> List_List<Double> {
+        { end in
+            if start > end {
+                return .List_Empty
+            } else {
+                var soFar: List_List<Double> = .List_Empty
+                for i in (Int(start)...Int(end)).reversed() {
+                    soFar = .List_Cons(Double(i), soFar)
+                }
+                return soFar
             }
-            return soFar
         }
     }
-    static func list_sum(_ list: List_List<Double>) -> Double {
-        list_foldl(basics_add, 0, list)
+    static func List_sum(_ list: List_List<Double>) -> Double {
+        var sumSoFar: Double = 0.0
+        var remainingList = list
+        while case .List_Cons(let head, let tail) = remainingList {
+            sumSoFar = sumSoFar + head
+            remainingList = tail
+        }
+        return sumSoFar
+    }
+    static func List_product(_ list: List_List<Double>) -> Double {
+        var productSoFar: Double = 1.0
+        var remainingList = list
+        while case .List_Cons(let head, let tail) = remainingList {
+            productSoFar = productSoFar * head
+            remainingList = tail
+        }
+        return productSoFar
     }
 
-    static func list_product(_ list: List_List<Double>) -> Double {
-        list_foldl(basics_mul, 1, list)
-    }
-
-    static func list_maximum(_ list: List_List<Double>) -> Maybe_Maybe<Double> {
+    static func List_maximum<a: Comparable>(_ list: List_List<a>) -> Maybe_Maybe<a> {
         return switch list {
-        case .Empty:
-            .Nothing
-        case .Cons(let head, let tail):
-            .Just(list_foldl(Double.maximum, head, tail))
+        case .List_Empty:
+            .Maybe_Nothing
+        case .List_Cons(let head, let tail):
+            .Maybe_Just(List_foldl(Basics_max)(head)(tail))
         }
     }
 
-    static func list_minimum(_ list: List_List<Double>) -> Maybe_Maybe<Double> {
+    static func List_minimum<a: Comparable>(_ list: List_List<a>) -> Maybe_Maybe<a> {
         return switch list {
-        case .Empty:
-            .Nothing
-        case .Cons(let head, let tail):
-            .Just(list_foldl(Double.minimum, head, tail))
+        case .List_Empty:
+            .Maybe_Nothing
+        case .List_Cons(let head, let tail):
+            .Maybe_Just(List_foldl(Basics_min)(head)(tail))
         }
     }
 
-    static func list_sortWith<A>(_ elementCompare: (A, A) -> Basics_Order, _ list: List_List<A>)
-        -> List_List<A>
+    static func List_sortWith<a>(_ elementCompare: @escaping (a) -> (a) -> Basics_Order)
+        -> (List_List<a>) -> List_List<a>
     {
-        var asArray = list_ListToArray(list)
-        asArray.sort(by: { (a, b) in elementCompare(a, b) == .LT })  // mutate
-        return arrayToList_List(asArray)
+        { list in
+            var asArray = List_ListToArray(list)
+            asArray.sort(by: { (a, b) in elementCompare(a)(b) == .Basics_LT })  // mutate
+            return arrayToList_List(asArray)
+        }
     }
 
-    static func list_sortBy<A, Comp>(_ elementToComparable: (A) -> Comp, _ list: List_List<A>)
-        -> List_List<A>
-    where Comp: Comparable {
-        var asArray = list_ListToArray(list)
-        asArray.sort(by: { (a, b) in elementToComparable(a) < elementToComparable(b) })  // mutate
-        return arrayToList_List(asArray)
+    static func List_sortBy<element, comparable>(
+        _ elementToComparable: @escaping (element) -> comparable
+    ) -> (List_List<element>) -> List_List<element>
+    where comparable: Comparable {
+        { list in
+            var asArray = List_ListToArray(list)
+            asArray.sort(by: { (a, b) in elementToComparable(a) < elementToComparable(b) })  // mutate
+            return arrayToList_List(asArray)
+        }
     }
 
-    static func list_sort<Comp>(_ list: List_List<Comp>)
-        -> List_List<Comp>
-    where Comp: Comparable {
-        var asArray = list_ListToArray(list)
+    static func List_sort<comparable>(_ list: List_List<comparable>)
+        -> List_List<comparable>
+    where comparable: Comparable {
+        var asArray = List_ListToArray(list)
         asArray.sort(by: { (a, b) in a < b })  // mutate
         return arrayToList_List(asArray)
     }
+
 }
