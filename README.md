@@ -75,6 +75,7 @@ TODO MERGE END
 -   elm-exploration/linear-algebra's `Vec2`, `Vec3`, `Vec4`, `Mat4` components have 64-bit precision but their swift counterparts only have 32
 -   dependencies cannot internally use the same module names as the transpiled project
 -   the resulting code might not be readable or even conventionally formatted and comments are not preserved
+-  on every web search you need to ignore -app -swiftui -ios -apple -xcode -taylor
 
 Please [report any issues](https://github.com/lue-bird/elm-syntax-to-swift/issues/new) you notice <3
 
