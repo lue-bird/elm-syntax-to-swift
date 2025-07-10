@@ -1,0 +1,4 @@
+module C {
+    header "c.h"
+    export *
+}
