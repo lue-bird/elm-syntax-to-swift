@@ -364,6 +364,10 @@ public enum Elm {
         String(char)
     }
 
+    public static func String_fromInt(_ int: Double) -> String {
+        String(Int64(int))
+    }
+
     public static func String_fromFloat(_ float: Double) -> String {
         String(float)
     }
