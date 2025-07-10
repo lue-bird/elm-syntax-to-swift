@@ -23,7 +23,7 @@ public enum Elm {
         ).replaceAll("\\", "\\\\")
         .replaceAll("\n    ", "\n")
         .slice(0, -2) //  drop the last \n}
-    + "\n\"\"\""
+    + "\"\"\""
 fs.writeFileSync(
     path.join(import.meta.dirname, "DefaultDeclarations.elm"),
     elmString,
