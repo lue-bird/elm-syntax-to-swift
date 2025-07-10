@@ -32,5 +32,8 @@ ElmjutsuDumMyM0DuL3.elm
 .vscode
 .editorconfig
 
+# not ready for release, yet
+example-transpile-itself
+
 
 .fake
