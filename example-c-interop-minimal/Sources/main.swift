@@ -1,3 +1,3 @@
 import C
 
-print(add(36, 6))
+print(Elm.Age_toString(Double(add(36, 6))))
