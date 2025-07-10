@@ -35,50 +35,48 @@ public enum Elm {
         case List_Cons(_ head: a, _ tail: List_List<a>)
     }
 
-    public typealias Basics_Never = Never
-
-    static func Debug_toString<a>(_ data: a) -> String {
+    public static func Debug_toString<a>(_ data: a) -> String {
         String(reflecting: data)
     }
 
-    static func Debug_log<a>(_ tag: String) -> (a) -> a {
+    public static func Debug_log<a>(_ tag: String) -> (a) -> a {
         { data in
             print(tag, data)
             return data
         }
     }
 
-    static func Debug_todo<a>(_ message: String) -> a {
+    public static func Debug_todo<a>(_ message: String) -> a {
         fatalError("TODO " + message)
     }
 
-    static func Basics_identity<a>(_ a: a) -> a {
+    public static func Basics_identity<a>(_ a: a) -> a {
         a
     }
 
-    static func Basics_always<Ignored, Kept>(_ kept: Kept) -> (Ignored) -> Kept {
+    public static func Basics_always<Ignored, Kept>(_ kept: Kept) -> (Ignored) -> Kept {
         { _ in kept }
     }
 
-    static func Basics_never<a>(_: Never) -> a {
+    public static func Basics_never<a>(_: Never) -> a {
     }
 
-    static func Basics_not(_ bool: Bool) -> Bool {
+    public static func Basics_not(_ bool: Bool) -> Bool {
         !bool
     }
 
-    static func Basics_or(_ a: Bool) -> (Bool) -> Bool {
+    public static func Basics_or(_ a: Bool) -> (Bool) -> Bool {
         { b in a || b }
     }
 
-    static func Basics_and(_ a: Bool) -> (Bool) -> Bool {
+    public static func Basics_and(_ a: Bool) -> (Bool) -> Bool {
         { b in a && b }
     }
 
-    static func Basics_eq<a: Equatable>(_ a: a) -> (a) -> Bool {
+    public static func Basics_eq<a: Equatable>(_ a: a) -> (a) -> Bool {
         { b in a == b }
     }
-    static func Basics_eq<a>(_ a: a) -> (a) -> Bool {
+    public static func Basics_eq<a>(_ a: a) -> (a) -> Bool {
         { b in
             if let a = a as? AnyHashable,
                 let b = b as? AnyHashable
@@ -90,10 +88,10 @@ public enum Elm {
         }
     }
 
-    static func Basics_neq<a: Equatable>(_ a: a) -> (a) -> Bool {
+    public static func Basics_neq<a: Equatable>(_ a: a) -> (a) -> Bool {
         { b in a != b }
     }
-    static func Basics_neq<a>(_ a: a) -> (a) -> Bool {
+    public static func Basics_neq<a>(_ a: a) -> (a) -> Bool {
         { b in
             if let a = a as? AnyHashable,
                 let b = b as? AnyHashable
@@ -105,23 +103,23 @@ public enum Elm {
         }
     }
 
-    static func Basics_lt<a: Comparable>(_ a: a) -> (a) -> Bool {
+    public static func Basics_lt<a: Comparable>(_ a: a) -> (a) -> Bool {
         { b in a < b }
     }
 
-    static func Basics_gt<a: Comparable>(_ a: a) -> (a) -> Bool {
+    public static func Basics_gt<a: Comparable>(_ a: a) -> (a) -> Bool {
         { b in a > b }
     }
 
-    static func Basics_le<a: Comparable>(_ a: a) -> (a) -> Bool {
+    public static func Basics_le<a: Comparable>(_ a: a) -> (a) -> Bool {
         { b in a <= b }
     }
 
-    static func Basics_ge<a: Comparable>(_ a: a) -> (a) -> Bool {
+    public static func Basics_ge<a: Comparable>(_ a: a) -> (a) -> Bool {
         { b in a >= b }
     }
 
-    static func Basics_compare<a: Comparable>(_ a: a) -> (a) -> Basics_Order {
+    public static func Basics_compare<a: Comparable>(_ a: a) -> (a) -> Basics_Order {
         { b in
             if a < b {
                 .Basics_LT
@@ -134,7 +132,8 @@ public enum Elm {
     }
 
     // TODO is this overload necessary?
-    static func Basics_compare<comparable: RawRepresentable>(_ a: comparable) -> (comparable) ->
+    public static func Basics_compare<comparable: RawRepresentable>(_ a: comparable) -> (comparable)
+        ->
         Basics_Order
     where comparable.RawValue: Comparable {
         { b in
@@ -148,7 +147,7 @@ public enum Elm {
         }
     }
 
-    static func Basics_compare<a: Comparable>(_ aList: List_List<a>) -> (List_List<a>) ->
+    public static func Basics_compare<a: Comparable>(_ aList: List_List<a>) -> (List_List<a>) ->
         Basics_Order
     {
         { bList in
@@ -168,15 +167,15 @@ public enum Elm {
         }
     }
 
-    static func Basics_min<a: Comparable>(_ a: a) -> (a) -> a {
+    public static func Basics_min<a: Comparable>(_ a: a) -> (a) -> a {
         { b in if a < b { a } else { b } }
     }
 
-    static func Basics_max<a: Comparable>(_ a: a) -> (a) -> a {
+    public static func Basics_max<a: Comparable>(_ a: a) -> (a) -> a {
         { b in if a > b { a } else { b } }
     }
 
-    static func Basics_clamp(low: Double) -> (Double) -> (Double) -> Double {
+    public static func Basics_clamp(low: Double) -> (Double) -> (Double) -> Double {
         { high in
             { number in
                 if number < low { low } else if number > high { high } else { number }
@@ -184,110 +183,110 @@ public enum Elm {
         }
     }
 
-    static func Basics_negate(_ float: Double) -> Double {
+    public static func Basics_negate(_ float: Double) -> Double {
         -float
     }
 
-    static func Basics_abs(_ float: Double) -> Double {
+    public static func Basics_abs(_ float: Double) -> Double {
         abs(float)
     }
 
-    static func Basics_truncate(_ float: Double) -> Double {
+    public static func Basics_truncate(_ float: Double) -> Double {
         float.rounded(.towardZero)
     }
 
-    static func Basics_round(_ float: Double) -> Double {
+    public static func Basics_round(_ float: Double) -> Double {
         float.rounded()
     }
 
-    static func Basics_floor(_ float: Double) -> Double {
+    public static func Basics_floor(_ float: Double) -> Double {
         float.rounded(.down)
     }
 
-    static func Basics_ceiling(_ float: Double) -> Double {
+    public static func Basics_ceiling(_ float: Double) -> Double {
         float.rounded(.up)
     }
 
-    static func Basics_isInfinite(_ float: Double) -> Bool {
+    public static func Basics_isInfinite(_ float: Double) -> Bool {
         float.isInfinite
     }
 
-    static func Basics_isNaN(_ float: Double) -> Bool {
+    public static func Basics_isNaN(_ float: Double) -> Bool {
         float.isNaN
     }
 
-    static func Basics_add(_ a: Double) -> (Double) -> Double {
+    public static func Basics_add(_ a: Double) -> (Double) -> Double {
         { b in a + b }
     }
 
-    static func Basics_sub(_ base: Double) -> (Double) -> Double {
+    public static func Basics_sub(_ base: Double) -> (Double) -> Double {
         { toSubtract in base - toSubtract }
     }
 
-    static func Basics_mul(_ a: Double) -> (Double) -> Double {
+    public static func Basics_mul(_ a: Double) -> (Double) -> Double {
         { b in a * b }
     }
 
-    static func Basics_idiv(_ toDivide: Double) -> (Double) -> Double {
+    public static func Basics_idiv(_ toDivide: Double) -> (Double) -> Double {
         { divisor in (toDivide / divisor).rounded(.towardZero) }
     }
 
-    static func Basics_fdiv(_ toDivide: Double) -> (Double) -> Double {
+    public static func Basics_fdiv(_ toDivide: Double) -> (Double) -> Double {
         { divisor in toDivide / divisor }
     }
 
-    static func Basics_remainderBy(_ divisor: Double) -> (Double) -> Double {
+    public static func Basics_remainderBy(_ divisor: Double) -> (Double) -> Double {
         { toDivide in toDivide.truncatingRemainder(dividingBy: divisor) }
     }
 
-    static func Basics_modBy(_ divisor: Double) -> (Double) -> Double {
+    public static func Basics_modBy(_ divisor: Double) -> (Double) -> Double {
         { toDivide in toDivide.remainder(dividingBy: divisor) }
     }
 
-    static func Basics_pow(_ base: Double) -> (Double) -> Double {
+    public static func Basics_pow(_ base: Double) -> (Double) -> Double {
         { exponent in pow(base, exponent) }
     }
-    static func Basics_logBase(_ base: Double) -> (Double) -> Double {
+    public static func Basics_logBase(_ base: Double) -> (Double) -> Double {
         { float in log(float) / log(base) }
     }
-    static func Basics_degrees(_ angleInDegrees: Double) -> Double {
+    public static func Basics_degrees(_ angleInDegrees: Double) -> Double {
         (angleInDegrees * Double.pi) / 180
     }
-    static func Basics_turns(_ angleInTurns: Double) -> Double {
+    public static func Basics_turns(_ angleInTurns: Double) -> Double {
         angleInTurns * Double.pi * 2
     }
-    static func Basics_fromPolar(_ polar: (Double, Double)) -> (Double, Double) {
+    public static func Basics_fromPolar(_ polar: (Double, Double)) -> (Double, Double) {
         let (radius, theta) = polar
         return (radius * (cos(theta)), radius * (sin(theta)))
     }
-    static func Basics_toPolar(_ coordinates: (Double, Double)) -> (Double, Double) {
+    public static func Basics_toPolar(_ coordinates: (Double, Double)) -> (Double, Double) {
         let (x, y) = coordinates
         return (sqrt((x * x) + (y * y)), atan2(y, x))
     }
 
-    static func Basics_atan2(_ y: Double) -> (Double) -> Double {
+    public static func Basics_atan2(_ y: Double) -> (Double) -> Double {
         { x in atan2(y, x) }
     }
 
-    static func Bitwise_complement(_ int: Double) -> Double {
+    public static func Bitwise_complement(_ int: Double) -> Double {
         Double(~(Int32(int)))
     }
-    static func Bitwise_and(_ a: Double) -> (Double) -> Double {
+    public static func Bitwise_and(_ a: Double) -> (Double) -> Double {
         { b in Double(Int32(a) & Int32(b)) }
     }
-    static func Bitwise_or(_ a: Double) -> (Double) -> Double {
+    public static func Bitwise_or(_ a: Double) -> (Double) -> Double {
         { b in Double(Int32(a) | Int32(b)) }
     }
-    static func Bitwise_xor(_ a: Double) -> (Double) -> Double {
+    public static func Bitwise_xor(_ a: Double) -> (Double) -> Double {
         { b in Double(Int32(a) ^ Int32(b)) }
     }
-    static func Bitwise_shiftLeftBy(_ shifts: Double) -> (Double) -> Double {
+    public static func Bitwise_shiftLeftBy(_ shifts: Double) -> (Double) -> Double {
         { float in Double(Int32(float) << Int32(shifts)) }
     }
-    static func Bitwise_shiftRightBy(_ shifts: Double) -> (Double) -> Double {
+    public static func Bitwise_shiftRightBy(_ shifts: Double) -> (Double) -> Double {
         { float in Double(Int32(float) >> Int32(shifts)) }
     }
-    static func Bitwise_shiftRightZfBy(_ shifts: Double) -> (Double) -> Double {
+    public static func Bitwise_shiftRightZfBy(_ shifts: Double) -> (Double) -> Double {
         { float in
             Double(
                 UInt32(bitPattern: Int32(float))
@@ -296,11 +295,11 @@ public enum Elm {
         }
     }
 
-    static func Char_toCode(_ char: UnicodeScalar) -> Double {
+    public static func Char_toCode(_ char: UnicodeScalar) -> Double {
         Double(char.value)
     }
 
-    static func Char_fromCode(_ charCode: Double) -> UnicodeScalar {
+    public static func Char_fromCode(_ charCode: Double) -> UnicodeScalar {
         return if let scalar = UnicodeScalar(Int(charCode)) {
             scalar
         } else {
@@ -308,35 +307,35 @@ public enum Elm {
         }
     }
 
-    static func Char_isHexDigit(_ char: UnicodeScalar) -> Bool {
+    public static func Char_isHexDigit(_ char: UnicodeScalar) -> Bool {
         (0x30 <= char.value && char.value <= 0x39)
             || (0x41 <= char.value && char.value <= 0x46)
             || (0x61 <= char.value && char.value <= 0x66)
     }
-    static func Char_isDigit(_ char: UnicodeScalar) -> Bool {
+    public static func Char_isDigit(_ char: UnicodeScalar) -> Bool {
         char.value <= 0x39 && 0x30 <= char.value
     }
-    static func Char_isUpper(_ char: UnicodeScalar) -> Bool {
+    public static func Char_isUpper(_ char: UnicodeScalar) -> Bool {
         char.value <= 0x5A && 0x41 <= char.value
     }
-    static func Char_isLower(_ char: UnicodeScalar) -> Bool {
+    public static func Char_isLower(_ char: UnicodeScalar) -> Bool {
         0x61 <= char.value && char.value <= 0x7A
     }
-    static func Char_isAlpha(_ char: UnicodeScalar) -> Bool {
+    public static func Char_isAlpha(_ char: UnicodeScalar) -> Bool {
         Char_isLower(char) || Char_isUpper(char)
     }
-    static func Char_isAlphaNum(_ char: UnicodeScalar) -> Bool {
+    public static func Char_isAlphaNum(_ char: UnicodeScalar) -> Bool {
         Char_isAlpha(char) || Char_isDigit(char)
     }
 
-    static func Char_toUpper(_ char: UnicodeScalar) -> UnicodeScalar {
+    public static func Char_toUpper(_ char: UnicodeScalar) -> UnicodeScalar {
         if let uppercasedChar = Character(char).uppercased().unicodeScalars.first {
             uppercasedChar
         } else {
             char
         }
     }
-    static func Char_toLocaleUpper(_ char: UnicodeScalar) -> UnicodeScalar {
+    public static func Char_toLocaleUpper(_ char: UnicodeScalar) -> UnicodeScalar {
         // Character does not have uppercased(with: Locale)
         if let uppercasedChar = String(char).uppercased(with: Locale.current).unicodeScalars.first {
             uppercasedChar
@@ -345,7 +344,7 @@ public enum Elm {
         }
     }
 
-    static func Char_toLower(_ char: UnicodeScalar) -> UnicodeScalar {
+    public static func Char_toLower(_ char: UnicodeScalar) -> UnicodeScalar {
         // Character does not have lowercased(with: Locale)
         if let uppercasedChar = Character(char).lowercased().unicodeScalars.first {
             uppercasedChar
@@ -353,7 +352,7 @@ public enum Elm {
             char
         }
     }
-    static func Char_toLocaleLower(_ char: UnicodeScalar) -> UnicodeScalar {
+    public static func Char_toLocaleLower(_ char: UnicodeScalar) -> UnicodeScalar {
         if let uppercasedChar = String(char).lowercased(with: Locale.current).unicodeScalars.first {
             uppercasedChar
         } else {
@@ -361,15 +360,15 @@ public enum Elm {
         }
     }
 
-    static func String_fromChar(_ char: UnicodeScalar) -> String {
+    public static func String_fromChar(_ char: UnicodeScalar) -> String {
         String(char)
     }
 
-    static func String_fromFloat(_ float: Double) -> String {
+    public static func String_fromFloat(_ float: Double) -> String {
         String(float)
     }
 
-    static func String_toInt(_ string: String) -> Maybe_Maybe<Double> {
+    public static func String_toInt(_ string: String) -> Maybe_Maybe<Double> {
         switch Int64(string) {
         case .some(let parseResult):
             .Maybe_Just(Double(parseResult))
@@ -378,7 +377,7 @@ public enum Elm {
         }
     }
 
-    static func String_toFloat(_ string: String) -> Maybe_Maybe<Double> {
+    public static func String_toFloat(_ string: String) -> Maybe_Maybe<Double> {
         switch Double(string) {
         case .some(let parseResult):
             .Maybe_Just(parseResult)
@@ -387,7 +386,7 @@ public enum Elm {
         }
     }
 
-    static func String_toList(_ string: String) -> List_List<UnicodeScalar> {
+    public static func String_toList(_ string: String) -> List_List<UnicodeScalar> {
         var chars: List_List<UnicodeScalar> = .List_Empty
         for char in string.unicodeScalars.reversed() {
             chars = .List_Cons(char, chars)
@@ -395,7 +394,7 @@ public enum Elm {
         return chars
     }
 
-    static func String_fromList(_ chars: List_List<UnicodeScalar>) -> String {
+    public static func String_fromList(_ chars: List_List<UnicodeScalar>) -> String {
         var remainingChars = chars
         var stringBuffer = String()
         while case .List_Cons(let head, let tail) = remainingChars {
@@ -405,35 +404,35 @@ public enum Elm {
         return stringBuffer
     }
 
-    static func String_length(_ string: String) -> Double {
+    public static func String_length(_ string: String) -> Double {
         Double(string.utf16.count)
     }
 
-    static func String_isEmpty(_ string: String) -> Bool {
+    public static func String_isEmpty(_ string: String) -> Bool {
         string.isEmpty
     }
 
-    static func String_cons(_ headChar: UnicodeScalar) -> (String) -> String {
+    public static func String_cons(_ headChar: UnicodeScalar) -> (String) -> String {
         { tailString in String(headChar) + tailString }
     }
 
-    static func String_append(_ earlier: String) -> (String) -> String {
+    public static func String_append(_ earlier: String) -> (String) -> String {
         { later in earlier + later }
     }
 
-    static func String_contains(_ sub: String) -> (String) -> Bool {
+    public static func String_contains(_ sub: String) -> (String) -> Bool {
         { string in string.contains(sub) }
     }
 
-    static func String_startsWith(_ start: String) -> (String) -> Bool {
+    public static func String_startsWith(_ start: String) -> (String) -> Bool {
         { string in string.hasPrefix(start) }
     }
 
-    static func String_endsWith(_ end: String) -> (String) -> Bool {
+    public static func String_endsWith(_ end: String) -> (String) -> Bool {
         { string in string.hasSuffix(end) }
     }
 
-    static func String_concat(_ segments: List_List<String>) -> String {
+    public static func String_concat(_ segments: List_List<String>) -> String {
         var remainingSegments = segments
         var stringBuffer = String()
         while case .List_Cons(let head, let tail) = remainingSegments {
@@ -443,7 +442,7 @@ public enum Elm {
         return stringBuffer
     }
 
-    static func String_join(_ inBetween: String) -> (List_List<String>) -> String {
+    public static func String_join(_ inBetween: String) -> (List_List<String>) -> String {
         { segments in
             switch segments {
             case .List_Empty:
@@ -462,32 +461,32 @@ public enum Elm {
         }
     }
 
-    static func String_reverse(_ string: String) -> String {
+    public static func String_reverse(_ string: String) -> String {
         String(decoding: Array(string.utf16).reversed(), as: UTF16.self)
     }
 
-    static func String_dropLeft(_ countToSkip: Double) -> (String) -> String {
+    public static func String_dropLeft(_ countToSkip: Double) -> (String) -> String {
         { string in
             String(decoding: Array(string.utf16.dropFirst(Int(countToSkip))), as: UTF16.self)
         }
     }
 
-    static func String_dropRight(_ countToSkip: Double) -> (String) -> String {
+    public static func String_dropRight(_ countToSkip: Double) -> (String) -> String {
         { string in String(decoding: Array(string.utf16.dropLast(Int(countToSkip))), as: UTF16.self)
         }
     }
 
-    static func String_left(_ countToTake: Double) -> (String) -> String {
+    public static func String_left(_ countToTake: Double) -> (String) -> String {
         { string in String(decoding: Array(string.utf16.prefix(Int(countToTake))), as: UTF16.self)
         }
     }
 
-    static func String_right(_ countToTake: Double) -> (String) -> String {
+    public static func String_right(_ countToTake: Double) -> (String) -> String {
         { string in String(decoding: Array(string.utf16.suffix(Int(countToTake))), as: UTF16.self)
         }
     }
 
-    static func String_padRight(_ desiredLength: Double) -> (String) -> (String)
+    public static func String_padRight(_ desiredLength: Double) -> (String) -> (String)
         -> String
     {
         { padChar in
@@ -497,7 +496,7 @@ public enum Elm {
         }
     }
 
-    static func String_padLeft(_ desiredLength: Double) -> (String) -> (String) -> String {
+    public static func String_padLeft(_ desiredLength: Double) -> (String) -> (String) -> String {
         { string in
             { padChar in
                 String(repeating: padChar, count: max(0, Int(desiredLength) - string.utf16.count))
@@ -506,25 +505,25 @@ public enum Elm {
         }
     }
 
-    static func String_repeat(_ count: Double) -> (String) -> String {
+    public static func String_repeat(_ count: Double) -> (String) -> String {
         { segment in String(repeating: segment, count: Int(count)) }
     }
 
-    static func String_replace(_ toReplace: String) -> (String) -> (String)
+    public static func String_replace(_ toReplace: String) -> (String) -> (String)
         -> String
     {
         { replacement in { string in string.replacing(toReplace, with: replacement) } }
     }
 
-    static func String_toLower(_ string: String) -> String {
+    public static func String_toLower(_ string: String) -> String {
         string.lowercased()
     }
 
-    static func String_toUpper(_ string: String) -> String {
+    public static func String_toUpper(_ string: String) -> String {
         string.uppercased()
     }
 
-    static func String_trimLeft(_ string: String) -> String {
+    public static func String_trimLeft(_ string: String) -> String {
         String(
             string.trimmingPrefix(while: { character in
                 character.isWhitespace || character.isNewline
@@ -532,7 +531,7 @@ public enum Elm {
         )
     }
 
-    static func String_trimRight(_ string: String) -> String {
+    public static func String_trimRight(_ string: String) -> String {
         let startToRestoreAfterTrimming =
             string.prefix(while: { character in
                 character.isWhitespace || character.isNewline
@@ -541,19 +540,22 @@ public enum Elm {
             + string.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    static func String_trim(_ string: String) -> String {
+    public static func String_trim(_ string: String) -> String {
         string.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    static func String_map(_ characterChange: @escaping (UnicodeScalar) -> UnicodeScalar) -> (
-        String
-    ) -> String {
+    public static func String_map(_ characterChange: @escaping (UnicodeScalar) -> UnicodeScalar)
+        -> (
+            String
+        ) -> String
+    {
         { string in
             String(String.UnicodeScalarView(string.unicodeScalars.map(characterChange)))
         }
     }
 
-    static func String_filter(_ keepCharacter: @escaping (UnicodeScalar) -> Bool) -> (String) ->
+    public static func String_filter(_ keepCharacter: @escaping (UnicodeScalar) -> Bool) -> (String)
+        ->
         String
     {
         { string in
@@ -561,11 +563,11 @@ public enum Elm {
         }
     }
 
-    static func String_lines(_ string: String) -> List_List<String> {
+    public static func String_lines(_ string: String) -> List_List<String> {
         arrayToList_List(string.components(separatedBy: .newlines))
     }
 
-    static func String_split(_ separator: String) -> (String) -> List_List<String> {
+    public static func String_split(_ separator: String) -> (String) -> List_List<String> {
         { string in
             arrayToList_List(
                 string.split(separator: separator)
@@ -573,15 +575,17 @@ public enum Elm {
         }
     }
 
-    static func String_all(_ isExpected: @escaping (UnicodeScalar) -> Bool) -> (String) -> Bool {
+    public static func String_all(_ isExpected: @escaping (UnicodeScalar) -> Bool) -> (String) ->
+        Bool
+    {
         { string in string.unicodeScalars.allSatisfy(isExpected) }
     }
 
-    static func String_any(_ isOdd: @escaping (UnicodeScalar) -> Bool) -> (String) -> Bool {
+    public static func String_any(_ isOdd: @escaping (UnicodeScalar) -> Bool) -> (String) -> Bool {
         { string in string.unicodeScalars.contains(where: isOdd) }
     }
 
-    static func String_slice(_ start: Double) -> (Double) -> (String) -> String {
+    public static func String_slice(_ start: Double) -> (Double) -> (String) -> String {
         { end in
             { string in
                 if (start >= 0) && (start + 1 == end) {
@@ -619,7 +623,7 @@ public enum Elm {
         }
     }
 
-    static func String_foldl<Folded>(
+    public static func String_foldl<Folded>(
         _ reduce: @escaping (UnicodeScalar) -> (Folded) -> Folded
     ) -> (Folded) -> (String) -> Folded {
         { initialFolded in
@@ -634,7 +638,7 @@ public enum Elm {
         }
     }
 
-    static func String_foldr<Folded>(
+    public static func String_foldr<Folded>(
         _ reduce: @escaping (UnicodeScalar) -> (Folded) -> Folded
     ) -> (Folded) -> (String) -> Folded {
         { initialFolded in
@@ -649,7 +653,7 @@ public enum Elm {
         }
     }
 
-    static func Maybe_withDefault<a>(valueOnNothing: a) -> (Maybe_Maybe<a>) -> a {
+    public static func Maybe_withDefault<a>(valueOnNothing: a) -> (Maybe_Maybe<a>) -> a {
         { maybe in
             switch maybe {
             case .Maybe_Nothing: valueOnNothing
@@ -657,7 +661,7 @@ public enum Elm {
             }
         }
     }
-    static func Maybe_map<a, b>(valueChange: @escaping (a) -> b) -> (Maybe_Maybe<a>) ->
+    public static func Maybe_map<a, b>(valueChange: @escaping (a) -> b) -> (Maybe_Maybe<a>) ->
         Maybe_Maybe<b>
     {
         { maybe in
@@ -667,7 +671,7 @@ public enum Elm {
             }
         }
     }
-    static func Maybe_map2<a, b, combined>(valueCombine: @escaping (a) -> (b) -> combined)
+    public static func Maybe_map2<a, b, combined>(valueCombine: @escaping (a) -> (b) -> combined)
         -> (Maybe_Maybe<a>) -> (Maybe_Maybe<b>) -> Maybe_Maybe<combined>
     {
         { aMaybe in
@@ -684,7 +688,9 @@ public enum Elm {
             }
         }
     }
-    static func Maybe_map3<a, b, c, combined>(valueCombine: @escaping (a) -> (b) -> (c) -> combined)
+    public static func Maybe_map3<a, b, c, combined>(
+        valueCombine: @escaping (a) -> (b) -> (c) -> combined
+    )
         -> (Maybe_Maybe<a>) -> (Maybe_Maybe<b>) -> (Maybe_Maybe<c>) -> Maybe_Maybe<combined>
     {
         { aMaybe in
@@ -707,7 +713,7 @@ public enum Elm {
             }
         }
     }
-    static func Maybe_map4<a, b, c, d, combined>(
+    public static func Maybe_map4<a, b, c, d, combined>(
         valueCombine: @escaping (a) -> (b) -> (c) -> (d) -> combined
     )
         -> (Maybe_Maybe<a>) -> (Maybe_Maybe<b>) -> (Maybe_Maybe<c>) -> (Maybe_Maybe<d>) ->
@@ -739,7 +745,7 @@ public enum Elm {
             }
         }
     }
-    static func Maybe_map5<a, b, c, d, e, combined>(
+    public static func Maybe_map5<a, b, c, d, e, combined>(
         valueCombine: @escaping (a) -> (b) -> (c) -> (d) -> (e) -> combined
     )
         -> (Maybe_Maybe<a>) -> (Maybe_Maybe<b>) -> (Maybe_Maybe<c>) -> (Maybe_Maybe<d>) -> (
@@ -783,7 +789,7 @@ public enum Elm {
         }
     }
 
-    static func Maybe_andThen<a, b>(valueToMaybe: @escaping (a) -> Maybe_Maybe<b>)
+    public static func Maybe_andThen<a, b>(valueToMaybe: @escaping (a) -> Maybe_Maybe<b>)
         -> (Maybe_Maybe<a>) -> Maybe_Maybe<b>
     {
         { maybe in
@@ -816,35 +822,35 @@ public enum Elm {
         }
     }
 
-    static func List_singleton<a>(_ onlyElement: a) -> List_List<a> {
+    public static func List_singleton<a>(_ onlyElement: a) -> List_List<a> {
         .List_Cons(onlyElement, .List_Empty)
     }
 
-    static func List_cons<a>(_ newHead: a) -> (List_List<a>) -> List_List<a> {
+    public static func List_cons<a>(_ newHead: a) -> (List_List<a>) -> List_List<a> {
         { tail in List_List.List_Cons(newHead, tail) }
     }
 
-    static func List_isEmpty<a>(_ list: List_List<a>) -> Bool {
+    public static func List_isEmpty<a>(_ list: List_List<a>) -> Bool {
         switch list {
         case .List_Empty: true
         case .List_Cons(_, _): false
         }
     }
 
-    static func List_head<a>(_ list: List_List<a>) -> Maybe_Maybe<a> {
+    public static func List_head<a>(_ list: List_List<a>) -> Maybe_Maybe<a> {
         switch list {
         case .List_Empty: .Maybe_Nothing
         case .List_Cons(let head, _): .Maybe_Just(head)
         }
     }
-    static func List_tail<a>(_ list: List_List<a>) -> Maybe_Maybe<List_List<a>> {
+    public static func List_tail<a>(_ list: List_List<a>) -> Maybe_Maybe<List_List<a>> {
         switch list {
         case .List_Empty: .Maybe_Nothing
         case .List_Cons(_, let tail): .Maybe_Just(tail)
         }
     }
 
-    static func List_length<a>(_ list: List_List<a>) -> Double {
+    public static func List_length<a>(_ list: List_List<a>) -> Double {
         Double(List_foldl({ (_, soFar) in soFar + 1 }, 0, list))
     }
 
@@ -865,7 +871,7 @@ public enum Elm {
             }
         }
     }
-    static func List_foldl<a, Folded>(
+    public static func List_foldl<a, Folded>(
         _ reduce: @escaping (a) -> (Folded) -> Folded
     ) -> (Folded) -> (List_List<a>) -> Folded {
         { initialFolded in
@@ -892,17 +898,17 @@ public enum Elm {
     ) -> Folded {
         List_foldl(reduce, initialFolded, List_reverse(list))
     }
-    static func List_foldr<a, Folded>(
+    public static func List_foldr<a, Folded>(
         _ reduce: @escaping (a) -> (Folded) -> Folded,
     ) -> (Folded) -> (List_List<a>) -> Folded {
         { initialFolded in { list in List_foldl(reduce)(initialFolded)(List_reverse(list)) } }
     }
 
-    static func List_reverse<a>(_ list: List_List<a>) -> List_List<a> {
+    public static func List_reverse<a>(_ list: List_List<a>) -> List_List<a> {
         List_foldl(List_List.List_Cons, .List_Empty, list)
     }
 
-    static func List_all<a>(_ isExpected: @escaping (a) -> Bool) -> (List_List<a>) -> Bool {
+    public static func List_all<a>(_ isExpected: @escaping (a) -> Bool) -> (List_List<a>) -> Bool {
         { list in
             var remainingList = list
             while case .List_Cons(let head, let tail) = remainingList {
@@ -916,7 +922,7 @@ public enum Elm {
         }
     }
 
-    static func List_any<a>(_ isOdd: @escaping (a) -> Bool) -> (List_List<a>) -> Bool {
+    public static func List_any<a>(_ isOdd: @escaping (a) -> Bool) -> (List_List<a>) -> Bool {
         { list in
             var remainingList = list
             while case .List_Cons(let head, let tail) = remainingList {
@@ -930,11 +936,11 @@ public enum Elm {
         }
     }
 
-    static func List_member<a>(_ needle: (a)) -> (List_List<a>) -> Bool {
+    public static func List_member<a>(_ needle: (a)) -> (List_List<a>) -> Bool {
         List_any({ element in Basics_eq(element)(needle) })
     }
 
-    static func List_drop<a>(_ countToSkip: Double) -> (List_List<a>) -> List_List<a> {
+    public static func List_drop<a>(_ countToSkip: Double) -> (List_List<a>) -> List_List<a> {
         { list in
             var remainingCountToSkip = countToSkip
             var remainingList = list
@@ -951,7 +957,7 @@ public enum Elm {
         }
     }
 
-    static func List_take<a>(_ countToTake: Double) -> (List_List<a>) -> List_List<a> {
+    public static func List_take<a>(_ countToTake: Double) -> (List_List<a>) -> List_List<a> {
         { list in
             var remainingCountToTake = countToTake
             var remainingList = list
@@ -970,7 +976,7 @@ public enum Elm {
         }
     }
 
-    static func List_intersperse<a>(_ inBetween: a) -> (List_List<a>) -> List_List<a> {
+    public static func List_intersperse<a>(_ inBetween: a) -> (List_List<a>) -> List_List<a> {
         { list in
             switch list {
             case .List_Empty: .List_Empty
@@ -986,7 +992,7 @@ public enum Elm {
         }
     }
 
-    static func List_map<a, b>(_ elementChange: @escaping (a) -> b) -> (List_List<a>)
+    public static func List_map<a, b>(_ elementChange: @escaping (a) -> b) -> (List_List<a>)
         -> List_List<b>
     {
         { list in
@@ -1002,7 +1008,7 @@ public enum Elm {
         }
     }
 
-    static func List_indexedMap<a, b>(
+    public static func List_indexedMap<a, b>(
         _ indexedElementChange: @escaping (Double) -> (a) -> b,
     ) -> (List_List<a>) -> List_List<b> {
         { list in
@@ -1020,7 +1026,7 @@ public enum Elm {
         }
     }
 
-    static func List_map2<a, b, c>(
+    public static func List_map2<a, b, c>(
         _ combineAb: @escaping (a) -> (b) -> c,
     ) -> (List_List<a>) -> (List_List<b>) -> List_List<c> {
         { aList in
@@ -1039,13 +1045,13 @@ public enum Elm {
             }
         }
     }
-    static func List_zip<a, b>(_ aList: List_List<a>) -> (List_List<b>)
+    public static func List_zip<a, b>(_ aList: List_List<a>) -> (List_List<b>)
         -> List_List<(first: a, second: b)>
     {
         { bList in List_map2({ a in { b in (first: a, second: b) } })(aList)(bList) }
     }
 
-    static func List_unzip<a, b>(_ abList: List_List<(first: a, second: b)>)
+    public static func List_unzip<a, b>(_ abList: List_List<(first: a, second: b)>)
         -> (first: List_List<a>, second: List_List<b>)
     {
         (
@@ -1054,9 +1060,11 @@ public enum Elm {
         )
     }
 
-    static func List_filter<a>(_ keepElement: @escaping (a) -> Bool) -> (List_List<a>) -> List_List<
-        a
-    > {
+    public static func List_filter<a>(_ keepElement: @escaping (a) -> Bool) -> (List_List<a>) ->
+        List_List<
+            a
+        >
+    {
         { list in
             // TODO mutating version
             List_foldr(
@@ -1073,7 +1081,7 @@ public enum Elm {
         }
     }
 
-    static func List_filterMap<a, b>(
+    public static func List_filterMap<a, b>(
         _ element_toMaybe_Maybe: @escaping (a) -> Maybe_Maybe<b>,
     ) -> (List_List<a>) -> List_List<b> {
         { list in
@@ -1092,7 +1100,7 @@ public enum Elm {
         }
     }
 
-    static func List_append<a>(_ earlier: List_List<a>) -> (List_List<a>) -> List_List<a> {
+    public static func List_append<a>(_ earlier: List_List<a>) -> (List_List<a>) -> List_List<a> {
         { later in
             // TODO mutating version
             List_foldr(
@@ -1105,7 +1113,7 @@ public enum Elm {
         }
     }
 
-    static func List_concatMap<a, b>(_ elementToList: @escaping (a) -> List_List<b>) -> (
+    public static func List_concatMap<a, b>(_ elementToList: @escaping (a) -> List_List<b>) -> (
         List_List<a>
     )
         -> List_List<b>
@@ -1122,7 +1130,7 @@ public enum Elm {
         }
     }
 
-    static func List_concat<a>(_ list: List_List<List_List<a>>) -> List_List<a> {
+    public static func List_concat<a>(_ list: List_List<List_List<a>>) -> List_List<a> {
         // TODO mutating versions
         List_foldr(
             { (element, soFar) in
@@ -1133,7 +1141,7 @@ public enum Elm {
         )
     }
 
-    static func List_repeat<a>(_ count: Double) -> (a) -> List_List<a> {
+    public static func List_repeat<a>(_ count: Double) -> (a) -> List_List<a> {
         { element in
             if count <= 0 {
                 return .List_Empty
@@ -1147,7 +1155,7 @@ public enum Elm {
         }
     }
 
-    static func List_range(_ start: Double) -> (Double) -> List_List<Double> {
+    public static func List_range(_ start: Double) -> (Double) -> List_List<Double> {
         { end in
             if start > end {
                 return .List_Empty
@@ -1160,7 +1168,7 @@ public enum Elm {
             }
         }
     }
-    static func List_sum(_ list: List_List<Double>) -> Double {
+    public static func List_sum(_ list: List_List<Double>) -> Double {
         var sumSoFar: Double = 0.0
         var remainingList = list
         while case .List_Cons(let head, let tail) = remainingList {
@@ -1169,7 +1177,7 @@ public enum Elm {
         }
         return sumSoFar
     }
-    static func List_product(_ list: List_List<Double>) -> Double {
+    public static func List_product(_ list: List_List<Double>) -> Double {
         var productSoFar: Double = 1.0
         var remainingList = list
         while case .List_Cons(let head, let tail) = remainingList {
@@ -1179,7 +1187,7 @@ public enum Elm {
         return productSoFar
     }
 
-    static func List_maximum<a: Comparable>(_ list: List_List<a>) -> Maybe_Maybe<a> {
+    public static func List_maximum<a: Comparable>(_ list: List_List<a>) -> Maybe_Maybe<a> {
         return switch list {
         case .List_Empty:
             .Maybe_Nothing
@@ -1188,7 +1196,7 @@ public enum Elm {
         }
     }
 
-    static func List_minimum<a: Comparable>(_ list: List_List<a>) -> Maybe_Maybe<a> {
+    public static func List_minimum<a: Comparable>(_ list: List_List<a>) -> Maybe_Maybe<a> {
         return switch list {
         case .List_Empty:
             .Maybe_Nothing
@@ -1197,7 +1205,7 @@ public enum Elm {
         }
     }
 
-    static func List_sortWith<a>(_ elementCompare: @escaping (a) -> (a) -> Basics_Order)
+    public static func List_sortWith<a>(_ elementCompare: @escaping (a) -> (a) -> Basics_Order)
         -> (List_List<a>) -> List_List<a>
     {
         { list in
@@ -1207,7 +1215,7 @@ public enum Elm {
         }
     }
 
-    static func List_sortBy<element, comparable>(
+    public static func List_sortBy<element, comparable>(
         _ elementToComparable: @escaping (element) -> comparable
     ) -> (List_List<element>) -> List_List<element>
     where comparable: Comparable {
@@ -1218,7 +1226,7 @@ public enum Elm {
         }
     }
 
-    static func List_sort<comparable>(_ list: List_List<comparable>)
+    public static func List_sort<comparable>(_ list: List_List<comparable>)
         -> List_List<comparable>
     where comparable: Comparable {
         var asArray = List_ListToArray(list)

@@ -111,7 +111,6 @@ elmModuleSourceTranspileToSwift source =
                                 { parameters : List String
                                 , type_ : ElmSyntaxToSwift.SwiftType
                                 }
-                        , recordTypes : FastSet.Set (List String)
                         , enumTypes :
                             FastDict.Dict
                                 String
