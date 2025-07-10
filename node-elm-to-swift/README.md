@@ -1,6 +1,6 @@
 Transpile all elm modules in the current project
 (source-directories + dependencies)
-into a bundled `src/Elm.swift` file that exposes every value/function declaration
+into a bundled `Sources/Elm.swift` file that exposes every value/function declaration
 (e.g. `Main_runOnString` for `Main.runOnString`)
 
 Be aware that no compile checks are performed before transpiling to swift

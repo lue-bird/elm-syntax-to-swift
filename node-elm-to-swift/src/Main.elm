@@ -125,11 +125,11 @@ interface state =
         Finished result ->
             case result of
                 Err error ->
-                    errorInterface "Failed to write the bundled code into src/Elm.swift."
+                    errorInterface "Failed to write the bundled code into Sources/Elm.swift."
 
                 Ok () ->
                     Node.standardOutWrite
-                        "Successfully wrote the bundled code into src/Elm.swift.\n"
+                        "Successfully wrote the bundled code into Sources/Elm.swift.\n"
 
         ElmJsonReadFailed elmJsonDecodeError ->
             errorInterface elmJsonDecodeError
@@ -191,7 +191,7 @@ runningInterface state =
                 ++ "\n"
             )
         , Node.fileWrite
-            { path = "src/Elm.swift"
+            { path = "Sources/Elm.swift"
             , content =
                 transpiledDeclarationsAndErrors.declarations
                     |> ElmSyntaxToSwift.swiftDeclarationsToModuleString
