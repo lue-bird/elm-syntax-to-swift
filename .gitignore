@@ -5,6 +5,7 @@ zombie
 package-lock.json
 elm.js
 elm.swift
+Elm.swift
 main.js
 elmMain.js
 dist
