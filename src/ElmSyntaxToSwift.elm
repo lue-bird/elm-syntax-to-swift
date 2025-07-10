@@ -5840,21 +5840,25 @@ valueOrFunctionDeclaration moduleContext syntaxDeclarationValueOrFunction =
                                     )
                                     { result = result.result
                                     , statementsToAdd =
-                                        result.statements
-                                            |> swiftStatementsPrependLetDeclarationsForVariableAsPatternAliases
-                                                (parameterTypedPatterns
-                                                    |> listMapToFastDictsAndUnify .variableAsPatternAliases
-                                                    |> FastDict.union
-                                                        (parameterTypedPatterns
-                                                            |> List.indexedMap
-                                                                (\parameterIndex parameter ->
-                                                                    ( parameterNameForIndex parameterIndex
-                                                                    , parameter.pattern
-                                                                    )
-                                                                )
-                                                            |> FastDict.fromList
-                                                        )
+                                        (parameterTypedPatterns
+                                            |> List.indexedMap
+                                                (\parameterIndex parameter ->
+                                                    SwiftStatementLetDestructuring
+                                                        { pattern = parameter.pattern
+                                                        , expression =
+                                                            SwiftExpressionReference
+                                                                { moduleOrigin = Nothing
+                                                                , name = parameterNameForIndex parameterIndex
+                                                                }
+                                                        }
                                                 )
+                                        )
+                                            ++ (result.statements
+                                                    |> swiftStatementsPrependLetDeclarationsForVariableAsPatternAliases
+                                                        (parameterTypedPatterns
+                                                            |> listMapToFastDictsAndUnify .variableAsPatternAliases
+                                                        )
+                                               )
                                     }
                     in
                     { parameters =
@@ -6883,24 +6887,28 @@ expression context expressionTypedNode =
                             )
                             { result = result.result
                             , statements =
-                                result.statements
-                                    |> swiftStatementsPrependLetDeclarationsForVariableAsPatternAliases
-                                        (parameter0.variableAsPatternAliases
-                                            |> FastDict.union
-                                                (parameter1Up
-                                                    |> listMapToFastDictsAndUnify .variableAsPatternAliases
-                                                )
-                                            |> FastDict.union
-                                                ((parameter0 :: parameter1Up)
-                                                    |> List.indexedMap
-                                                        (\parameterIndex parameter ->
-                                                            ( parameterNameForIndex parameterIndex
-                                                            , parameter.pattern
-                                                            )
-                                                        )
-                                                    |> FastDict.fromList
-                                                )
+                                ((parameter0 :: parameter1Up)
+                                    |> List.indexedMap
+                                        (\parameterIndex parameter ->
+                                            SwiftStatementLetDestructuring
+                                                { pattern = parameter.pattern
+                                                , expression =
+                                                    SwiftExpressionReference
+                                                        { moduleOrigin = Nothing
+                                                        , name = parameterNameForIndex parameterIndex
+                                                        }
+                                                }
                                         )
+                                )
+                                    ++ (result.statements
+                                            |> swiftStatementsPrependLetDeclarationsForVariableAsPatternAliases
+                                                (parameter0.variableAsPatternAliases
+                                                    |> FastDict.union
+                                                        (parameter1Up
+                                                            |> listMapToFastDictsAndUnify .variableAsPatternAliases
+                                                        )
+                                                )
+                                       )
                             }
                 )
                 (lambda.result
@@ -7646,21 +7654,25 @@ letValueOrFunctionDeclaration context syntaxLetDeclarationValueOrFunction =
                               }
                             ]
                         , statements =
-                            result.statements
-                                |> swiftStatementsPrependLetDeclarationsForVariableAsPatternAliases
-                                    (parameterTypedPatterns
-                                        |> listMapToFastDictsAndUnify .variableAsPatternAliases
-                                        |> FastDict.union
-                                            (parameterTypedPatterns
-                                                |> List.indexedMap
-                                                    (\parameterIndex parameter ->
-                                                        ( parameterNameForIndex parameterIndex
-                                                        , parameter.pattern
-                                                        )
-                                                    )
-                                                |> FastDict.fromList
-                                            )
+                            (parameterTypedPatterns
+                                |> List.indexedMap
+                                    (\parameterIndex parameter ->
+                                        SwiftStatementLetDestructuring
+                                            { pattern = parameter.pattern
+                                            , expression =
+                                                SwiftExpressionReference
+                                                    { moduleOrigin = Nothing
+                                                    , name = parameterNameForIndex parameterIndex
+                                                    }
+                                            }
                                     )
+                            )
+                                ++ (result.statements
+                                        |> swiftStatementsPrependLetDeclarationsForVariableAsPatternAliases
+                                            (parameterTypedPatterns
+                                                |> listMapToFastDictsAndUnify .variableAsPatternAliases
+                                            )
+                                   )
                         , result =
                             parameter1UpTypedPatterns
                                 |> List.indexedMap
