@@ -819,14 +819,7 @@ typeNotVariable inferredTypeNotVariable =
                             )
                             FastDict.empty
             in
-            SwiftTypeConstruct
-                { moduleOrigin = Nothing
-                , name =
-                    generatedSwiftRecordTypeAliasName
-                        (swiftFields |> FastDict.keys)
-                , arguments =
-                    swiftFields |> FastDict.values
-                }
+            SwiftTypeRecord swiftFields
 
         ElmSyntaxTypeInfer.TypeFunction typeFunction ->
             SwiftTypeFunction
@@ -852,14 +845,7 @@ typeNotVariable inferredTypeNotVariable =
                             )
                             FastDict.empty
             in
-            SwiftTypeConstruct
-                { moduleOrigin = Nothing
-                , name =
-                    generatedSwiftRecordTypeAliasName
-                        (swiftFields |> FastDict.keys)
-                , arguments =
-                    swiftFields |> FastDict.values
-                }
+            SwiftTypeRecord swiftFields
 
 
 {-| Type position:
@@ -5702,11 +5688,6 @@ patternIntroducedVariables inferredPattern =
                     FastSet.empty
 
 
-generatedSwiftRecordTypeAliasName : List String -> String
-generatedSwiftRecordTypeAliasName recordFields =
-    "Generated_" ++ (recordFields |> String.join "_")
-
-
 moduleHeaderName : Elm.Syntax.Module.Module -> String
 moduleHeaderName moduleHeader =
     (case moduleHeader of
@@ -9958,8 +9939,8 @@ and similarly
 
 will be split into and used as
 
-    let Fields_setX__p_X_Y : 'x -> Generated_X_Y<'x, 'p_Y> -> Generated_X_Y<'x, 'p_Y>
-    let Fields_setX__p_X_Y_Z : x -> Generated_X_Y_Z<'x, 'p_Y, 'p_Z> -> Generated_X_Y_Z<'x, 'p_Y, 'p_Z>
+    let Fields_setX__p_x_y<x, p_y> : x -> (x: x, y: p_y) -> (x: x, y: p_y)
+    let Fields_setX__p_x_y_z : x -> (x: x, y: p_y, z: p_z) -> (x: x, y: p_y, z: p_z)
 
 for all elm records in types and expressions that contain the field `x`
 
