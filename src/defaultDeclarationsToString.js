@@ -11,7 +11,7 @@ const defaultDeclarationsSwiftFile =
         { encoding: "utf-8" }
     )
 const elmString =
-    "\"\"\""
+    "\"\"\"\n"
     + defaultDeclarationsSwiftFile
         .replaceAll(
             `import Foundation
@@ -22,8 +22,9 @@ public enum Elm {
             "\n"
         ).replaceAll("\\", "\\\\")
         .replaceAll("\n    ", "\n")
-        .slice(0, -2) //  drop the last \n}
-    + "\"\"\""
+        .slice(0, -2) //  drop the enum-closing }\n
+        .trim()
+    + "\n\"\"\""
 fs.writeFileSync(
     path.join(import.meta.dirname, "DefaultDeclarations.elm"),
     elmString,
