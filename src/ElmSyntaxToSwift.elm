@@ -3748,7 +3748,6 @@ referenceToCoreSwift reference =
                     Nothing
 
         "Result" ->
-            -- TODO
             case reference.name of
                 "Err" ->
                     Just { moduleOrigin = Nothing, name = "Result_Err" }
@@ -25816,6 +25815,8 @@ public static func Basics_max<a: Comparable>(_ a: a) -> (a) -> a {
     { b in if a > b { a } else { b } }
 }
 
+public static let Basics_e: Double = exp(1.0)
+
 public static func Basics_clamp(_ low: Double) -> (Double) -> (Double) -> Double {
     { high in
         { number in
@@ -26452,6 +26453,184 @@ public static func Maybe_andThen<a, b>(_ valueToMaybe: @escaping (a) -> Maybe_Ma
         switch maybe {
         case .Maybe_Nothing: .Maybe_Nothing
         case .Maybe_Just(let value): valueToMaybe(value)
+        }
+    }
+}
+
+public static func Result_fromMaybe<a, x>(_ errorOnNothing: x)
+    -> (Maybe_Maybe<a>) -> Result_Result<x, a>
+{
+    { (maybe: Maybe_Maybe<a>) in
+        switch maybe {
+        case let .Maybe_Just(value): .Result_Ok(value)
+        case .Maybe_Nothing: .Result_Err(errorOnNothing)
+        }
+    }
+}
+
+public static func Result_toMaybe<a, x>(_ result: Result_Result<x, a>) -> Maybe_Maybe<a> {
+    switch result {
+    case let .Result_Ok(value): .Maybe_Just(value)
+    case .Result_Err(_): .Maybe_Nothing
+    }
+}
+
+public static func Result_withDefault<a, x>(_ valueOnError: a) -> (Result_Result<x, a>) -> a {
+    { (result: Result_Result<x, a>) in
+        switch result {
+        case let .Result_Ok(value): value
+        case .Result_Err(_): valueOnError
+        }
+    }
+}
+
+public static func Result_mapError<a, x, y>(_ errorChange: @escaping (x) -> y)
+    -> (Result_Result<x, a>) -> Result_Result<y, a>
+{
+    { (result: Result_Result<x, a>) in
+        switch result {
+        case let .Result_Ok(value): .Result_Ok(value)
+        case let .Result_Err(error): .Result_Err(errorChange(error))
+        }
+    }
+}
+
+public static func Result_andThen<a, b, x>(
+    _ onOk: @escaping (a) -> Result_Result<x, b>
+) -> (Result_Result<x, a>) -> Result_Result<x, b> {
+    { (result: Result_Result<x, a>) in
+        switch result {
+        case let .Result_Ok(value): onOk(value)
+        case let .Result_Err(error): .Result_Err(error)
+        }
+    }
+}
+
+public static func Result_map<a, value, x>(_ valueChange: @escaping (a) -> value) -> (
+    Result_Result<x, a>
+) -> Result_Result<x, value> {
+    { (result: Result_Result<x, a>) in
+        switch result {
+        case let .Result_Err(error): .Result_Err(error)
+        case let .Result_Ok(value):
+            .Result_Ok(valueChange(value))
+        }
+    }
+}
+
+public static func Result_map2<a, b, value, x>(
+    _ combine: @escaping (a) -> (b) -> value
+) -> (Result_Result<x, a>) -> (Result_Result<x, b>) -> Result_Result<x, value> {
+    { (aResult: Result_Result<x, a>) in
+        { (bResult: Result_Result<x, b>) in
+            switch aResult {
+            case let .Result_Err(x): .Result_Err(x)
+            case let .Result_Ok(a):
+                switch bResult {
+                case let .Result_Err(x): .Result_Err(x)
+                case let .Result_Ok(b):
+                    .Result_Ok(combine(a)(b))
+                }
+            }
+        }
+    }
+}
+
+public static func Result_map3<a, b, c, value, x>(
+    _ combine: @escaping (a) -> (b) -> (c) -> value
+) -> (Result_Result<x, a>) -> (Result_Result<x, b>) -> (Result_Result<x, c>) -> Result_Result<
+    x, value
+> {
+    { (aResult: Result_Result<x, a>) in
+        { (bResult: Result_Result<x, b>) in
+            { (cResult: Result_Result<x, c>) in
+                switch aResult {
+                case let .Result_Err(x): .Result_Err(x)
+                case let .Result_Ok(a):
+                    switch bResult {
+                    case let .Result_Err(x): .Result_Err(x)
+                    case let .Result_Ok(b):
+                        switch cResult {
+                        case let .Result_Err(x): .Result_Err(x)
+                        case let .Result_Ok(c):
+                            .Result_Ok(combine(a)(b)(c))
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+public static func Result_map4<a, b, c, d, value, x>(
+    _ combine: @escaping (a) -> (b) -> (c) -> (d) -> value
+) -> (Result_Result<x, a>) -> (Result_Result<x, b>) -> (Result_Result<x, c>) -> (
+    Result_Result<x, d>
+) -> Result_Result<x, value> {
+    { (aResult: Result_Result<x, a>) in
+        { (bResult: Result_Result<x, b>) in
+            { (cResult: Result_Result<x, c>) in
+                { (dResult: Result_Result<x, d>) in
+                    switch aResult {
+                    case let .Result_Err(x): .Result_Err(x)
+                    case let .Result_Ok(a):
+                        switch bResult {
+                        case let .Result_Err(x): .Result_Err(x)
+                        case let .Result_Ok(b):
+                            switch cResult {
+                            case let .Result_Err(x): .Result_Err(x)
+                            case let .Result_Ok(c):
+                                switch dResult {
+                                case let .Result_Err(x): .Result_Err(x)
+                                case let .Result_Ok(d):
+                                    .Result_Ok(combine(a)(b)(c)(d))
+
+                                }
+                            }
+
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+public static func Result_map5<a, b, c, d, e, value, x>(
+    _ combine: @escaping (a) -> (b) -> (c) -> (d) -> (e) -> value
+) -> (Result_Result<x, a>) -> (Result_Result<x, b>) -> (Result_Result<x, c>) -> (
+    Result_Result<x, d>
+) -> (Result_Result<x, e>) -> Result_Result<x, value> {
+    { (aResult: Result_Result<x, a>) in
+        { (bResult: Result_Result<x, b>) in
+            { (cResult: Result_Result<x, c>) in
+                { (dResult: Result_Result<x, d>) in
+                    { (eResult: Result_Result<x, e>) in
+                        switch aResult {
+                        case let .Result_Err(x): .Result_Err(x)
+                        case let .Result_Ok(a):
+                            switch bResult {
+                            case let .Result_Err(x): .Result_Err(x)
+                            case let .Result_Ok(b):
+                                switch cResult {
+                                case let .Result_Err(x): .Result_Err(x)
+                                case let .Result_Ok(c):
+                                    switch dResult {
+                                    case let .Result_Err(x): .Result_Err(x)
+                                    case let .Result_Ok(d):
+                                        switch eResult {
+                                        case let .Result_Err(x): .Result_Err(x)
+                                        case let .Result_Ok(e):
+                                            .Result_Ok(combine(a)(b)(c)(d)(e))
+                                        }
+                                    }
+                                }
+                            }
+
+                        }
+                    }
+                }
+            }
         }
     }
 }
