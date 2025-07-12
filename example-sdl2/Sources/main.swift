@@ -1,6 +1,6 @@
 import SDL
 
-if SDL_Init(SDL_INIT_VIDEO) != 0 {
+if SDL_Init(SDL_INIT_EVENTS | SDL_INIT_VIDEO) != 0 {
     fatalError("SDL could not initialize! SDL_Error: \(String(cString: SDL_GetError()))")
 }
 
