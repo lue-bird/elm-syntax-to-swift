@@ -3012,7 +3012,7 @@ typeConstructReferenceToCoreSwift reference =
                     Just { moduleOrigin = Nothing, name = "Basics_Order" }
 
                 "Bool" ->
-                    Just { moduleOrigin = Nothing, name = "bool" }
+                    Just { moduleOrigin = Nothing, name = "Bool" }
 
                 "Int" ->
                     -- TODO currently Int is treated as Float
@@ -6977,56 +6977,70 @@ expression context expressionTypedNode =
             Ok
                 { statements = []
                 , result =
-                    case expressionTypedNode.type_ |> inferredTypeExpandFunction |> .inputs |> List.map type_ of
-                        [] ->
-                            SwiftExpressionVariant
-                                { originTypeName = Nothing
-                                , name = swiftVariantName
+                    case swiftVariantName of
+                        "true" ->
+                            SwiftExpressionReference
+                                { moduleOrigin = Nothing
+                                , name = "true"
                                 }
 
-                        valueType0 :: valueType1Up ->
-                            let
-                                generatedValueParameterName : Int -> String
-                                generatedValueParameterName valueIndex =
-                                    ("generated_" ++ (valueIndex |> String.fromInt) ++ "_")
-                                        ++ (context.path |> String.join "_")
-                            in
-                            (valueType0 :: valueType1Up)
-                                |> List.indexedMap
-                                    (\valueIndex valueType ->
-                                        { pattern = generatedValueParameterName valueIndex
-                                        , type_ = valueType
+                        "false" ->
+                            SwiftExpressionReference
+                                { moduleOrigin = Nothing
+                                , name = "false"
+                                }
+
+                        _ ->
+                            case expressionTypedNode.type_ |> inferredTypeExpandFunction |> .inputs |> List.map type_ of
+                                [] ->
+                                    SwiftExpressionVariant
+                                        { originTypeName = Nothing
+                                        , name = swiftVariantName
                                         }
-                                    )
-                                |> List.foldr
-                                    (\parameter resultSoFar ->
-                                        SwiftExpressionLambda
-                                            { parameters =
-                                                [ { name = parameter.pattern
-                                                  , type_ = parameter.type_
-                                                  }
-                                                ]
-                                            , statements = []
-                                            , result = resultSoFar
-                                            }
-                                    )
-                                    (SwiftExpressionCall
-                                        { called =
-                                            SwiftExpressionVariant
-                                                { originTypeName = Nothing
-                                                , name = swiftVariantName
+
+                                valueType0 :: valueType1Up ->
+                                    let
+                                        generatedValueParameterName : Int -> String
+                                        generatedValueParameterName valueIndex =
+                                            ("generated_" ++ (valueIndex |> String.fromInt) ++ "_")
+                                                ++ (context.path |> String.join "_")
+                                    in
+                                    (valueType0 :: valueType1Up)
+                                        |> List.indexedMap
+                                            (\valueIndex valueType ->
+                                                { pattern = generatedValueParameterName valueIndex
+                                                , type_ = valueType
                                                 }
-                                        , arguments =
-                                            (valueType0 :: valueType1Up)
-                                                |> List.indexedMap
-                                                    (\valueIndex _ ->
-                                                        SwiftExpressionReference
-                                                            { moduleOrigin = Nothing
-                                                            , name = generatedValueParameterName valueIndex
-                                                            }
-                                                    )
-                                        }
-                                    )
+                                            )
+                                        |> List.foldr
+                                            (\parameter resultSoFar ->
+                                                SwiftExpressionLambda
+                                                    { parameters =
+                                                        [ { name = parameter.pattern
+                                                          , type_ = parameter.type_
+                                                          }
+                                                        ]
+                                                    , statements = []
+                                                    , result = resultSoFar
+                                                    }
+                                            )
+                                            (SwiftExpressionCall
+                                                { called =
+                                                    SwiftExpressionVariant
+                                                        { originTypeName = Nothing
+                                                        , name = swiftVariantName
+                                                        }
+                                                , arguments =
+                                                    (valueType0 :: valueType1Up)
+                                                        |> List.indexedMap
+                                                            (\valueIndex _ ->
+                                                                SwiftExpressionReference
+                                                                    { moduleOrigin = Nothing
+                                                                    , name = generatedValueParameterName valueIndex
+                                                                    }
+                                                            )
+                                                }
+                                            )
                 }
 
         ElmSyntaxTypeInfer.ExpressionReferenceRecordTypeAliasConstructorFunction reference ->
