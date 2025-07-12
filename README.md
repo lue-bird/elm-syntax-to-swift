@@ -30,8 +30,8 @@ Ok """import Foundation
 public enum Elm {
     ..some default declarations..
 
-    public static func sample_plus2(n: Double) -> Double {
-        basics_add(n, list_sum(List_List.Cons(2.0, List_List.Empty)));
+    public static func sample_plus2(_ n: Double) -> Double {
+        basics_add(n, Array_toList([ 2.0 ]))
     }
 }
 """
