@@ -1011,7 +1011,17 @@ public enum Elm {
         }
     }
 
-    private static func Array_toList<a>(_ array: [a]) -> List_List<a> {
+    static func Array_mapToList<a, b>(_ elementChange: (a) -> b, _ array: [a])
+        -> List_List<b>
+    {
+        var soFar: List_List<b> = .List_Empty
+        for element in array.reversed() {
+            soFar = .List_Cons(elementChange(element), soFar)
+        }
+        return soFar
+    }
+
+    public static func Array_toList<a>(_ array: [a]) -> List_List<a> {
         var soFar: List_List<a> = .List_Empty
         for element in array.reversed() {
             soFar = .List_Cons(element, soFar)
@@ -1245,8 +1255,9 @@ public enum Elm {
                 var remainingAList = aList
                 var remainingBList = bList
                 var combinedArraySoFar: [c] = []
-                while case (
-                    a: .List_Cons(let aHead, let aTail), b: .List_Cons(let bHead, let bTail)
+                while case let (
+                    a: .List_Cons(aHead, aTail),
+                    b: .List_Cons(bHead, bTail)
                 ) = (remainingAList, remainingBList) {
                     remainingAList = aTail
                     remainingBList = bTail
@@ -1256,6 +1267,104 @@ public enum Elm {
             }
         }
     }
+    public static func List_map3<a, b, c, combined>(
+        _ combine: @escaping (a) -> (b) -> (c) -> combined,
+    ) -> (List_List<a>) -> (List_List<b>) -> (List_List<c>) -> List_List<combined> {
+        { aList in
+            { bList in
+                { cList in
+                    var remainingAList = aList
+                    var remainingBList = bList
+                    var remainingCList = cList
+                    var combinedArraySoFar: [combined] = []
+                    while case let (
+                        .List_Cons(aHead, aTail),
+                        .List_Cons(bHead, bTail),
+                        .List_Cons(cHead, cTail)
+                    ) = (remainingAList, remainingBList, remainingCList) {
+                        remainingAList = aTail
+                        remainingBList = bTail
+                        remainingCList = cTail
+                        combinedArraySoFar.append(combine(aHead)(bHead)(cHead))
+                    }
+                    return Array_toList(combinedArraySoFar)
+                }
+            }
+        }
+    }
+    public static func List_map4<a, b, c, d, combined>(
+        _ combine: @escaping (a) -> (b) -> (c) -> (d) -> combined,
+    ) -> (List_List<a>) -> (List_List<b>) -> (List_List<c>) -> (List_List<d>) -> List_List<combined>
+    {
+        { aList in
+            { bList in
+                { cList in
+                    { dList in
+                        var remainingAList = aList
+                        var remainingBList = bList
+                        var remainingCList = cList
+                        var remainingDList = dList
+                        var combinedArraySoFar: [combined] = []
+                        while case let (
+                            .List_Cons(aHead, aTail),
+                            .List_Cons(bHead, bTail),
+                            .List_Cons(cHead, cTail),
+                            .List_Cons(dHead, dTail)
+                        ) = (remainingAList, remainingBList, remainingCList, remainingDList) {
+                            remainingAList = aTail
+                            remainingBList = bTail
+                            remainingCList = cTail
+                            remainingDList = dTail
+                            combinedArraySoFar.append(combine(aHead)(bHead)(cHead)(dHead))
+                        }
+                        return Array_toList(combinedArraySoFar)
+                    }
+                }
+            }
+        }
+    }
+    public static func List_map5<a, b, c, d, e, combined>(
+        _ combine: @escaping (a) -> (b) -> (c) -> (d) -> (e) -> combined,
+    ) -> (List_List<a>) -> (List_List<b>) -> (List_List<c>) -> (List_List<d>) -> (List_List<e>) ->
+        List_List<combined>
+    {
+        { aList in
+            { bList in
+                { cList in
+                    { dList in
+                        { eList in
+                            var remainingAList = aList
+                            var remainingBList = bList
+                            var remainingCList = cList
+                            var remainingDList = dList
+                            var remainingEList = eList
+                            var combinedArraySoFar: [combined] = []
+                            while case let (
+                                .List_Cons(aHead, aTail),
+                                .List_Cons(bHead, bTail),
+                                .List_Cons(cHead, cTail),
+                                .List_Cons(dHead, dTail),
+                                .List_Cons(eHead, eTail)
+                            ) = (
+                                remainingAList, remainingBList, remainingCList, remainingDList,
+                                remainingEList
+                            ) {
+                                remainingAList = aTail
+                                remainingBList = bTail
+                                remainingCList = cTail
+                                remainingDList = dTail
+                                remainingEList = eTail
+                                combinedArraySoFar.append(
+                                    combine(aHead)(bHead)(cHead)(dHead)(eHead))
+                            }
+                            return Array_toList(combinedArraySoFar)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     public static func List_zip<a, b>(_ aList: List_List<a>) -> (List_List<b>)
         -> List_List<(first: a, second: b)>
     {
@@ -1443,6 +1552,296 @@ public enum Elm {
         var asArray = Array_fromList(list)
         asArray.sort(by: { (a, b) in a < b })  // mutate
         return Array_toList(asArray)
+    }
+
+    public typealias Regex_Regex = Regex<Substring>
+    public typealias Regex_Options = (caseInsensitive: Bool, multiline: Bool)
+    public typealias Regex_Match = (
+        index: Int,
+        match: String,
+        number: Int,
+        submatches: List_List<(Maybe_Maybe<String>)>
+    )
+
+    public static let Regex_never: Regex_Regex = #/.^/#
+    public static func Regex_fromString(_ string: String) -> Maybe_Maybe<Regex_Regex> {
+        do {
+            return try .Maybe_Just(Regex(string))
+        } catch {
+            return .Maybe_Nothing
+        }
+    }
+    public static func Regex_contains(_ regex: Regex_Regex) -> (String) -> Bool {
+        { string in string.contains(regex) }
+    }
+    public static func Regex_split(_ regex: Regex_Regex) -> (String) -> List_List<String> {
+        { string in Array_mapToList({ sub in String(sub) }, string.split(separator: regex)) }
+    }
+    public static func Regex_splitAtMost(_ maxSplitCount: Double) -> (Regex_Regex) -> (String) ->
+        List_List<String>
+    {
+        { regex in
+            { string in
+                Array_mapToList(
+                    { sub in String(sub) },
+                    string.split(separator: regex, maxSplits: Int(maxSplitCount))
+                )
+            }
+        }
+    }
+
+    public enum Time_Posix { case Time_Posix(Double) }
+
+    public typealias Time_Era = (offset: Double, start: Double)
+
+    public enum Time_Zone { case Time_Zone(Double, List_List<Time_Era>) }
+
+    public enum Time_Weekday {
+        case Time_Mon
+        case Time_Tue
+        case Time_Wed
+        case Time_Thu
+        case Time_Fri
+        case Time_Sat
+        case Time_Sun
+    }
+
+    public enum Time_Month {
+        case Time_Jan
+        case Time_Feb
+        case Time_Mar
+        case Time_Apr
+        case Time_May
+        case Time_Jun
+        case Time_Jul
+        case Time_Aug
+        case Time_Sep
+        case Time_Oct
+        case Time_Nov
+        case Time_Dec
+    }
+
+    public enum Time_ZoneName {
+        case Time_Name(String)
+        case Time_Offset(Double)
+    }
+
+    public typealias Time_Civil = (
+        day: Double,
+        month: Double,
+        year: Double
+    )
+
+    public static func Time_posixToMillis(_ timePosix: Time_Posix) -> Double {
+        switch timePosix {
+        case let .Time_Posix(millis): millis
+        }
+    }
+    public static func Time_millisToPosix(_ millis: Double) -> Time_Posix {
+        .Time_Posix(millis)
+    }
+
+    public static let Time_utc: Time_Zone = .Time_Zone(0, .List_Empty)
+
+    public static func Time_customZone(_ n: Double) -> (List_List<Time_Era>) -> Time_Zone {
+        { eras in .Time_Zone(n, eras) }
+    }
+
+    public static func flooredDiv(_ numerator: Double, _ denominator: Double) -> Double {
+        (floor(numerator / denominator))
+    }
+
+    static func Time_toAdjustedMinutesHelp(
+        _ defaultOffset: Double,
+        _ posixMinutes: Double,
+        _ eras: List_List<Time_Era>
+    )
+        -> Double
+    {
+        switch eras {
+        case .List_Empty: posixMinutes + defaultOffset
+
+        case let .List_Cons(era, olderEras):
+            if era.start < posixMinutes {
+                posixMinutes + era.offset
+            } else {
+                Time_toAdjustedMinutesHelp(defaultOffset, posixMinutes, olderEras)
+            }
+        }
+    }
+
+    static func Time_toAdjustedMinutes(_ timeZone: Time_Zone, _ time: Time_Posix) -> Double {
+        switch timeZone {
+        case let .Time_Zone(defaultOffset, eras):
+            Time_toAdjustedMinutesHelp(
+                defaultOffset,
+                flooredDiv(Time_posixToMillis(time), 60000),
+                eras
+            )
+        }
+    }
+
+    public static func Time_toCivil(_ minutes: Double) -> Time_Civil {
+        let rawDay = flooredDiv(minutes, 60 * 24) + 719468
+        let era = if rawDay >= 0 { rawDay / 146097 } else { (rawDay - 146096) / 146097 }
+        let dayOfEra = rawDay - era * 146097  // [0, 146096]
+
+        let yearOfEra =
+            (dayOfEra - dayOfEra / 1460 + dayOfEra / 36524 - dayOfEra / 146096)
+            / 365  // [0, 399]
+
+        let year = yearOfEra + era * 400
+
+        let dayOfYear =
+            dayOfEra - (365 * yearOfEra + yearOfEra / 4 - yearOfEra / 100)  // [0, 365]
+
+        let mp = (5 * dayOfYear + 2) / 153  // [0, 11]
+        let month = if mp < 10 { mp + 3 } else { mp - 9 }  // [1, 12]
+
+        let resultYear = if month <= 2 { year + 1 } else { year }
+
+        return (
+            day: dayOfYear - (153 * mp + 2) / 5 + 1,  // [1, 31]
+            month: month,
+            year: resultYear,
+        )
+    }
+
+    public static func Time_toYear(_ zone: Time_Zone) -> (Time_Posix) -> Double {
+        { time in (Time_toCivil(Time_toAdjustedMinutes(zone, time))).year }
+    }
+
+    public static func Time_toMonth(_ zone: Time_Zone) -> (Time_Posix) -> Time_Month {
+        { time in
+            switch (Time_toCivil(Time_toAdjustedMinutes(zone, time))).month {
+            case 1: .Time_Jan
+            case 2: .Time_Feb
+            case 3: .Time_Mar
+            case 4: .Time_Apr
+            case 5: .Time_May
+            case 6: .Time_Jun
+            case 7: .Time_Jul
+            case 8: .Time_Aug
+            case 9: .Time_Sep
+            case 10: .Time_Oct
+            case 11: .Time_Nov
+            case _: .Time_Dec
+            }
+        }
+    }
+
+    public static func Time_toDay(_ zone: Time_Zone) -> (Time_Posix) -> Double {
+        { time in (Time_toCivil(Time_toAdjustedMinutes(zone, time))).day }
+    }
+
+    public static func Time_toWeekday(_ zone: Time_Zone) -> (Time_Posix) -> Time_Weekday {
+        { time in
+            switch Basics_modBy(7)(flooredDiv(Time_toAdjustedMinutes(zone, time), 60 * 24))
+            {
+            case 0: .Time_Thu
+            case 1: .Time_Fri
+            case 2: .Time_Sat
+            case 3: .Time_Sun
+            case 4: .Time_Mon
+            case 5: .Time_Tue
+            case _: .Time_Wed
+            }
+        }
+    }
+
+    public static func Time_toHour(_ zone: Time_Zone) -> (Time_Posix) -> Double {
+        { time in Basics_modBy(24)(flooredDiv(Time_toAdjustedMinutes(zone, time), 60)) }
+    }
+
+    public static func Time_toMinute(_ zone: Time_Zone) -> (Time_Posix) -> Double {
+        { time in Basics_modBy(60)(Time_toAdjustedMinutes(zone, time)) }
+    }
+
+    public static func Time_toSecond(_ zone: Time_Zone) -> (Time_Posix) -> Double {
+        { time in Basics_modBy(60)(flooredDiv(Time_posixToMillis(time), 1000)) }
+    }
+
+    public static func Time_toMillis(_ zone: Time_Zone) -> (Time_Posix) -> Double {
+        { time in Basics_modBy(1000)(Time_posixToMillis(time)) }
+    }
+
+    public typealias Bytes_Bytes = [UInt8]
+
+    public enum Bytes_Endianness {
+        case Bytes_LE
+        case Bytes_BE
+    }
+
+    public enum PlatformCmd_CmdSingle<event> {
+        case PlatformCmd_PortOutgoing(name: String, value: Data)
+    }
+    public typealias PlatformCmd_Cmd<event> =
+        [PlatformCmd_CmdSingle<event>]
+
+    public static func PlatformCmd_none<event>() -> PlatformCmd_Cmd<event> { [] }
+    public static func PlatformCmd_batch<event>(_ cmds: List_List<PlatformCmd_Cmd<event>>)
+        -> PlatformCmd_Cmd<event>
+    {
+        // can be optimized
+        Array_fromList(cmds).flatMap({ cmd in cmd })
+    }
+    public static func PlatformCmd_map<event, eventMapped>(
+        _: @escaping (event) -> eventMapped
+    )
+        -> (PlatformCmd_Cmd<event>) -> PlatformCmd_Cmd<eventMapped>
+    {
+        { cmd in
+            cmd.map({ cmdSingle in
+                switch cmdSingle {
+                case let .PlatformCmd_PortOutgoing(name, value):
+                    .PlatformCmd_PortOutgoing(name: name, value: value)
+                }
+            })
+        }
+    }
+
+    public enum PlatformSub_SubSingle<event> {
+        case PlatformSub_PortIncoming(name: String, onValue: (Data) -> event)
+    }
+    public typealias PlatformSub_Sub<event> = [PlatformSub_SubSingle<event>]
+
+    public static func PlatformSub_none<event>() -> PlatformSub_Sub<event> { [] }
+    public static func PlatformSub_batch<event>(_ subs: List_List<PlatformSub_Sub<event>>)
+        -> PlatformSub_Sub<event>
+    {
+        // can be optimized
+        Array_fromList(subs).flatMap({ sub in sub })
+    }
+    public static func PlatformSub_map<event, eventMapped>(
+        _ eventChange: @escaping (event) -> eventMapped
+    )
+        -> (PlatformSub_Sub<event>) -> PlatformSub_Sub<eventMapped>
+    {
+        { sub in
+            sub.map({ subSingle in
+                switch subSingle {
+                case let .PlatformSub_PortIncoming(name, onValue):
+                    .PlatformSub_PortIncoming(
+                        name: name,
+                        onValue: { value in eventChange(onValue(value)) }
+                    )
+                }
+            })
+        }
+    }
+
+    public typealias Platform_Program<flags, state, event> = (
+        init: (flags) -> (state, PlatformCmd_Cmd<event>),
+        update: (event) -> (state) -> (state, PlatformCmd_Cmd<event>),
+        subscriptions: (state) -> PlatformSub_Sub<event>
+    )
+
+    public static func Platform_worker<flags, state, event>(
+        _ config: Platform_Program<flags, state, event>
+    )
+        -> Platform_Program<flags, state, event>
+    {
+        config
     }
 
 }
