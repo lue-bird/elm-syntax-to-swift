@@ -7639,47 +7639,78 @@ expression context expressionTypedNode =
         ElmSyntaxTypeInfer.ExpressionCaseOf caseOf ->
             Result.map3
                 (\matched case0 case1Up ->
-                    -- TODO possibility for improvement:
-                    -- use SwiftExpressionSwitch when all case results have 0 statements
                     let
                         switchLocalResultVariableToInitialize : String
                         switchLocalResultVariableToInitialize =
                             generatedLocalReturnResult context.path
+
+                        allCasesHaveNoStatements : Bool
+                        allCasesHaveNoStatements =
+                            (case0 :: case1Up)
+                                |> List.all
+                                    (\swiftCase ->
+                                        swiftCase.statements |> List.isEmpty
+                                    )
                     in
                     { statements =
                         matched.statements
-                            ++ [ SwiftStatementLetDeclarationUninitialized
-                                    { name = switchLocalResultVariableToInitialize
-                                    , type_ = expressionTypedNode.type_ |> type_
-                                    }
-                               , SwiftStatementSwitch
-                                    { matched = matched.result
-                                    , case0 =
-                                        { pattern = case0.pattern
-                                        , statements =
-                                            case0.statements
-                                                ++ [ SwiftStatementBindingAssignment
-                                                        { name = switchLocalResultVariableToInitialize
-                                                        , assignedValue = case0.result
-                                                        }
-                                                   ]
-                                        }
-                                    , case1Up =
-                                        case1Up
-                                            |> List.map
-                                                (\swiftCase ->
-                                                    { pattern = swiftCase.pattern
-                                                    , statements =
-                                                        swiftCase.statements
-                                                            ++ [ SwiftStatementBindingAssignment
-                                                                    { name = switchLocalResultVariableToInitialize
-                                                                    , assignedValue = swiftCase.result
-                                                                    }
-                                                               ]
+                            ++ (if allCasesHaveNoStatements then
+                                    [ SwiftStatementLetDeclaration
+                                        { name = switchLocalResultVariableToInitialize
+                                        , resultType = expressionTypedNode.type_ |> type_
+                                        , result =
+                                            SwiftExpressionSwitch
+                                                { matched = matched.result
+                                                , case0 =
+                                                    { pattern = case0.pattern
+                                                    , result = case0.result
                                                     }
-                                                )
-                                    }
-                               ]
+                                                , case1Up =
+                                                    case1Up
+                                                        |> List.map
+                                                            (\swiftCase ->
+                                                                { pattern = swiftCase.pattern
+                                                                , result = swiftCase.result
+                                                                }
+                                                            )
+                                                }
+                                        }
+                                    ]
+
+                                else
+                                    [ SwiftStatementLetDeclarationUninitialized
+                                        { name = switchLocalResultVariableToInitialize
+                                        , type_ = expressionTypedNode.type_ |> type_
+                                        }
+                                    , SwiftStatementSwitch
+                                        { matched = matched.result
+                                        , case0 =
+                                            { pattern = case0.pattern
+                                            , statements =
+                                                case0.statements
+                                                    ++ [ SwiftStatementBindingAssignment
+                                                            { name = switchLocalResultVariableToInitialize
+                                                            , assignedValue = case0.result
+                                                            }
+                                                       ]
+                                            }
+                                        , case1Up =
+                                            case1Up
+                                                |> List.map
+                                                    (\swiftCase ->
+                                                        { pattern = swiftCase.pattern
+                                                        , statements =
+                                                            swiftCase.statements
+                                                                ++ [ SwiftStatementBindingAssignment
+                                                                        { name = switchLocalResultVariableToInitialize
+                                                                        , assignedValue = swiftCase.result
+                                                                        }
+                                                                   ]
+                                                        }
+                                                    )
+                                        }
+                                    ]
+                               )
                     , result =
                         SwiftExpressionReference
                             { moduleOrigin = Nothing
