@@ -1554,7 +1554,9 @@ public enum Elm {
         return Array_toList(asArray)
     }
 
-    public typealias Regex_Regex = Regex<Substring>
+    // not alias for Regex<Substring> because Regex is not Sendable
+    public enum Regex_Regex: Sendable { case Regex_Regex(String) }
+
     public typealias Regex_Options = (caseInsensitive: Bool, multiline: Bool)
     public typealias Regex_Match = (
         index: Int,
@@ -1563,40 +1565,73 @@ public enum Elm {
         submatches: List_List<(Maybe_Maybe<String>)>
     )
 
-    public static let Regex_never: Regex_Regex = #/.^/#
+    public static let Regex_never: Regex_Regex = .Regex_Regex("/.^/")
     public static func Regex_fromString(_ string: String) -> Maybe_Maybe<Regex_Regex> {
         do {
-            return try .Maybe_Just(Regex(string))
+            try _ = Regex(string)
+            return .Maybe_Just(.Regex_Regex(string))
         } catch {
             return .Maybe_Nothing
         }
     }
     public static func Regex_contains(_ regex: Regex_Regex) -> (String) -> Bool {
-        { string in string.contains(regex) }
+        { string in
+            switch regex {
+            case let .Regex_Regex(regexString):
+                do {
+                    return try string.contains(Regex(regexString))
+                } catch {
+                    return false
+                }
+            }
+        }
     }
     public static func Regex_split(_ regex: Regex_Regex) -> (String) -> List_List<String> {
-        { string in Array_mapToList({ sub in String(sub) }, string.split(separator: regex)) }
+        { string in
+            switch regex {
+            case let .Regex_Regex(regexString):
+                do {
+                    return try Array_mapToList(
+                        { sub in String(sub) },
+                        string.split(separator: Regex(regexString))
+                    )
+                } catch {
+                    return List_singleton(string)
+                }
+            }
+        }
     }
+
     public static func Regex_splitAtMost(_ maxSplitCount: Double) -> (Regex_Regex) -> (String) ->
         List_List<String>
     {
         { regex in
             { string in
-                Array_mapToList(
-                    { sub in String(sub) },
-                    string.split(separator: regex, maxSplits: Int(maxSplitCount))
-                )
+                switch regex {
+                case let .Regex_Regex(regexString):
+                    do {
+                        return try Array_mapToList(
+                            { sub in String(sub) },
+                            string.split(
+                                separator: Regex(regexString),
+                                maxSplits: Int(maxSplitCount)
+                            )
+                        )
+                    } catch {
+                        return List_singleton(string)
+                    }
+                }
             }
         }
     }
 
-    public enum Time_Posix { case Time_Posix(Double) }
+    public enum Time_Posix: Sendable { case Time_Posix(Double) }
 
     public typealias Time_Era = (offset: Double, start: Double)
 
-    public enum Time_Zone { case Time_Zone(Double, List_List<Time_Era>) }
+    public enum Time_Zone: Sendable { case Time_Zone(Double, List_List<Time_Era>) }
 
-    public enum Time_Weekday {
+    public enum Time_Weekday: Sendable {
         case Time_Mon
         case Time_Tue
         case Time_Wed
@@ -1606,7 +1641,7 @@ public enum Elm {
         case Time_Sun
     }
 
-    public enum Time_Month {
+    public enum Time_Month: Sendable {
         case Time_Jan
         case Time_Feb
         case Time_Mar
@@ -1621,7 +1656,7 @@ public enum Elm {
         case Time_Dec
     }
 
-    public enum Time_ZoneName {
+    public enum Time_ZoneName: Sendable {
         case Time_Name(String)
         case Time_Offset(Double)
     }
@@ -1767,12 +1802,12 @@ public enum Elm {
 
     public typealias Bytes_Bytes = [UInt8]
 
-    public enum Bytes_Endianness {
+    public enum Bytes_Endianness: Sendable {
         case Bytes_LE
         case Bytes_BE
     }
 
-    public enum PlatformCmd_CmdSingle<event> {
+    public enum PlatformCmd_CmdSingle<event>: Sendable {
         case PlatformCmd_PortOutgoing(name: String, value: Data)
     }
     public typealias PlatformCmd_Cmd<event> =
@@ -1800,8 +1835,8 @@ public enum Elm {
         }
     }
 
-    public enum PlatformSub_SubSingle<event> {
-        case PlatformSub_PortIncoming(name: String, onValue: (Data) -> event)
+    public enum PlatformSub_SubSingle<event>: Sendable {
+        case PlatformSub_PortIncoming(name: String, onValue: @Sendable (Data) -> event)
     }
     public typealias PlatformSub_Sub<event> = [PlatformSub_SubSingle<event>]
 
@@ -1813,7 +1848,7 @@ public enum Elm {
         Array_fromList(subs).flatMap({ sub in sub })
     }
     public static func PlatformSub_map<event, eventMapped>(
-        _ eventChange: @escaping (event) -> eventMapped
+        _ eventChange: @escaping @Sendable (event) -> eventMapped
     )
         -> (PlatformSub_Sub<event>) -> PlatformSub_Sub<eventMapped>
     {
