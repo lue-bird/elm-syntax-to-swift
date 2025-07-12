@@ -1085,30 +1085,41 @@ printSwiftTypeTuple position parts =
                     (\part ->
                         part |> printSwiftTypeNotParenthesized position
                     )
+
+        lineSpread : Print.LineSpread
+        lineSpread =
+            (part0Print |> Print.lineSpread)
+                |> Print.lineSpreadMergeWith
+                    (\() ->
+                        part1Print |> Print.lineSpread
+                    )
+                |> Print.lineSpreadMergeWith
+                    (\() ->
+                        part2UpPrints
+                            |> Print.lineSpreadListMapAndCombine Print.lineSpread
+                    )
     in
     -- doubly-parenthesized because swift interprets the pattern
     -- { (x, y) in ... } as a function taking two arguments which is different from
     -- a function taking a tuple
     Print.exactly "(("
         |> Print.followedBy
-            ((part0Print :: part1Print :: part2UpPrints)
-                |> Print.listMapAndIntersperseAndFlatten
-                    (\partPrint ->
-                        Print.withIndentIncreasedBy 3
+            (Print.withIndentIncreasedBy 3
+                ((part0Print :: part1Print :: part2UpPrints)
+                    |> Print.listMapAndIntersperseAndFlatten
+                        (\partPrint ->
                             partPrint
-                    )
-                    printLinebreakIndentedCommaSpace
+                        )
+                        (Print.exactly ","
+                            |> Print.followedBy
+                                (Print.spaceOrLinebreakIndented lineSpread)
+                        )
+                )
             )
-        |> Print.followedBy Print.linebreakIndented
+        |> Print.followedBy
+            (Print.emptyOrLinebreakIndented lineSpread)
         |> Print.followedBy
             (Print.exactly "))")
-
-
-printLinebreakIndentedCommaSpace : Print
-printLinebreakIndentedCommaSpace =
-    Print.linebreakIndented
-        |> Print.followedBy
-            (Print.exactly ", ")
 
 
 printSwiftTypeConstruct :
