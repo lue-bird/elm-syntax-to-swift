@@ -102,13 +102,6 @@ type SwiftExpression
         , part1 : SwiftExpression
         , part2Up : List SwiftExpression
         }
-    | -- maybe remove as it isn't useful in most situations
-      -- as swift does not allow e.g. parenthesized, in term etc
-      SwiftExpressionIfElse
-        { condition : SwiftExpression
-        , onTrue : SwiftExpression
-        , onFalse : SwiftExpression
-        }
     | SwiftExpressionArrayLiteral (List SwiftExpression)
     | SwiftExpressionRecord (FastDict.Dict String SwiftExpression)
     | SwiftExpressionCall
@@ -124,7 +117,14 @@ type SwiftExpression
         , statements : List SwiftStatement
         , result : SwiftExpression
         }
-    | SwiftExpressionSwitch
+    | -- can only be used as expression in return, throw, or as the source of an assignment
+      SwiftExpressionIfElse
+        { condition : SwiftExpression
+        , onTrue : SwiftExpression
+        , onFalse : SwiftExpression
+        }
+    | -- can only be used as expression in return, throw, or as the source of an assignment
+      SwiftExpressionSwitch
         { matched : SwiftExpression
         , case0 :
             { pattern : SwiftPattern
@@ -7637,15 +7637,15 @@ expression context expressionTypedNode =
                 )
 
         ElmSyntaxTypeInfer.ExpressionCaseOf caseOf ->
-            let
-                switchLocalResultVariableToInitialize : String
-                switchLocalResultVariableToInitialize =
-                    generatedLocalReturnResult context.path
-            in
             Result.map3
                 (\matched case0 case1Up ->
                     -- TODO possibility for improvement:
                     -- use SwiftExpressionSwitch when all case results have 0 statements
+                    let
+                        switchLocalResultVariableToInitialize : String
+                        switchLocalResultVariableToInitialize =
+                            generatedLocalReturnResult context.path
+                    in
                     { statements =
                         matched.statements
                             ++ [ SwiftStatementLetDeclarationUninitialized
@@ -7654,8 +7654,30 @@ expression context expressionTypedNode =
                                     }
                                , SwiftStatementSwitch
                                     { matched = matched.result
-                                    , case0 = case0
-                                    , case1Up = case1Up
+                                    , case0 =
+                                        { pattern = case0.pattern
+                                        , statements =
+                                            case0.statements
+                                                ++ [ SwiftStatementBindingAssignment
+                                                        { name = switchLocalResultVariableToInitialize
+                                                        , assignedValue = case0.result
+                                                        }
+                                                   ]
+                                        }
+                                    , case1Up =
+                                        case1Up
+                                            |> List.map
+                                                (\swiftCase ->
+                                                    { pattern = swiftCase.pattern
+                                                    , statements =
+                                                        swiftCase.statements
+                                                            ++ [ SwiftStatementBindingAssignment
+                                                                    { name = switchLocalResultVariableToInitialize
+                                                                    , assignedValue = swiftCase.result
+                                                                    }
+                                                               ]
+                                                    }
+                                                )
                                     }
                                ]
                     , result =
@@ -7673,10 +7695,7 @@ expression context expressionTypedNode =
                         , path = "matched" :: context.path
                         }
                 )
-                ({ pattern = caseOf.case0.pattern
-                 , result = caseOf.case0.result
-                 , localResultVariableToInitialize = switchLocalResultVariableToInitialize
-                 }
+                (caseOf.case0
                     |> case_
                         { moduleInfo = context.moduleInfo
                         , variablesFromWithinDeclarationInScope =
@@ -7691,10 +7710,7 @@ expression context expressionTypedNode =
                         )
                     |> listMapAndCombineOk
                         (\( caseIndex, laterCase ) ->
-                            { pattern = laterCase.pattern
-                            , result = laterCase.result
-                            , localResultVariableToInitialize = switchLocalResultVariableToInitialize
-                            }
+                            laterCase
                                 |> case_
                                     { moduleInfo = context.moduleInfo
                                     , variablesFromWithinDeclarationInScope =
@@ -8165,13 +8181,13 @@ case_ :
         , result :
             ElmSyntaxTypeInfer.TypedNode
                 ElmSyntaxTypeInfer.Expression
-        , localResultVariableToInitialize : String
         }
     ->
         Result
             String
             { pattern : SwiftPattern
             , statements : List SwiftStatement
+            , result : SwiftExpression
             }
 case_ context syntaxCase =
     let
@@ -8183,15 +8199,10 @@ case_ context syntaxCase =
         (\result ->
             { pattern = casePatternAsSwift.pattern
             , statements =
-                (result.statements
+                result.statements
                     |> swiftStatementsPrependLetDeclarationsForVariableAsPatternAliases
                         casePatternAsSwift.variableAsPatternAliases
-                )
-                    ++ [ SwiftStatementBindingAssignment
-                            { name = syntaxCase.localResultVariableToInitialize
-                            , assignedValue = result.result
-                            }
-                       ]
+            , result = result.result
             }
         )
         (syntaxCase.result
