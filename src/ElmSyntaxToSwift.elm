@@ -6951,41 +6951,63 @@ expression context expressionTypedNode =
 
         ElmSyntaxTypeInfer.ExpressionReferenceVariant reference ->
             let
-                swiftVariantName : String
-                swiftVariantName =
-                    case
-                        { moduleOrigin = reference.moduleOrigin
-                        , name = reference.name
-                        , type_ = expressionTypedNode.type_
-                        }
-                            |> referenceToCoreSwift
-                    of
-                        Just swiftCoreReference ->
-                            swiftCoreReference.name
+                asBool : Maybe SwiftExpression
+                asBool =
+                    case reference.moduleOrigin of
+                        "Basics" ->
+                            case reference.name of
+                                "True" ->
+                                    Just
+                                        (SwiftExpressionReference
+                                            { moduleOrigin = Nothing
+                                            , name = "true"
+                                            }
+                                        )
 
-                        Nothing ->
-                            referenceToSwiftName
-                                { moduleOrigin = reference.moduleOrigin
-                                , name = reference.name
-                                }
-            in
-            Ok
-                { statements = []
-                , result =
-                    case swiftVariantName of
-                        "true" ->
-                            SwiftExpressionReference
-                                { moduleOrigin = Nothing
-                                , name = "true"
-                                }
+                                "False" ->
+                                    Just
+                                        (SwiftExpressionReference
+                                            { moduleOrigin = Nothing
+                                            , name = "false"
+                                            }
+                                        )
 
-                        "false" ->
-                            SwiftExpressionReference
-                                { moduleOrigin = Nothing
-                                , name = "false"
-                                }
+                                _ ->
+                                    Nothing
 
                         _ ->
+                            Nothing
+            in
+            case asBool of
+                Just bool ->
+                    Ok
+                        { statements = []
+                        , result = bool
+                        }
+
+                Nothing ->
+                    let
+                        swiftVariantName : String
+                        swiftVariantName =
+                            case
+                                { moduleOrigin = reference.moduleOrigin
+                                , name = reference.name
+                                , type_ = expressionTypedNode.type_
+                                }
+                                    |> referenceToCoreSwift
+                            of
+                                Just swiftCoreReference ->
+                                    swiftCoreReference.name
+
+                                Nothing ->
+                                    referenceToSwiftName
+                                        { moduleOrigin = reference.moduleOrigin
+                                        , name = reference.name
+                                        }
+                    in
+                    Ok
+                        { statements = []
+                        , result =
                             case expressionTypedNode.type_ |> inferredTypeExpandFunction |> .inputs |> List.map type_ of
                                 [] ->
                                     SwiftExpressionVariant
@@ -7036,7 +7058,7 @@ expression context expressionTypedNode =
                                                             )
                                                 }
                                             )
-                }
+                        }
 
         ElmSyntaxTypeInfer.ExpressionReferenceRecordTypeAliasConstructorFunction reference ->
             case
@@ -11897,15 +11919,6 @@ swiftStatementsPrependLetDeclarationsForVariableAsPatternAliases variableAsPatte
                     :: resultSoFar
             )
             statements
-
-
-variableAsPatternAliasesToSwiftStatementLetDestructurings :
-    FastDict.Dict String SwiftPattern
-    -> List SwiftStatement
-variableAsPatternAliasesToSwiftStatementLetDestructurings variableAsPatternAliases =
-    []
-        |> swiftStatementsPrependLetDeclarationsForVariableAsPatternAliases
-            variableAsPatternAliases
 
 
 swiftExpressionReferenceTrue : SwiftExpression
