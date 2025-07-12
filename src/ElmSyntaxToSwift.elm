@@ -58,7 +58,8 @@ type SwiftType
 type SwiftPattern
     = SwiftPatternIgnore
     | SwiftPatternBool Bool
-    | SwiftPatternInt64 Int
+    | -- TODO change to Double?
+      SwiftPatternInt64 Int
     | SwiftPatternUnicodeScalar Char
     | SwiftPatternStringLiteral String
     | SwiftPatternVariable String
@@ -121,6 +122,20 @@ type SwiftExpression
         , statements : List SwiftStatement
         , result : SwiftExpression
         }
+    | SwiftExpressionSwitch
+        { matched : SwiftExpression
+        , case0 :
+            { pattern : SwiftPattern
+            , --, patternType : SwiftType
+              result : SwiftExpression
+            }
+        , case1Up :
+            List
+                { pattern : SwiftPattern
+                , --, patternType : SwiftType
+                  result : SwiftExpression
+                }
+        }
 
 
 {-| The sub-set of swift statement syntax used in generated swift code
@@ -128,8 +143,7 @@ type SwiftExpression
 type SwiftStatement
     = SwiftStatementLetDestructuring
         { pattern : SwiftPattern
-        , -- TODO check if necessary patternType : SwiftType
-          expression : SwiftExpression
+        , expression : SwiftExpression
         }
     | SwiftStatementLetDeclaration
         { name : String
@@ -143,16 +157,13 @@ type SwiftStatement
         , result : SwiftExpression
         , resultType : SwiftType
         }
-    | SwiftStatementLetValueDeclarationUninitialized
+    | SwiftStatementLetDeclarationUninitialized
         { name : String
-
-        -- TODO check if necessary , type_ : SwiftType
+        , type_ : SwiftType
         }
     | SwiftStatementVarDeclaration
         { name : String
         , value : SwiftExpression
-
-        -- TODO check if necessary , type_ : SwiftType
         }
     | SwiftStatementBindingAssignment
         { name : String
@@ -167,14 +178,14 @@ type SwiftStatement
         { matched : SwiftExpression
         , case0 :
             { pattern : SwiftPattern
-            , patternType : SwiftType
-            , statements : List SwiftStatement
+            , --  , patternType : SwiftType
+              statements : List SwiftStatement
             }
         , case1Up :
             List
                 { pattern : SwiftPattern
-                , patternType : SwiftType
-                , statements : List SwiftStatement
+                , --, patternType : SwiftType
+                  statements : List SwiftStatement
                 }
         }
 
@@ -537,6 +548,17 @@ swiftExpressionUsedLocalReferences swiftExpression =
                         |> swiftExpressionUsedLocalReferences
                     )
 
+        SwiftExpressionSwitch switch ->
+            switch.matched
+                |> swiftExpressionUsedLocalReferences
+                |> FastSet.union
+                    ((switch.case0 :: switch.case1Up)
+                        |> listMapToFastSetsAndUnify
+                            (\swiftCase ->
+                                swiftCase.result |> swiftExpressionUsedLocalReferences
+                            )
+                    )
+
         SwiftExpressionTuple parts ->
             parts.part0
                 |> swiftExpressionUsedLocalReferences
@@ -592,16 +614,17 @@ printSwiftEnumDeclaration :
     { indirect : Bool
     , name : String
     , parameters : List String
-    , variants : FastDict.Dict String (List SwiftType)
+    , -- TODO rename to cases
+      variants : FastDict.Dict String (List SwiftType)
     }
     -> Print
 printSwiftEnumDeclaration swiftEnumType =
     Print.exactly
         ((if swiftEnumType.indirect then
-            "public indirect enum"
+            "public indirect enum "
 
           else
-            "public enum"
+            "public enum "
          )
             ++ swiftEnumType.name
             ++ (case swiftEnumType.parameters of
@@ -626,7 +649,7 @@ printSwiftEnumDeclaration swiftEnumType =
                             |> FastDict.toList
                             |> Print.listMapAndIntersperseAndFlatten
                                 (\( name, values ) ->
-                                    printSwiftVariantDeclaration
+                                    printSwiftEnumCaseDeclaration
                                         { name = name
                                         , values = values
                                         }
@@ -639,59 +662,48 @@ printSwiftEnumDeclaration swiftEnumType =
         |> Print.followedBy printExactlyCurlyClosing
 
 
-printSwiftVariantDeclaration : { name : String, values : List SwiftType } -> Print
-printSwiftVariantDeclaration swiftVariant =
-    Print.exactly ("case " ++ swiftVariant.name)
-        |> Print.followedBy
-            (case swiftVariant.values of
-                [] ->
-                    Print.empty
+printSwiftEnumCaseDeclaration : { name : String, values : List SwiftType } -> Print
+printSwiftEnumCaseDeclaration swiftVariant =
+    case swiftVariant.values of
+        [] ->
+            Print.exactly ("case " ++ swiftVariant.name)
 
-                value0 :: value1Up ->
-                    let
-                        valuePrints : List Print
-                        valuePrints =
-                            (value0 :: value1Up)
-                                |> List.map
-                                    (\value ->
-                                        let
-                                            valuePrint : Print
-                                            valuePrint =
-                                                value |> printSwiftTypeNotParenthesized TypeIncoming
-                                        in
-                                        Print.spaceOrLinebreakIndented
-                                            (valuePrint |> Print.lineSpread)
-                                            |> Print.followedBy
+        value0 :: value1Up ->
+            let
+                valuePrints : List Print
+                valuePrints =
+                    (value0 :: value1Up)
+                        |> List.map
+                            (\value ->
+                                value |> printSwiftTypeNotParenthesized TypeIncoming
+                            )
+
+                fullLineSpread : Print.LineSpread
+                fullLineSpread =
+                    valuePrints
+                        |> Print.lineSpreadListMapAndCombine Print.lineSpread
+            in
+            Print.exactly ("case " ++ swiftVariant.name ++ "(")
+                |> Print.followedBy
+                    (Print.withIndentAtNextMultipleOf4
+                        (Print.emptyOrLinebreakIndented fullLineSpread
+                            |> Print.followedBy
+                                (valuePrints
+                                    |> Print.listMapAndIntersperseAndFlatten
+                                        (\valuePrint ->
+                                            Print.withIndentAtNextMultipleOf4
                                                 valuePrint
-                                    )
-
-                        fullLineSpread : Print.LineSpread
-                        fullLineSpread =
-                            valuePrints
-                                |> Print.lineSpreadListMapAndCombine Print.lineSpread
-                    in
-                    printExactlyParenOpening
-                        |> Print.followedBy
-                            (Print.withIndentAtNextMultipleOf4
-                                (Print.emptyOrLinebreakIndented fullLineSpread
-                                    |> Print.followedBy
-                                        (valuePrints
-                                            |> Print.listMapAndIntersperseAndFlatten
-                                                (\valuePrint ->
-                                                    Print.withIndentAtNextMultipleOf4
-                                                        valuePrint
-                                                )
-                                                (Print.exactly ","
-                                                    |> Print.followedBy
-                                                        (Print.spaceOrLinebreakIndented fullLineSpread)
-                                                )
+                                        )
+                                        (Print.exactly ","
+                                            |> Print.followedBy
+                                                (Print.spaceOrLinebreakIndented fullLineSpread)
                                         )
                                 )
-                            )
-                        |> Print.followedBy
-                            (Print.emptyOrLinebreakIndented fullLineSpread)
-                        |> Print.followedBy (Print.exactly ")")
-            )
+                        )
+                    )
+                |> Print.followedBy
+                    (Print.emptyOrLinebreakIndented fullLineSpread)
+                |> Print.followedBy (Print.exactly ")")
 
 
 typeAliasDeclaration :
@@ -734,9 +746,7 @@ printSwiftTypealiasDeclaration swiftTypeAliasDeclaration =
                 (Print.linebreakIndented
                     |> Print.followedBy
                         (swiftTypeAliasDeclaration.type_
-                            |> printSwiftTypeNotParenthesized
-                                -- TODO ?
-                                TypeOutgoing
+                            |> printSwiftTypeNotParenthesized TypeOutgoing
                         )
                 )
             )
@@ -748,10 +758,23 @@ type_ : ElmSyntaxTypeInfer.Type -> SwiftType
 type_ inferredType =
     case inferredType of
         ElmSyntaxTypeInfer.TypeVariable variable ->
-            SwiftTypeVariable (variable.name |> variableNameDisambiguateFromSwiftKeywords)
+            if variable.name |> String.startsWith "number" then
+                swiftTypeDouble
+
+            else
+                SwiftTypeVariable (variable.name |> variableNameDisambiguateFromSwiftKeywords)
 
         ElmSyntaxTypeInfer.TypeNotVariable inferredTypeNotVariable ->
             typeNotVariable inferredTypeNotVariable
+
+
+swiftTypeDouble : SwiftType
+swiftTypeDouble =
+    SwiftTypeConstruct
+        { moduleOrigin = swiftReferenceDouble.moduleOrigin
+        , name = swiftReferenceDouble.name
+        , arguments = []
+        }
 
 
 typeNotVariable : ElmSyntaxTypeInfer.TypeNotVariable -> SwiftType
@@ -955,7 +978,10 @@ printSwiftTypeFunction position typeFunction =
             outputExpanded.inputs
                 |> List.map
                     (\inputType ->
-                        inputType |> printSwiftTypeParenthesizedIfSpaceSeparated TypeIncoming
+                        printParenthesized
+                            (printSwiftTypeNotParenthesized TypeIncoming
+                                inputType
+                            )
                     )
 
         fullLineSpread : Print.LineSpread
@@ -971,10 +997,10 @@ printSwiftTypeFunction position typeFunction =
                                 Print.lineSpread
                     )
     in
-    -- TODO only escaping when necessary
     Print.exactly
         (case position of
             TypeIncoming ->
+                -- TODO only escaping when necessary
                 "@Sendable @escaping "
 
             TypeOutgoing ->
@@ -1148,11 +1174,6 @@ printExactlyLessThan =
 printExactlyGreaterThan : Print
 printExactlyGreaterThan =
     Print.exactly ">"
-
-
-printExactlyComma : Print
-printExactlyComma =
-    Print.exactly ","
 
 
 typeIsSpaceSeparated : SwiftType -> Bool
@@ -1504,12 +1525,683 @@ charIsLatinAlphaNumOrUnderscoreFast c =
            (code == 95)
 
 
+{-| Internally, this will declare bindings for all introduced pattern variables: let x; let y; etc
+and populate them in switches and let destructurings
+-}
+destructuringToSwiftStatements :
+    { pattern :
+        ElmSyntaxTypeInfer.TypedNode
+            ElmSyntaxTypeInfer.Pattern
+    , expression : SwiftExpression
+    }
+    -> List SwiftStatement
+destructuringToSwiftStatements toDestructure =
+    (toDestructure.pattern
+        |> inferredPatternIntroducedVariables
+        |> List.map
+            (\bindingToIntroduce ->
+                SwiftStatementLetDeclarationUninitialized
+                    { name =
+                        variableNameDisambiguateFromSwiftKeywords
+                            bindingToIntroduce.name
+                    , type_ = bindingToIntroduce.type_ |> type_
+                    }
+            )
+    )
+        ++ destructuringToSwiftAssignmentStatements
+            { pattern = toDestructure.pattern
+            , expression = toDestructure.expression
+            }
+
+
+swiftPatternIgnorePatternAliasesEmpty :
+    { pattern : SwiftPattern
+    , patternAliases :
+        List
+            { variable : String
+            , pattern :
+                ElmSyntaxTypeInfer.TypedNode
+                    ElmSyntaxTypeInfer.Pattern
+            }
+    }
+swiftPatternIgnorePatternAliasesEmpty =
+    { pattern = SwiftPatternIgnore
+    , patternAliases = []
+    }
+
+
+inferredPatternUntilAsPatterns :
+    ElmSyntaxTypeInfer.TypedNode
+        ElmSyntaxTypeInfer.Pattern
+    ->
+        { pattern : SwiftPattern
+        , patternAliases :
+            List
+                { variable : String
+                , pattern :
+                    ElmSyntaxTypeInfer.TypedNode
+                        ElmSyntaxTypeInfer.Pattern
+                }
+        }
+inferredPatternUntilAsPatterns patternTypedNode =
+    -- IGNORE TCO
+    case patternTypedNode.value of
+        ElmSyntaxTypeInfer.PatternIgnored ->
+            swiftPatternIgnorePatternAliasesEmpty
+
+        ElmSyntaxTypeInfer.PatternUnit ->
+            swiftPatternIgnorePatternAliasesEmpty
+
+        ElmSyntaxTypeInfer.PatternChar charValue ->
+            { pattern = SwiftPatternUnicodeScalar charValue
+            , patternAliases = []
+            }
+
+        ElmSyntaxTypeInfer.PatternString stringValue ->
+            { pattern = SwiftPatternStringLiteral stringValue
+            , patternAliases = []
+            }
+
+        ElmSyntaxTypeInfer.PatternInt intValue ->
+            { pattern = SwiftPatternInt64 intValue.value
+            , patternAliases = []
+            }
+
+        ElmSyntaxTypeInfer.PatternVariable variableName ->
+            let
+                disambiguatedVariableName : String
+                disambiguatedVariableName =
+                    variableName |> variableNameDisambiguateFromSwiftKeywords
+            in
+            { pattern = SwiftPatternVariable disambiguatedVariableName
+            , patternAliases = []
+            }
+
+        ElmSyntaxTypeInfer.PatternParenthesized inParens ->
+            inferredPatternUntilAsPatterns inParens
+
+        ElmSyntaxTypeInfer.PatternTuple parts ->
+            let
+                part0 : { pattern : SwiftPattern, patternAliases : List { variable : String, pattern : ElmSyntaxTypeInfer.TypedNode ElmSyntaxTypeInfer.Pattern } }
+                part0 =
+                    parts.part0 |> inferredPatternUntilAsPatterns
+
+                part1 : { pattern : SwiftPattern, patternAliases : List { variable : String, pattern : ElmSyntaxTypeInfer.TypedNode ElmSyntaxTypeInfer.Pattern } }
+                part1 =
+                    parts.part1 |> inferredPatternUntilAsPatterns
+            in
+            { pattern =
+                SwiftPatternTuple
+                    { part0 = part0.pattern
+                    , part1 = part1.pattern
+                    , part2Up = []
+                    }
+            , patternAliases =
+                part0.patternAliases
+                    ++ part1.patternAliases
+            }
+
+        ElmSyntaxTypeInfer.PatternTriple parts ->
+            let
+                part0 : { pattern : SwiftPattern, patternAliases : List { variable : String, pattern : ElmSyntaxTypeInfer.TypedNode ElmSyntaxTypeInfer.Pattern } }
+                part0 =
+                    parts.part0 |> inferredPatternUntilAsPatterns
+
+                part1 : { pattern : SwiftPattern, patternAliases : List { variable : String, pattern : ElmSyntaxTypeInfer.TypedNode ElmSyntaxTypeInfer.Pattern } }
+                part1 =
+                    parts.part1 |> inferredPatternUntilAsPatterns
+
+                part2 : { pattern : SwiftPattern, patternAliases : List { variable : String, pattern : ElmSyntaxTypeInfer.TypedNode ElmSyntaxTypeInfer.Pattern } }
+                part2 =
+                    parts.part2 |> inferredPatternUntilAsPatterns
+            in
+            { pattern =
+                SwiftPatternTuple
+                    { part0 = part0.pattern
+                    , part1 = part1.pattern
+                    , part2Up = [ part2.pattern ]
+                    }
+            , patternAliases =
+                part0.patternAliases
+                    ++ part1.patternAliases
+                    ++ part2.patternAliases
+            }
+
+        ElmSyntaxTypeInfer.PatternRecord patternFields ->
+            let
+                allFields : FastDict.Dict String ElmSyntaxTypeInfer.Type
+                allFields =
+                    case patternTypedNode.type_ of
+                        ElmSyntaxTypeInfer.TypeVariable _ ->
+                            FastDict.empty
+
+                        ElmSyntaxTypeInfer.TypeNotVariable patternTypeNotVariable ->
+                            case patternTypeNotVariable of
+                                ElmSyntaxTypeInfer.TypeUnit ->
+                                    FastDict.empty
+
+                                ElmSyntaxTypeInfer.TypeConstruct _ ->
+                                    FastDict.empty
+
+                                ElmSyntaxTypeInfer.TypeTuple _ ->
+                                    FastDict.empty
+
+                                ElmSyntaxTypeInfer.TypeTriple _ ->
+                                    FastDict.empty
+
+                                ElmSyntaxTypeInfer.TypeRecord patternTypeRecordFields ->
+                                    patternTypeRecordFields
+
+                                ElmSyntaxTypeInfer.TypeRecordExtension _ ->
+                                    FastDict.empty
+
+                                ElmSyntaxTypeInfer.TypeFunction _ ->
+                                    FastDict.empty
+
+                combinedFieldNames :
+                    { fields : FastDict.Dict String SwiftPattern
+                    , introducedVariables : FastSet.Set String
+                    }
+                combinedFieldNames =
+                    FastDict.merge
+                        (\fieldName _ soFar ->
+                            { fields =
+                                soFar.fields
+                                    |> FastDict.insert
+                                        (fieldName |> variableNameDisambiguateFromSwiftKeywords)
+                                        SwiftPatternIgnore
+                            , introducedVariables =
+                                soFar.introducedVariables
+                            }
+                        )
+                        (\fieldName _ () soFar ->
+                            let
+                                disambiguatedFieldName : String
+                                disambiguatedFieldName =
+                                    fieldName |> variableNameDisambiguateFromSwiftKeywords
+                            in
+                            { fields =
+                                soFar.fields
+                                    |> FastDict.insert
+                                        disambiguatedFieldName
+                                        (SwiftPatternVariable
+                                            disambiguatedFieldName
+                                        )
+                            , introducedVariables =
+                                soFar.introducedVariables
+                                    |> FastSet.insert disambiguatedFieldName
+                            }
+                        )
+                        (\fieldName () soFar ->
+                            let
+                                disambiguatedFieldName : String
+                                disambiguatedFieldName =
+                                    fieldName |> variableNameDisambiguateFromSwiftKeywords
+                            in
+                            { fields =
+                                soFar.fields
+                                    |> FastDict.insert
+                                        disambiguatedFieldName
+                                        (SwiftPatternVariable
+                                            disambiguatedFieldName
+                                        )
+                            , introducedVariables =
+                                soFar.introducedVariables
+                                    |> FastSet.insert disambiguatedFieldName
+                            }
+                        )
+                        allFields
+                        (patternFields
+                            |> List.foldl
+                                (\fieldNameTypedNode soFar ->
+                                    soFar |> FastDict.insert fieldNameTypedNode.value ()
+                                )
+                                FastDict.empty
+                        )
+                        fieldsDictEmptyIntroducedVariablesDictEmpty
+            in
+            { pattern = SwiftPatternRecord combinedFieldNames.fields
+            , patternAliases = []
+            }
+
+        ElmSyntaxTypeInfer.PatternListCons listCons ->
+            let
+                head : { pattern : SwiftPattern, patternAliases : List { variable : String, pattern : ElmSyntaxTypeInfer.TypedNode ElmSyntaxTypeInfer.Pattern } }
+                head =
+                    listCons.head |> inferredPatternUntilAsPatterns
+
+                tail : { pattern : SwiftPattern, patternAliases : List { variable : String, pattern : ElmSyntaxTypeInfer.TypedNode ElmSyntaxTypeInfer.Pattern } }
+                tail =
+                    listCons.tail |> inferredPatternUntilAsPatterns
+            in
+            { pattern =
+                SwiftPatternVariant
+                    { originTypeName = Nothing
+                    , name = "List_Cons"
+                    , values =
+                        [ head.pattern
+                        , tail.pattern
+                        ]
+                    }
+            , patternAliases =
+                head.patternAliases
+                    ++ tail.patternAliases
+            }
+
+        ElmSyntaxTypeInfer.PatternListExact elementPatterns ->
+            let
+                elements : List { pattern : SwiftPattern, patternAliases : List { variable : String, pattern : ElmSyntaxTypeInfer.TypedNode ElmSyntaxTypeInfer.Pattern } }
+                elements =
+                    elementPatterns
+                        |> List.indexedMap
+                            (\elementIndex element ->
+                                element |> inferredPatternUntilAsPatterns
+                            )
+            in
+            { pattern =
+                elements
+                    |> List.foldr
+                        (\element soFar ->
+                            SwiftPatternVariant
+                                { originTypeName = Nothing
+                                , name = "List_Cons"
+                                , values =
+                                    [ element.pattern
+                                    , soFar
+                                    ]
+                                }
+                        )
+                        (SwiftPatternVariant
+                            { originTypeName = Nothing
+                            , name = "List_Empty"
+                            , values = []
+                            }
+                        )
+            , patternAliases =
+                elements
+                    |> List.concatMap .patternAliases
+            }
+
+        ElmSyntaxTypeInfer.PatternVariant variant ->
+            let
+                asBool : Maybe Bool
+                asBool =
+                    case variant.moduleOrigin of
+                        "Basics" ->
+                            case variant.name of
+                                "True" ->
+                                    Just True
+
+                                "False" ->
+                                    Just False
+
+                                _ ->
+                                    Nothing
+
+                        _ ->
+                            Nothing
+            in
+            case asBool of
+                Just bool ->
+                    { pattern = SwiftPatternBool bool
+                    , patternAliases = []
+                    }
+
+                Nothing ->
+                    let
+                        reference : { moduleOrigin : Maybe String, name : String }
+                        reference =
+                            case
+                                { moduleOrigin = variant.moduleOrigin
+                                , name = variant.name
+                                , type_ = patternTypedNode.type_
+                                }
+                                    |> referenceToCoreSwift
+                            of
+                                Just swiftReference ->
+                                    swiftReference
+
+                                Nothing ->
+                                    { moduleOrigin = Nothing
+                                    , name =
+                                        referenceToSwiftName
+                                            { moduleOrigin = variant.moduleOrigin
+                                            , name = variant.name
+                                            }
+                                    }
+
+                        values : List { pattern : SwiftPattern, patternAliases : List { variable : String, pattern : ElmSyntaxTypeInfer.TypedNode ElmSyntaxTypeInfer.Pattern } }
+                        values =
+                            variant.values
+                                |> List.map
+                                    inferredPatternUntilAsPatterns
+                    in
+                    { pattern =
+                        SwiftPatternVariant
+                            { originTypeName = reference.moduleOrigin
+                            , name = reference.name
+                            , values = values |> List.map .pattern
+                            }
+                    , patternAliases =
+                        values
+                            |> List.concatMap .patternAliases
+                    }
+
+        ElmSyntaxTypeInfer.PatternAs patternAs ->
+            let
+                variableDisambiguated : String
+                variableDisambiguated =
+                    patternAs.variable.value |> variableNameDisambiguateFromSwiftKeywords
+            in
+            { pattern = SwiftPatternVariable variableDisambiguated
+            , patternAliases =
+                [ { variable = variableDisambiguated
+                  , pattern = patternAs.pattern
+                  }
+                ]
+            }
+
+
+inferredPatternIntroducedVariables :
+    ElmSyntaxTypeInfer.TypedNode
+        ElmSyntaxTypeInfer.Pattern
+    -> List { name : String, type_ : ElmSyntaxTypeInfer.Type }
+inferredPatternIntroducedVariables patternTypedNode =
+    -- IGNORE TCO
+    case patternTypedNode.value of
+        ElmSyntaxTypeInfer.PatternUnit ->
+            []
+
+        ElmSyntaxTypeInfer.PatternIgnored ->
+            []
+
+        ElmSyntaxTypeInfer.PatternInt _ ->
+            []
+
+        ElmSyntaxTypeInfer.PatternString _ ->
+            []
+
+        ElmSyntaxTypeInfer.PatternChar _ ->
+            []
+
+        ElmSyntaxTypeInfer.PatternVariable variable ->
+            [ { name = variable, type_ = patternTypedNode.type_ } ]
+
+        ElmSyntaxTypeInfer.PatternRecord fieldVariables ->
+            fieldVariables
+                |> List.map
+                    (\fieldVariable ->
+                        { name = fieldVariable.value
+                        , type_ = fieldVariable.type_
+                        }
+                    )
+
+        ElmSyntaxTypeInfer.PatternAs patternAs ->
+            { name = patternAs.variable.value
+            , type_ = patternAs.variable.type_
+            }
+                :: (patternAs.pattern |> inferredPatternIntroducedVariables)
+
+        ElmSyntaxTypeInfer.PatternParenthesized inParens ->
+            inferredPatternIntroducedVariables inParens
+
+        ElmSyntaxTypeInfer.PatternListCons listCons ->
+            (listCons.head |> inferredPatternIntroducedVariables)
+                ++ (listCons.tail |> inferredPatternIntroducedVariables)
+
+        ElmSyntaxTypeInfer.PatternTuple parts ->
+            (parts.part0 |> inferredPatternIntroducedVariables)
+                ++ (parts.part1 |> inferredPatternIntroducedVariables)
+
+        ElmSyntaxTypeInfer.PatternTriple parts ->
+            (parts.part0 |> inferredPatternIntroducedVariables)
+                ++ (parts.part1 |> inferredPatternIntroducedVariables)
+                ++ (parts.part2 |> inferredPatternIntroducedVariables)
+
+        ElmSyntaxTypeInfer.PatternListExact elements ->
+            elements
+                |> List.concatMap inferredPatternIntroducedVariables
+
+        ElmSyntaxTypeInfer.PatternVariant variant ->
+            variant.values
+                |> List.concatMap inferredPatternIntroducedVariables
+
+
+generatedDestructuringVariableNameFor : String -> String
+generatedDestructuringVariableNameFor variableName =
+    "generated_destructured_" ++ variableName
+
+
+destructuringToSwiftAssignmentStatements :
+    { pattern :
+        ElmSyntaxTypeInfer.TypedNode
+            ElmSyntaxTypeInfer.Pattern
+    , expression : SwiftExpression
+    }
+    -> List SwiftStatement
+destructuringToSwiftAssignmentStatements toDestructure =
+    let
+        patternUntilAsPatterns :
+            { pattern : SwiftPattern
+            , patternAliases :
+                List
+                    { variable : String
+                    , pattern : ElmSyntaxTypeInfer.TypedNode ElmSyntaxTypeInfer.Pattern
+                    }
+            }
+        patternUntilAsPatterns =
+            toDestructure.pattern
+                |> inferredPatternUntilAsPatterns
+
+        patternUntilAsPatternsWithGeneratedVariableNames : SwiftPattern
+        patternUntilAsPatternsWithGeneratedVariableNames =
+            patternUntilAsPatterns.pattern
+                |> swiftPatternAlterVariables generatedDestructuringVariableNameFor
+
+        asPatternAliasDestructuringStatements : List SwiftStatement
+        asPatternAliasDestructuringStatements =
+            patternUntilAsPatterns.patternAliases
+                |> List.concatMap
+                    (\variableAsPatternAlias ->
+                        destructuringToSwiftAssignmentStatements
+                            { expression =
+                                SwiftExpressionReference
+                                    { moduleOrigin = Nothing
+                                    , name = variableAsPatternAlias.variable
+                                    }
+                            , pattern = variableAsPatternAlias.pattern
+                            }
+                    )
+
+        patternUntilAsPatternsIntroducedVariableAssignments : List SwiftStatement
+        patternUntilAsPatternsIntroducedVariableAssignments =
+            patternUntilAsPatterns.pattern
+                |> swiftPatternIntroducedVariables
+                |> List.map
+                    (\introducedVariableName ->
+                        SwiftStatementBindingAssignment
+                            { name = introducedVariableName
+                            , assignedValue =
+                                SwiftExpressionReference
+                                    { moduleOrigin = Nothing
+                                    , name =
+                                        generatedDestructuringVariableNameFor
+                                            introducedVariableName
+                                    }
+                            }
+                    )
+    in
+    if patternUntilAsPatternsWithGeneratedVariableNames |> swiftPatternCanBeUsedInSwiftDestructuring then
+        SwiftStatementLetDestructuring
+            { pattern = patternUntilAsPatternsWithGeneratedVariableNames
+            , expression = toDestructure.expression
+            }
+            :: patternUntilAsPatternsIntroducedVariableAssignments
+            ++ asPatternAliasDestructuringStatements
+
+    else
+        [ SwiftStatementSwitch
+            { matched = toDestructure.expression
+            , case0 =
+                { pattern = patternUntilAsPatternsWithGeneratedVariableNames
+                , statements =
+                    asPatternAliasDestructuringStatements
+                        ++ patternUntilAsPatternsIntroducedVariableAssignments
+                }
+            , case1Up = []
+            }
+        ]
+
+
+swiftPatternIntroducedVariables : SwiftPattern -> List String
+swiftPatternIntroducedVariables swiftPattern =
+    -- IGNORE TCO
+    case swiftPattern of
+        SwiftPatternIgnore ->
+            []
+
+        SwiftPatternBool _ ->
+            []
+
+        SwiftPatternInt64 _ ->
+            []
+
+        SwiftPatternUnicodeScalar _ ->
+            []
+
+        SwiftPatternStringLiteral _ ->
+            []
+
+        SwiftPatternVariable variable ->
+            [ variable ]
+
+        SwiftPatternTuple partPatterns ->
+            (partPatterns.part0 |> swiftPatternIntroducedVariables)
+                ++ (partPatterns.part1 |> swiftPatternIntroducedVariables)
+                ++ (partPatterns.part2Up
+                        |> List.concatMap swiftPatternIntroducedVariables
+                   )
+
+        SwiftPatternVariant patternVariant ->
+            patternVariant.values
+                |> List.concatMap swiftPatternIntroducedVariables
+
+        SwiftPatternRecord recordPatternInexhaustiveFieldNames ->
+            recordPatternInexhaustiveFieldNames
+                |> FastDict.foldl
+                    (\_ field soFar ->
+                        (field |> swiftPatternIntroducedVariables)
+                            ++ soFar
+                    )
+                    []
+
+
+swiftPatternAlterVariables : (String -> String) -> SwiftPattern -> SwiftPattern
+swiftPatternAlterVariables variableNameChange swiftPattern =
+    -- IGNORE TCO
+    case swiftPattern of
+        SwiftPatternIgnore ->
+            SwiftPatternIgnore
+
+        SwiftPatternVariable variable ->
+            SwiftPatternVariable (variable |> variableNameChange)
+
+        SwiftPatternBool _ ->
+            swiftPattern
+
+        SwiftPatternInt64 _ ->
+            swiftPattern
+
+        SwiftPatternUnicodeScalar _ ->
+            swiftPattern
+
+        SwiftPatternStringLiteral _ ->
+            swiftPattern
+
+        SwiftPatternRecord fields ->
+            SwiftPatternRecord
+                (fields
+                    |> FastDict.map
+                        (\_ fieldValue ->
+                            fieldValue |> swiftPatternAlterVariables variableNameChange
+                        )
+                )
+
+        SwiftPatternVariant variant ->
+            SwiftPatternVariant
+                { originTypeName = variant.originTypeName
+                , name = variant.name
+                , values =
+                    variant.values
+                        |> List.map
+                            (\value ->
+                                value |> swiftPatternAlterVariables variableNameChange
+                            )
+                }
+
+        SwiftPatternTuple parts ->
+            SwiftPatternTuple
+                { part0 = parts.part0 |> swiftPatternAlterVariables variableNameChange
+                , part1 = parts.part1 |> swiftPatternAlterVariables variableNameChange
+                , part2Up =
+                    parts.part2Up
+                        |> List.map
+                            (\part ->
+                                part |> swiftPatternAlterVariables variableNameChange
+                            )
+                }
+
+
+{-| Only a subset of swift patterns can be used for destructuring values in simple variable, constant, and optional bindings.
+These include wildcard patterns, identifier patterns, and any value binding or tuple patterns containing them.
+
+Most importantly, they do not allow single-variant destructuring like `.NonEmptyList(head, tail)`
+(note that single-`case` `switch` does allow it, ugh).
+
+-}
+swiftPatternCanBeUsedInSwiftDestructuring : SwiftPattern -> Bool
+swiftPatternCanBeUsedInSwiftDestructuring swiftPattern =
+    case swiftPattern of
+        SwiftPatternBool _ ->
+            False
+
+        SwiftPatternIgnore ->
+            True
+
+        SwiftPatternInt64 _ ->
+            False
+
+        SwiftPatternUnicodeScalar _ ->
+            False
+
+        SwiftPatternStringLiteral _ ->
+            False
+
+        SwiftPatternVariable _ ->
+            True
+
+        SwiftPatternRecord fields ->
+            fields
+                |> fastDictAll
+                    (\_ fieldValue ->
+                        fieldValue |> swiftPatternCanBeUsedInSwiftDestructuring
+                    )
+
+        SwiftPatternVariant _ ->
+            False
+
+        SwiftPatternTuple parts ->
+            (parts.part0 |> swiftPatternCanBeUsedInSwiftDestructuring)
+                || (parts.part1 |> swiftPatternCanBeUsedInSwiftDestructuring)
+                || (parts.part2Up |> List.all swiftPatternCanBeUsedInSwiftDestructuring)
+
+
 pattern :
     ElmSyntaxTypeInfer.TypedNode
         ElmSyntaxTypeInfer.Pattern
     ->
         { pattern : SwiftPattern
-        , introducedVariables : FastSet.Set String
+        , introducedVariables : {- TODO change to Dict SwiftType -} FastSet.Set String
         , variableAsPatternAliases : FastDict.Dict String SwiftPattern
         }
 pattern patternInferred =
@@ -2279,7 +2971,7 @@ swiftPatternIgnoreIntroducedVariablesSetEmptyVariableAsPatternAliasesDictEmpty =
 {-| Where used, add variable to pattern aliases as let variables
 with `swiftStatementsPrependLetDeclarationsForVariableAsPatternAliases`
 -}
-typedPattern :
+casePattern :
     ElmSyntaxTypeInfer.TypedNode
         ElmSyntaxTypeInfer.Pattern
     ->
@@ -2288,7 +2980,7 @@ typedPattern :
         , introducedVariables : FastSet.Set String
         , variableAsPatternAliases : FastDict.Dict String SwiftPattern
         }
-typedPattern patternTypedNode =
+casePattern patternTypedNode =
     let
         swiftPattern :
             { pattern : SwiftPattern
@@ -2545,7 +3237,12 @@ typeConstructReferenceToCoreSwift reference =
 
 justSwiftReferenceDouble : Maybe { moduleOrigin : Maybe String, name : String }
 justSwiftReferenceDouble =
-    Just { moduleOrigin = Nothing, name = "Double" }
+    Just swiftReferenceDouble
+
+
+swiftReferenceDouble : { moduleOrigin : Maybe String, name : String }
+swiftReferenceDouble =
+    { moduleOrigin = Nothing, name = "Double" }
 
 
 justSwiftReferenceString : Maybe { moduleOrigin : Maybe String, name : String }
@@ -2599,19 +3296,19 @@ referenceToCoreSwift reference =
                     Just { moduleOrigin = Nothing, name = "Basics_compare" }
 
                 "max" ->
-                    Just { moduleOrigin = Nothing, name = "max" }
+                    Just { moduleOrigin = Nothing, name = "Basics_max" }
 
                 "min" ->
-                    Just { moduleOrigin = Nothing, name = "min" }
+                    Just { moduleOrigin = Nothing, name = "Basics_min" }
 
                 "LT" ->
-                    Just { moduleOrigin = Just "Basics_Order", name = "LT" }
+                    Just { moduleOrigin = Just "Basics_Order", name = "Basics_LT" }
 
                 "EQ" ->
-                    Just { moduleOrigin = Just "Basics_Order", name = "EQ" }
+                    Just { moduleOrigin = Just "Basics_Order", name = "Basics_EQ" }
 
                 "GT" ->
-                    Just { moduleOrigin = Just "Basics_Order", name = "GT" }
+                    Just { moduleOrigin = Just "Basics_Order", name = "Basics_GT" }
 
                 "True" ->
                     Just { moduleOrigin = Nothing, name = "true" }
@@ -2626,10 +3323,10 @@ referenceToCoreSwift reference =
                     Just { moduleOrigin = Nothing, name = "Basics_neq" }
 
                 "e" ->
-                    Just { moduleOrigin = Just "System.Double", name = "E" }
+                    Just { moduleOrigin = Nothing, name = "Basics_e" }
 
                 "pi" ->
-                    Just { moduleOrigin = Just "System.Double", name = "Pi" }
+                    Just { moduleOrigin = Just "Double", name = "pi" }
 
                 "ceiling" ->
                     Just { moduleOrigin = Nothing, name = "Basics_ceiling" }
@@ -4210,10 +4907,9 @@ printSwiftPatternNotParenthesized swiftPattern =
 
         SwiftPatternVariant patternVariant ->
             Print.exactly
-                (qualifiedReferenceToSwiftName
-                    { moduleOrigin = patternVariant.originTypeName
-                    , name = patternVariant.name
-                    }
+                ((patternVariant.originTypeName |> Maybe.withDefault "")
+                    ++ "."
+                    ++ patternVariant.name
                 )
                 |> Print.followedBy
                     (case patternVariant.values of
@@ -4244,7 +4940,7 @@ printSwiftPatternNotParenthesized swiftPattern =
 
 printSwiftPatternRecord : FastDict.Dict String SwiftPattern -> Print
 printSwiftPatternRecord recordFields =
-    printExactlyCurlyOpeningSpace
+    printExactlyParenOpening
         |> Print.followedBy
             ((if (recordFields |> FastDict.size) >= 2 then
                 recordFields
@@ -4264,9 +4960,9 @@ printSwiftPatternRecord recordFields =
                                     fieldValuePattern
                                 )
                     )
-                    printExactlyCommaSpace
+                    printExactlyComma
             )
-        |> Print.followedBy printExactlySpaceCurlyClosing
+        |> Print.followedBy printExactlyParenClosing
 
 
 printExactlySpaceCurlyClosing : Print
@@ -4277,6 +4973,11 @@ printExactlySpaceCurlyClosing =
 printExactlyCommaSpace : Print
 printExactlyCommaSpace =
     Print.exactly ", "
+
+
+printExactlyComma : Print
+printExactlyComma =
+    Print.exactly ","
 
 
 unusedDummyFieldNameBecauseSwiftDoesNotSupportSingleFieldRecord : String
@@ -4310,7 +5011,7 @@ printSwiftExpressionRecord swiftRecordFields =
                                 fieldValuePrint =
                                     printSwiftExpressionNotParenthesized fieldValue
                             in
-                            Print.withIndentIncreasedBy 2
+                            Print.withIndentIncreasedBy 1
                                 (Print.exactly (fieldName ++ ":")
                                     |> Print.followedBy
                                         (Print.withIndentAtNextMultipleOf4
@@ -4321,7 +5022,9 @@ printSwiftExpressionRecord swiftRecordFields =
                                         )
                                 )
                         )
-                        printLinebreakIndentedCommaSpace
+                        (printExactlyComma
+                            |> Print.followedBy Print.linebreakIndented
+                        )
         in
         printExactlyParenOpening
             |> Print.followedBy fieldsPrint
@@ -5769,37 +6472,24 @@ valueOrFunctionDeclaration moduleContext syntaxDeclarationValueOrFunction =
                 )
 
         parameter0 :: parameter1Up ->
-            let
-                parameter0TypedPattern : { pattern : SwiftPattern, type_ : SwiftType, introducedVariables : FastSet.Set String, variableAsPatternAliases : FastDict.Dict String SwiftPattern }
-                parameter0TypedPattern =
-                    parameter0 |> typedPattern
-
-                parameter1UpTypedPatterns : List { pattern : SwiftPattern, type_ : SwiftType, introducedVariables : FastSet.Set String, variableAsPatternAliases : FastDict.Dict String SwiftPattern }
-                parameter1UpTypedPatterns =
-                    parameter1Up
-                        |> List.map typedPattern
-
-                parameterTypedPatterns : List { pattern : SwiftPattern, type_ : SwiftType, introducedVariables : FastSet.Set String, variableAsPatternAliases : FastDict.Dict String SwiftPattern }
-                parameterTypedPatterns =
-                    parameter0TypedPattern
-                        :: parameter1UpTypedPatterns
-
-                parameterNameForIndex : Int -> String
-                parameterNameForIndex parameterIndex =
-                    "generated_" ++ (parameterIndex |> String.fromInt)
-            in
             Result.map
                 (\result ->
                     let
+                        parameterNameForIndex : Int -> String
+                        parameterNameForIndex parameterIndex =
+                            "generated_" ++ (parameterIndex |> String.fromInt)
+
                         resultAndStatementsToAdd :
                             { statementsToAdd : List SwiftStatement
                             , result : SwiftExpression
                             }
                         resultAndStatementsToAdd =
-                            parameter1UpTypedPatterns
+                            parameter1Up
                                 |> List.indexedMap
-                                    (\parameterIndex parameter ->
-                                        { index = parameterIndex + 1, type_ = parameter.type_ }
+                                    (\laterParameterIndex parameter ->
+                                        { index = laterParameterIndex + 1
+                                        , type_ = parameter.type_
+                                        }
                                     )
                                 |> List.foldr
                                     (\parameter soFar ->
@@ -5807,7 +6497,7 @@ valueOrFunctionDeclaration moduleContext syntaxDeclarationValueOrFunction =
                                             SwiftExpressionLambda
                                                 { parameters =
                                                     [ { name = parameterNameForIndex parameter.index
-                                                      , type_ = parameter.type_
+                                                      , type_ = parameter.type_ |> type_
                                                       }
                                                     ]
                                                 , statements = soFar.statementsToAdd
@@ -5818,11 +6508,11 @@ valueOrFunctionDeclaration moduleContext syntaxDeclarationValueOrFunction =
                                     )
                                     { result = result.result
                                     , statementsToAdd =
-                                        (parameterTypedPatterns
+                                        ((parameter0 :: parameter1Up)
                                             |> List.indexedMap
                                                 (\parameterIndex parameter ->
-                                                    SwiftStatementLetDestructuring
-                                                        { pattern = parameter.pattern
+                                                    destructuringToSwiftStatements
+                                                        { pattern = parameter
                                                         , expression =
                                                             SwiftExpressionReference
                                                                 { moduleOrigin = Nothing
@@ -5830,27 +6520,23 @@ valueOrFunctionDeclaration moduleContext syntaxDeclarationValueOrFunction =
                                                                 }
                                                         }
                                                 )
+                                            |> List.concat
                                         )
-                                            ++ (result.statements
-                                                    |> swiftStatementsPrependLetDeclarationsForVariableAsPatternAliases
-                                                        (parameterTypedPatterns
-                                                            |> listMapToFastDictsAndUnify .variableAsPatternAliases
-                                                        )
-                                               )
+                                            ++ result.statements
                                     }
                     in
                     { parameters =
                         [ { name = parameterNameForIndex 0
-                          , type_ = parameter0TypedPattern.type_
+                          , type_ = parameter0.type_ |> type_
                           }
                         ]
                     , statements = resultAndStatementsToAdd.statementsToAdd
                     , resultType =
-                        parameter1UpTypedPatterns
+                        parameter1Up
                             |> List.foldr
                                 (\parameter outputTypeSoFar ->
                                     SwiftTypeFunction
-                                        { input = parameter.type_
+                                        { input = parameter.type_ |> type_
                                         , output = outputTypeSoFar
                                         }
                                 )
@@ -5862,8 +6548,10 @@ valueOrFunctionDeclaration moduleContext syntaxDeclarationValueOrFunction =
                     |> expression
                         { moduleInfo = moduleContext
                         , variablesFromWithinDeclarationInScope =
-                            parameterTypedPatterns
-                                |> listMapToFastSetsAndUnify .introducedVariables
+                            (parameter0 :: parameter1Up)
+                                |> listMapToFastSetsAndUnify
+                                    patternTypedNodeIntroducedVariables
+                                |> FastSet.map variableNameDisambiguateFromSwiftKeywords
                         , path = [ "declarationResult" ]
                         }
                 )
@@ -6270,8 +6958,8 @@ expression context expressionTypedNode =
 
         ElmSyntaxTypeInfer.ExpressionReferenceVariant reference ->
             let
-                swiftReference : { moduleOrigin : Maybe String, name : String }
-                swiftReference =
+                swiftVariantName : String
+                swiftVariantName =
                     case
                         { moduleOrigin = reference.moduleOrigin
                         , name = reference.name
@@ -6280,23 +6968,23 @@ expression context expressionTypedNode =
                             |> referenceToCoreSwift
                     of
                         Just swiftCoreReference ->
-                            swiftCoreReference
+                            swiftCoreReference.name
 
                         Nothing ->
-                            { moduleOrigin = Nothing
-                            , name =
-                                referenceToSwiftName
-                                    { moduleOrigin = reference.moduleOrigin
-                                    , name = reference.name
-                                    }
-                            }
+                            referenceToSwiftName
+                                { moduleOrigin = reference.moduleOrigin
+                                , name = reference.name
+                                }
             in
             Ok
                 { statements = []
                 , result =
                     case expressionTypedNode.type_ |> inferredTypeExpandFunction |> .inputs |> List.map type_ of
                         [] ->
-                            SwiftExpressionReference swiftReference
+                            SwiftExpressionVariant
+                                { originTypeName = Nothing
+                                , name = swiftVariantName
+                                }
 
                         valueType0 :: valueType1Up ->
                             let
@@ -6328,7 +7016,7 @@ expression context expressionTypedNode =
                                         { called =
                                             SwiftExpressionVariant
                                                 { originTypeName = Nothing
-                                                , name = swiftReference.name
+                                                , name = swiftVariantName
                                                 }
                                         , arguments =
                                             (valueType0 :: valueType1Up)
@@ -6824,15 +7512,6 @@ expression context expressionTypedNode =
 
         ElmSyntaxTypeInfer.ExpressionLambda lambda ->
             let
-                parameter0 : { pattern : SwiftPattern, type_ : SwiftType, introducedVariables : FastSet.Set String, variableAsPatternAliases : FastDict.Dict String SwiftPattern }
-                parameter0 =
-                    lambda.parameter0 |> typedPattern
-
-                parameter1Up : List { pattern : SwiftPattern, type_ : SwiftType, introducedVariables : FastSet.Set String, variableAsPatternAliases : FastDict.Dict String SwiftPattern }
-                parameter1Up =
-                    lambda.parameter1Up
-                        |> List.map typedPattern
-
                 parameterNameForIndex : Int -> String
                 parameterNameForIndex parameterIndex =
                     ("generated_" ++ (parameterIndex |> String.fromInt) ++ "_")
@@ -6840,54 +7519,67 @@ expression context expressionTypedNode =
             in
             Result.map
                 (\result ->
-                    (parameter0 :: parameter1Up)
-                        |> List.indexedMap
-                            (\parameter1UpIndex parameter ->
-                                { index = parameter1UpIndex + 1
-                                , type_ = parameter.type_
-                                }
-                            )
-                        |> List.foldr
-                            (\swiftParameter soFar ->
-                                { result =
-                                    SwiftExpressionLambda
-                                        { parameters =
-                                            [ { name =
-                                                    parameterNameForIndex swiftParameter.index
-                                              , type_ = swiftParameter.type_
-                                              }
-                                            ]
-                                        , statements = []
-                                        , result = soFar.result
-                                        }
-                                , statements = []
-                                }
-                            )
-                            { result = result.result
-                            , statements =
-                                ((parameter0 :: parameter1Up)
-                                    |> List.indexedMap
-                                        (\parameterIndex parameter ->
-                                            SwiftStatementLetDestructuring
-                                                { pattern = parameter.pattern
-                                                , expression =
-                                                    SwiftExpressionReference
-                                                        { moduleOrigin = Nothing
-                                                        , name = parameterNameForIndex parameterIndex
-                                                        }
-                                                }
-                                        )
-                                )
-                                    ++ (result.statements
-                                            |> swiftStatementsPrependLetDeclarationsForVariableAsPatternAliases
-                                                (parameter0.variableAsPatternAliases
-                                                    |> FastDict.union
-                                                        (parameter1Up
-                                                            |> listMapToFastDictsAndUnify .variableAsPatternAliases
-                                                        )
-                                                )
-                                       )
+                    let
+                        parameter1UpResultAndStatements :
+                            { statements : List SwiftStatement
+                            , result : SwiftExpression
                             }
+                        parameter1UpResultAndStatements =
+                            lambda.parameter1Up
+                                |> List.indexedMap
+                                    (\parameter1UpIndex parameter ->
+                                        { index = parameter1UpIndex + 1
+                                        , type_ = parameter.type_
+                                        }
+                                    )
+                                |> List.foldr
+                                    (\parameter soFar ->
+                                        { result =
+                                            SwiftExpressionLambda
+                                                { parameters =
+                                                    [ { name = parameterNameForIndex parameter.index
+                                                      , type_ = parameter.type_ |> type_
+                                                      }
+                                                    ]
+                                                , statements = soFar.statements
+                                                , result = soFar.result
+                                                }
+                                        , statements = []
+                                        }
+                                    )
+                                    { result = result.result
+                                    , statements =
+                                        ((lambda.parameter0 :: lambda.parameter1Up)
+                                            |> List.indexedMap
+                                                (\parameterIndex parameter ->
+                                                    destructuringToSwiftStatements
+                                                        { pattern = parameter
+                                                        , expression =
+                                                            SwiftExpressionReference
+                                                                { moduleOrigin = Nothing
+                                                                , name = parameterNameForIndex parameterIndex
+                                                                }
+                                                        }
+                                                )
+                                            |> List.concat
+                                        )
+                                            ++ result.statements
+                                    }
+                    in
+                    { statements = []
+                    , result =
+                        SwiftExpressionLambda
+                            { parameters =
+                                [ { name = parameterNameForIndex 0
+                                  , type_ = lambda.parameter0.type_ |> type_
+                                  }
+                                ]
+                            , statements =
+                                parameter1UpResultAndStatements.statements
+                            , result =
+                                parameter1UpResultAndStatements.result
+                            }
+                    }
                 )
                 (lambda.result
                     |> expression
@@ -6895,11 +7587,10 @@ expression context expressionTypedNode =
                         , variablesFromWithinDeclarationInScope =
                             context.variablesFromWithinDeclarationInScope
                                 |> FastSet.union
-                                    (FastSet.union
-                                        parameter0.introducedVariables
-                                        (parameter1Up
-                                            |> listMapToFastSetsAndUnify .introducedVariables
-                                        )
+                                    ((lambda.parameter0 :: lambda.parameter1Up)
+                                        |> listMapToFastSetsAndUnify
+                                            patternTypedNodeIntroducedVariables
+                                        |> FastSet.map variableNameDisambiguateFromSwiftKeywords
                                     )
                         , path = "result" :: context.path
                         }
@@ -6915,7 +7606,11 @@ expression context expressionTypedNode =
                 (\matched case0 case1Up ->
                     { statements =
                         matched.statements
-                            ++ [ SwiftStatementSwitch
+                            ++ [ SwiftStatementLetDeclarationUninitialized
+                                    { name = switchLocalResultVariableToInitialize
+                                    , type_ = caseOf.case0.result.type_ |> type_
+                                    }
+                               , SwiftStatementSwitch
                                     { matched = matched.result
                                     , case0 = case0
                                     , case1Up = case1Up
@@ -7393,6 +8088,12 @@ condenseExpressionCall call =
                 , arguments = [ call.argument ]
                 }
 
+        SwiftExpressionSwitch _ ->
+            SwiftExpressionCall
+                { called = call.called
+                , arguments = [ call.argument ]
+                }
+
 
 case_ :
     { variablesFromWithinDeclarationInScope : FastSet.Set String
@@ -7428,23 +8129,21 @@ case_ :
         Result
             String
             { pattern : SwiftPattern
-            , patternType : SwiftType
             , statements : List SwiftStatement
             }
 case_ context syntaxCase =
     let
-        casePattern : { pattern : SwiftPattern, type_ : SwiftType, introducedVariables : FastSet.Set String, variableAsPatternAliases : FastDict.Dict String SwiftPattern }
-        casePattern =
-            syntaxCase.pattern |> typedPattern
+        casePatternAsSwift : { pattern : SwiftPattern, type_ : SwiftType, introducedVariables : FastSet.Set String, variableAsPatternAliases : FastDict.Dict String SwiftPattern }
+        casePatternAsSwift =
+            syntaxCase.pattern |> casePattern
     in
     Result.map
         (\result ->
-            { pattern = casePattern.pattern
-            , patternType = casePattern.type_
+            { pattern = casePatternAsSwift.pattern
             , statements =
                 (result.statements
                     |> swiftStatementsPrependLetDeclarationsForVariableAsPatternAliases
-                        casePattern.variableAsPatternAliases
+                        casePatternAsSwift.variableAsPatternAliases
                 )
                     ++ [ SwiftStatementBindingAssignment
                             { name = syntaxCase.localResultVariableToInitialize
@@ -7459,7 +8158,7 @@ case_ context syntaxCase =
                 , variablesFromWithinDeclarationInScope =
                     context.variablesFromWithinDeclarationInScope
                         |> FastSet.union
-                            casePattern.introducedVariables
+                            casePatternAsSwift.introducedVariables
                 , path = "caseResult" :: context.path
                 }
         )
@@ -7495,22 +8194,12 @@ letDeclaration context syntaxLetDeclaration =
     case syntaxLetDeclaration of
         ElmSyntaxTypeInfer.LetDestructuring letDestructuring ->
             Result.map
-                (\destructuringExpression ->
-                    let
-                        destructuringPattern : { pattern : SwiftPattern, type_ : SwiftType, introducedVariables : FastSet.Set String, variableAsPatternAliases : FastDict.Dict String SwiftPattern }
-                        destructuringPattern =
-                            letDestructuring.pattern |> typedPattern
-                    in
-                    destructuringExpression.statements
-                        ++ (SwiftStatementLetDestructuring
-                                { pattern = destructuringPattern.pattern
-                                , --, patternType = destructuringPattern.type_
-                                  expression =
-                                    destructuringExpression.result
-                                }
-                                :: variableAsPatternAliasesToSwiftStatementLetDestructurings
-                                    destructuringPattern.variableAsPatternAliases
-                           )
+                (\destructuredExpression ->
+                    destructuredExpression.statements
+                        ++ destructuringToSwiftStatements
+                            { pattern = letDestructuring.pattern
+                            , expression = destructuredExpression.result
+                            }
                 )
                 (letDestructuring.expression
                     |> expression
@@ -7599,87 +8288,80 @@ letValueOrFunctionDeclaration context syntaxLetDeclarationValueOrFunction =
                 )
 
         parameter0 :: parameter1Up ->
-            let
-                parameter0TypedPattern : { pattern : SwiftPattern, type_ : SwiftType, introducedVariables : FastSet.Set String, variableAsPatternAliases : FastDict.Dict String SwiftPattern }
-                parameter0TypedPattern =
-                    parameter0 |> typedPattern
-
-                parameter1UpTypedPatterns : List { pattern : SwiftPattern, type_ : SwiftType, introducedVariables : FastSet.Set String, variableAsPatternAliases : FastDict.Dict String SwiftPattern }
-                parameter1UpTypedPatterns =
-                    parameter1Up
-                        |> List.map typedPattern
-
-                parameterTypedPatterns : List { pattern : SwiftPattern, type_ : SwiftType, introducedVariables : FastSet.Set String, variableAsPatternAliases : FastDict.Dict String SwiftPattern }
-                parameterTypedPatterns =
-                    parameter0TypedPattern
-                        :: parameter1UpTypedPatterns
-            in
             Result.map
                 (\result ->
                     let
                         parameterNameForIndex : Int -> String
                         parameterNameForIndex parameterIndex =
-                            ("generated_" ++ (parameterIndex |> String.fromInt) ++ "_")
-                                ++ (context.path |> String.join "_")
-                    in
-                    SwiftStatementFuncDeclaration
-                        { name =
-                            syntaxLetDeclarationValueOrFunction.name
-                                |> variableNameDisambiguateFromSwiftKeywords
-                        , parameters =
-                            [ { name = parameterNameForIndex 0
-                              , type_ = parameter0TypedPattern.type_
-                              }
-                            ]
-                        , statements =
-                            (parameterTypedPatterns
+                            "generated_" ++ (parameterIndex |> String.fromInt)
+
+                        resultAndStatementsToAdd :
+                            { statementsToAdd : List SwiftStatement
+                            , result : SwiftExpression
+                            }
+                        resultAndStatementsToAdd =
+                            parameter1Up
                                 |> List.indexedMap
-                                    (\parameterIndex parameter ->
-                                        SwiftStatementLetDestructuring
-                                            { pattern = parameter.pattern
-                                            , expression =
-                                                SwiftExpressionReference
-                                                    { moduleOrigin = Nothing
-                                                    , name = parameterNameForIndex parameterIndex
-                                                    }
-                                            }
-                                    )
-                            )
-                                ++ (result.statements
-                                        |> swiftStatementsPrependLetDeclarationsForVariableAsPatternAliases
-                                            (parameterTypedPatterns
-                                                |> listMapToFastDictsAndUnify .variableAsPatternAliases
-                                            )
-                                   )
-                        , result =
-                            parameter1UpTypedPatterns
-                                |> List.indexedMap
-                                    (\parameterIndex parameter ->
-                                        { index = parameterIndex + 1, type_ = parameter.type_ }
+                                    (\laterParameterIndex parameter ->
+                                        { index = laterParameterIndex + 1
+                                        , type_ = parameter.type_
+                                        }
                                     )
                                 |> List.foldr
-                                    (\parameter resultSoFar ->
-                                        SwiftExpressionLambda
-                                            { parameters =
-                                                [ { name = parameterNameForIndex parameter.index
-                                                  , type_ = parameter.type_
-                                                  }
-                                                ]
-                                            , statements = []
-                                            , result = resultSoFar
-                                            }
+                                    (\parameter soFar ->
+                                        { result =
+                                            SwiftExpressionLambda
+                                                { parameters =
+                                                    [ { name = parameterNameForIndex parameter.index
+                                                      , type_ = parameter.type_ |> type_
+                                                      }
+                                                    ]
+                                                , statements = soFar.statementsToAdd
+                                                , result = soFar.result
+                                                }
+                                        , statementsToAdd = []
+                                        }
                                     )
-                                    result.result
+                                    { result = result.result
+                                    , statementsToAdd =
+                                        ((parameter0 :: parameter1Up)
+                                            |> List.indexedMap
+                                                (\parameterIndex parameter ->
+                                                    destructuringToSwiftStatements
+                                                        { pattern = parameter
+                                                        , expression =
+                                                            SwiftExpressionReference
+                                                                { moduleOrigin = Nothing
+                                                                , name = parameterNameForIndex parameterIndex
+                                                                }
+                                                        }
+                                                )
+                                            |> List.concat
+                                        )
+                                            ++ result.statements
+                                    }
+                    in
+                    SwiftStatementFuncDeclaration
+                        { name = syntaxLetDeclarationValueOrFunction.name
+                        , parameters =
+                            [ { name = parameterNameForIndex 0
+                              , type_ = parameter0.type_ |> type_
+                              }
+                            ]
+                        , statements = resultAndStatementsToAdd.statementsToAdd
                         , resultType =
-                            parameter1UpTypedPatterns
+                            parameter1Up
                                 |> List.foldr
                                     (\parameter outputTypeSoFar ->
                                         SwiftTypeFunction
-                                            { input = parameter.type_
+                                            { input = parameter.type_ |> type_
                                             , output = outputTypeSoFar
                                             }
                                     )
-                                    (syntaxLetDeclarationValueOrFunction.result.type_ |> type_)
+                                    (syntaxLetDeclarationValueOrFunction.result.type_
+                                        |> type_
+                                    )
+                        , result = resultAndStatementsToAdd.result
                         }
                 )
                 (syntaxLetDeclarationValueOrFunction.result
@@ -7688,8 +8370,9 @@ letValueOrFunctionDeclaration context syntaxLetDeclarationValueOrFunction =
                         , variablesFromWithinDeclarationInScope =
                             context.variablesFromWithinDeclarationInScope
                                 |> FastSet.union
-                                    (parameterTypedPatterns
-                                        |> listMapToFastSetsAndUnify .introducedVariables
+                                    (syntaxLetDeclarationValueOrFunction.parameters
+                                        |> listMapToFastSetsAndUnify patternTypedNodeIntroducedVariables
+                                        |> FastSet.map variableNameDisambiguateFromSwiftKeywords
                                     )
                         , path = "letDeclarationResult" :: context.path
                         }
@@ -7853,32 +8536,32 @@ okReferenceFdiv =
 
 okReferenceSub : Result error_ { moduleOrigin : Maybe String, name : String }
 okReferenceSub =
-    Ok { moduleOrigin = Nothing, name = "(-)" }
+    Ok { moduleOrigin = Nothing, name = "Basics_sub" }
 
 
 okReferenceAdd : Result error_ { moduleOrigin : Maybe String, name : String }
 okReferenceAdd =
-    Ok { moduleOrigin = Nothing, name = "(+)" }
+    Ok { moduleOrigin = Nothing, name = "Basics_add" }
 
 
 okReferenceApR : Result error_ { moduleOrigin : Maybe String, name : String }
 okReferenceApR =
-    Ok { moduleOrigin = Nothing, name = "(|>)" }
+    Ok { moduleOrigin = Nothing, name = "Basics_apR" }
 
 
 okReferenceApL : Result error_ { moduleOrigin : Maybe String, name : String }
 okReferenceApL =
-    Ok { moduleOrigin = Nothing, name = "(<|)" }
+    Ok { moduleOrigin = Nothing, name = "Basics_apL" }
 
 
 okReferenceComposeR : Result error_ { moduleOrigin : Maybe String, name : String }
 okReferenceComposeR =
-    Ok { moduleOrigin = Nothing, name = "(>>)" }
+    Ok { moduleOrigin = Nothing, name = "Basics_composeR" }
 
 
 okReferenceComposeL : Result error_ { moduleOrigin : Maybe String, name : String }
 okReferenceComposeL =
-    Ok { moduleOrigin = Nothing, name = "(<<)" }
+    Ok { moduleOrigin = Nothing, name = "Basics_composeL" }
 
 
 okReferenceParserAdvancedKeeper : Result error_ { moduleOrigin : Maybe String, name : String }
@@ -8044,7 +8727,7 @@ printSwiftValueOrFunctionDeclaration swiftValueOrFunctionDeclaration =
                             |> Print.followedBy
                                 (case swiftValueOrFunctionDeclaration.statements of
                                     [] ->
-                                        printSwiftExpressionParenthesizedIfSpaceSeparated
+                                        printSwiftExpressionNotParenthesized
                                             swiftValueOrFunctionDeclaration.result
 
                                     statement0 :: statement1Up ->
@@ -8088,7 +8771,7 @@ printSwiftValueOrFunctionDeclaration swiftValueOrFunctionDeclaration =
                             |> Print.followedBy
                                 (Print.linebreakIndented
                                     |> Print.followedBy
-                                        (printSwiftExpressionParenthesizedIfSpaceSeparated
+                                        (printSwiftExpressionNotParenthesized
                                             (SwiftExpressionCall
                                                 { called =
                                                     SwiftExpressionLambda
@@ -8110,7 +8793,7 @@ printSwiftReturn swiftResultExpression =
     let
         swiftResultExpressionPrint : Print
         swiftResultExpressionPrint =
-            printSwiftExpressionParenthesizedIfSpaceSeparated
+            printSwiftExpressionNotParenthesized
                 swiftResultExpression
     in
     Print.linebreakIndented
@@ -8289,7 +8972,7 @@ printSwiftLocalLetDeclaration swiftLetDeclaration =
                  )
                     |> Print.followedBy printExactlySpaceEqualsLinebreakIndented
                     |> Print.followedBy
-                        (printSwiftExpressionParenthesizedIfSpaceSeparated
+                        (printSwiftExpressionNotParenthesized
                             swiftLetDeclaration.result
                         )
                 )
@@ -8839,13 +9522,13 @@ inferredTypeWithExpandedInnerAliasesSplitIntoSpecializedSwiftTypes :
     -> FastDict.Dict String (List SwiftTypeVariableSpecialization)
 inferredTypeWithExpandedInnerAliasesSplitIntoSpecializedSwiftTypes context inferredType =
     case inferredType of
-        ElmSyntaxTypeInfer.TypeVariable variable ->
-            if variable.name |> String.startsWith "number" then
-                FastDict.singleton variable.name
-                    swiftTypeVariableSpecializationsToIntAndFloat
-
-            else
-                FastDict.empty
+        ElmSyntaxTypeInfer.TypeVariable _ ->
+            -- if variable.name |> String.startsWith "number" then
+            --     FastDict.singleton variable.name
+            --         swiftTypeVariableSpecializationsToIntAndFloat
+            --
+            -- else
+            FastDict.empty
 
         ElmSyntaxTypeInfer.TypeNotVariable inferredTypeNotVariable ->
             inferredTypeNotVariableWithExpandedInnerAliasesSplitIntoSpecializedSwiftTypes
@@ -10261,6 +10944,9 @@ swiftExpressionIsSpaceSeparated swiftExpression =
         SwiftExpressionIfElse _ ->
             True
 
+        SwiftExpressionSwitch _ ->
+            True
+
         SwiftExpressionArrayLiteral _ ->
             False
 
@@ -10335,6 +11021,9 @@ printSwiftExpressionNotParenthesized swiftExpression =
                         ("." ++ syntaxRecordAccess.field)
                     )
 
+        SwiftExpressionSwitch switch ->
+            printSwiftExpressionSwitch switch
+
 
 printExactlyMinus : Print
 printExactlyMinus =
@@ -10406,75 +11095,50 @@ printSwiftExpressionCall call =
         calledPrint =
             printSwiftExpressionParenthesizedIfSpaceSeparated
                 call.called
-
-        argumentPrints : List Print
-        argumentPrints =
-            call.arguments
-                |> List.map
-                    printSwiftExpressionParenthesizedIfSpaceSeparated
-
-        fullLineSpread : Print.LineSpread
-        fullLineSpread =
-            argumentPrints
-                |> Print.lineSpreadListMapAndCombine Print.lineSpread
-                |> Print.lineSpreadMergeWith
-                    (\() -> calledPrint |> Print.lineSpread)
     in
-    calledPrint
-        |> Print.followedBy printExactlyParenOpening
-        |> Print.followedBy
-            (Print.withIndentAtNextMultipleOf4
-                (Print.spaceOrLinebreakIndented fullLineSpread
-                    |> Print.followedBy
-                        (argumentPrints
-                            |> Print.listIntersperseAndFlatten
-                                (Print.exactly ","
-                                    |> Print.followedBy
-                                        (Print.spaceOrLinebreakIndented fullLineSpread)
+    case call.arguments of
+        [] ->
+            calledPrint
+                |> Print.followedBy (Print.exactly "()")
+
+        argument0 :: argument1Up ->
+            let
+                argumentPrints : List Print
+                argumentPrints =
+                    (argument0 :: argument1Up)
+                        |> List.map
+                            printSwiftExpressionNotParenthesized
+
+                fullLineSpread : Print.LineSpread
+                fullLineSpread =
+                    argumentPrints
+                        |> Print.lineSpreadListMapAndCombine Print.lineSpread
+                        |> Print.lineSpreadMergeWith
+                            (\() -> calledPrint |> Print.lineSpread)
+            in
+            calledPrint
+                |> Print.followedBy printExactlyParenOpening
+                |> Print.followedBy
+                    (Print.withIndentAtNextMultipleOf4
+                        (Print.emptyOrLinebreakIndented fullLineSpread
+                            |> Print.followedBy
+                                (argumentPrints
+                                    |> Print.listIntersperseAndFlatten
+                                        (Print.exactly ","
+                                            |> Print.followedBy
+                                                (Print.spaceOrLinebreakIndented fullLineSpread)
+                                        )
                                 )
                         )
-                )
-            )
-        |> Print.followedBy (Print.emptyOrLinebreakIndented fullLineSpread)
-        |> Print.followedBy (Print.exactly ")")
-
-
-printSwiftExpressionListLiteral : List SwiftExpression -> Print
-printSwiftExpressionListLiteral listElements =
-    case listElements of
-        [] ->
-            printSwiftExpressionListLiteralEmpty
-
-        element0 :: element1Up ->
-            let
-                elementsPrint : Print
-                elementsPrint =
-                    (element0 :: element1Up)
-                        |> Print.listMapAndIntersperseAndFlatten
-                            printSwiftExpressionNotParenthesized
-                            printExactlySemicolonLinebreakIndented
-            in
-            printExactlyAngledOpeningSpace
-                |> Print.followedBy
-                    (Print.withIndentIncreasedBy 2
-                        elementsPrint
                     )
-                |> Print.followedBy
-                    (Print.spaceOrLinebreakIndented
-                        (elementsPrint |> Print.lineSpread)
-                    )
-                |> Print.followedBy printExactlyAngledClosing
+                |> Print.followedBy (Print.emptyOrLinebreakIndented fullLineSpread)
+                |> Print.followedBy (Print.exactly ")")
 
 
-printExactlySemicolonLinebreakIndented : Print
-printExactlySemicolonLinebreakIndented =
-    Print.exactly ";"
+printExactlyCommaLinebreakIndented : Print
+printExactlyCommaLinebreakIndented =
+    Print.exactly ","
         |> Print.followedBy Print.linebreakIndented
-
-
-printSwiftExpressionListLiteralEmpty : Print
-printSwiftExpressionListLiteralEmpty =
-    Print.exactly "[]"
 
 
 printExactlyAngledOpeningSpace : Print
@@ -10500,7 +11164,7 @@ printSwiftExpressionArrayLiteral elements =
                     (element0 :: element1Up)
                         |> Print.listMapAndIntersperseAndFlatten
                             printSwiftExpressionNotParenthesized
-                            printExactlySemicolonLinebreakIndented
+                            printExactlyCommaLinebreakIndented
             in
             printExactlyAngledOpeningSpace
                 |> Print.followedBy
@@ -10549,7 +11213,7 @@ patternIsSpaceSeparated swiftPattern =
             False
 
         SwiftPatternVariable _ ->
-            True
+            False
 
         SwiftPatternRecord _ ->
             False
@@ -10692,11 +11356,6 @@ printSwiftExpressionLambda lambda =
                 |> Print.followedBy printExactlyCurlyClosing
 
 
-printExactlySpaceMinusGreaterThan : Print
-printExactlySpaceMinusGreaterThan =
-    Print.exactly " ->"
-
-
 printSwiftExpressionIfElse :
     { condition : SwiftExpression
     , onTrue : SwiftExpression
@@ -10707,7 +11366,7 @@ printSwiftExpressionIfElse syntaxIfElse =
     let
         conditionPrint : Print
         conditionPrint =
-            printSwiftExpressionParenthesizedIfSpaceSeparated
+            printSwiftExpressionNotParenthesized
                 syntaxIfElse.condition
 
         conditionLineSpread : Print.LineSpread
@@ -10750,27 +11409,25 @@ printExactlyIf =
     Print.exactly "if"
 
 
-printSwiftStatementMatchWith :
+printSwiftStatementSwitch :
     { matched : SwiftExpression
     , case0 :
         { pattern : SwiftPattern
-        , patternType : SwiftType
         , statements : List SwiftStatement
         }
     , case1Up :
         List
             { pattern : SwiftPattern
-            , patternType : SwiftType
             , statements : List SwiftStatement
             }
     }
     -> Print
-printSwiftStatementMatchWith matchWith =
+printSwiftStatementSwitch swiftSwitch =
     let
         matchedPrint : Print
         matchedPrint =
-            printSwiftExpressionParenthesizedIfSpaceSeparated
-                matchWith.matched
+            printSwiftExpressionNotParenthesized
+                swiftSwitch.matched
 
         matchedPrintLineSpread : Print.LineSpread
         matchedPrintLineSpread =
@@ -10789,9 +11446,9 @@ printSwiftStatementMatchWith matchWith =
         |> Print.followedBy
             (Print.linebreakIndented
                 |> Print.followedBy
-                    ((matchWith.case0 :: matchWith.case1Up)
+                    ((swiftSwitch.case0 :: swiftSwitch.case1Up)
                         |> Print.listMapAndIntersperseAndFlatten
-                            printSwiftExpressionSwitchCase
+                            printSwiftStatementSwitchCase
                             printLinebreakLinebreakIndented
                     )
             )
@@ -10804,19 +11461,23 @@ printExactlySwitch =
     Print.exactly "switch"
 
 
-printSwiftExpressionSwitchCase :
+printSwiftStatementSwitchCase :
     { pattern : SwiftPattern
-    , patternType : SwiftType
     , statements : List SwiftStatement
     }
     -> Print
-printSwiftExpressionSwitchCase branch =
+printSwiftStatementSwitchCase branch =
     let
         patternPrint : Print
         patternPrint =
             printSwiftPatternNotParenthesized branch.pattern
     in
-    printExactlyVerticalBarSpace
+    (if branch.pattern |> swiftPatternContainsBindings then
+        printExactlyCaseSpaceLetSpace
+
+     else
+        printExactlyCaseSpace
+    )
         |> Print.followedBy
             (Print.withIndentIncreasedBy 2
                 patternPrint
@@ -10835,17 +11496,151 @@ printSwiftExpressionSwitchCase branch =
             )
 
 
+printExactlyCaseSpaceLetSpace : Print
+printExactlyCaseSpaceLetSpace =
+    Print.exactly "case let "
+
+
+printExactlyCaseSpace : Print
+printExactlyCaseSpace =
+    Print.exactly "case "
+
+
+printSwiftExpressionSwitch :
+    { matched : SwiftExpression
+    , case0 :
+        { pattern : SwiftPattern
+        , --, patternType : SwiftType
+          result : SwiftExpression
+        }
+    , case1Up :
+        List
+            { pattern : SwiftPattern
+            , --, patternType : SwiftType
+              result : SwiftExpression
+            }
+    }
+    -> Print
+printSwiftExpressionSwitch swiftSwitch =
+    let
+        matchedPrint : Print
+        matchedPrint =
+            printSwiftExpressionNotParenthesized
+                swiftSwitch.matched
+
+        matchedPrintLineSpread : Print.LineSpread
+        matchedPrintLineSpread =
+            matchedPrint |> Print.lineSpread
+    in
+    printExactlySwitch
+        |> Print.followedBy
+            (Print.withIndentAtNextMultipleOf4
+                (Print.spaceOrLinebreakIndented matchedPrintLineSpread
+                    |> Print.followedBy matchedPrint
+                )
+            )
+        |> Print.followedBy
+            (Print.spaceOrLinebreakIndented matchedPrintLineSpread)
+        |> Print.followedBy (Print.exactly "{")
+        |> Print.followedBy
+            (Print.linebreakIndented
+                |> Print.followedBy
+                    ((swiftSwitch.case0 :: swiftSwitch.case1Up)
+                        |> Print.listMapAndIntersperseAndFlatten
+                            printSwiftExpressionSwitchCase
+                            printLinebreakLinebreakIndented
+                    )
+            )
+        |> Print.followedBy Print.linebreakIndented
+        |> Print.followedBy printExactlyCurlyClosing
+
+
+printSwiftExpressionSwitchCase :
+    { pattern : SwiftPattern
+    , --, patternType : SwiftType
+      result : SwiftExpression
+    }
+    -> Print
+printSwiftExpressionSwitchCase branch =
+    let
+        patternPrint : Print
+        patternPrint =
+            printSwiftPatternNotParenthesized branch.pattern
+    in
+    (if branch.pattern |> swiftPatternContainsBindings then
+        printExactlyCaseSpaceLetSpace
+
+     else
+        printExactlyCaseSpace
+    )
+        |> Print.followedBy
+            (Print.withIndentIncreasedBy 2
+                patternPrint
+            )
+        |> Print.followedBy
+            (Print.spaceOrLinebreakIndented
+                (patternPrint |> Print.lineSpread)
+            )
+        |> Print.followedBy (Print.exactly ":")
+        |> Print.followedBy
+            (Print.withIndentAtNextMultipleOf4
+                (Print.linebreakIndented
+                    |> Print.followedBy
+                        (printSwiftExpressionNotParenthesized
+                            branch.result
+                        )
+                )
+            )
+
+
+swiftPatternContainsBindings : SwiftPattern -> Bool
+swiftPatternContainsBindings swiftPattern =
+    -- IGNORE TCO
+    case swiftPattern of
+        SwiftPatternVariable _ ->
+            True
+
+        SwiftPatternIgnore ->
+            False
+
+        SwiftPatternBool _ ->
+            False
+
+        SwiftPatternInt64 _ ->
+            False
+
+        SwiftPatternUnicodeScalar _ ->
+            False
+
+        SwiftPatternStringLiteral _ ->
+            False
+
+        SwiftPatternTuple partPatterns ->
+            (partPatterns.part0 |> swiftPatternContainsBindings)
+                || (partPatterns.part1 |> swiftPatternContainsBindings)
+                || (partPatterns.part2Up
+                        |> List.any swiftPatternContainsBindings
+                   )
+
+        SwiftPatternVariant patternVariant ->
+            patternVariant.values
+                |> List.any swiftPatternContainsBindings
+
+        SwiftPatternRecord recordPatternInexhaustiveFieldNames ->
+            recordPatternInexhaustiveFieldNames
+                |> FastDict.foldl
+                    (\_ valuePattern soFar ->
+                        soFar || (valuePattern |> swiftPatternContainsBindings)
+                    )
+                    False
+
+
 printSwiftStatements : List SwiftStatement -> Print
 printSwiftStatements swiftStatements =
     swiftStatements
         |> Print.listMapAndIntersperseAndFlatten
             printSwiftStatement
             printLinebreakIndentedLinebreakIndented
-
-
-printExactlyVerticalBarSpace : Print
-printExactlyVerticalBarSpace =
-    Print.exactly "| "
 
 
 printSwiftStatement : SwiftStatement -> Print
@@ -10860,8 +11655,8 @@ printSwiftStatement swiftStatement =
         SwiftStatementLetDeclaration swiftLetDeclaration ->
             swiftLetDeclaration |> printSwiftLocalLetDeclaration
 
-        SwiftStatementLetValueDeclarationUninitialized letValueDeclarationUnassigned ->
-            Print.exactly ("let " ++ letValueDeclarationUnassigned.name ++ ";")
+        SwiftStatementLetDeclarationUninitialized letDeclarationUnassigned ->
+            printSwiftStatementLetDeclarationUninitialized letDeclarationUnassigned
 
         SwiftStatementVarDeclaration varDeclarationInitialized ->
             let
@@ -10918,7 +11713,31 @@ printSwiftStatement swiftStatement =
                     )
 
         SwiftStatementSwitch syntaxSwitch ->
-            printSwiftStatementMatchWith syntaxSwitch
+            printSwiftStatementSwitch syntaxSwitch
+
+
+printSwiftStatementLetDeclarationUninitialized :
+    { type_ : SwiftType, name : String }
+    -> Print
+printSwiftStatementLetDeclarationUninitialized letDeclarationUnassigned =
+    let
+        typePrint : Print
+        typePrint =
+            printSwiftTypeNotParenthesized TypeOutgoing
+                letDeclarationUnassigned.type_
+    in
+    Print.exactly
+        ("let "
+            ++ letDeclarationUnassigned.name
+            ++ ":"
+        )
+        |> Print.followedBy
+            (Print.withIndentAtNextMultipleOf4
+                (Print.spaceOrLinebreakIndented
+                    (typePrint |> Print.lineSpread)
+                    |> Print.followedBy typePrint
+                )
+            )
 
 
 printLinebreakIndentedLinebreakIndented : Print
@@ -10955,6 +11774,22 @@ variableAsPatternAliasesToSwiftStatementLetDestructurings variableAsPatternAlias
             variableAsPatternAliases
 
 
+swiftExpressionReferenceTrue : SwiftExpression
+swiftExpressionReferenceTrue =
+    SwiftExpressionReference
+        { moduleOrigin = Nothing
+        , name = "true"
+        }
+
+
+swiftExpressionReferenceFalse : SwiftExpression
+swiftExpressionReferenceFalse =
+    SwiftExpressionReference
+        { moduleOrigin = Nothing
+        , name = "false"
+        }
+
+
 swiftPatternAsExpression : SwiftPattern -> SwiftExpression
 swiftPatternAsExpression swiftPattern =
     -- IGNORE TCO
@@ -10964,16 +11799,10 @@ swiftPatternAsExpression swiftPattern =
 
         SwiftPatternBool bool ->
             if bool then
-                SwiftExpressionReference
-                    { moduleOrigin = Nothing
-                    , name = "true"
-                    }
+                swiftExpressionReferenceTrue
 
             else
-                SwiftExpressionReference
-                    { moduleOrigin = Nothing
-                    , name = "false"
-                    }
+                swiftExpressionReferenceFalse
 
         SwiftPatternInt64 int ->
             -- TODO currently represented as Double
@@ -11065,7 +11894,7 @@ printSwiftLetDestructuring letDestructuring =
                     |> Print.followedBy
                         (Print.linebreakIndented
                             |> Print.followedBy
-                                (printSwiftExpressionParenthesizedIfSpaceSeparated
+                                (printSwiftExpressionNotParenthesized
                                     letDestructuring.expression
                                 )
                         )
@@ -24838,8 +25667,24 @@ public static func Basics_identity<a>(_ a: a) -> a {
     a
 }
 
-public static func Basics_always<Ignored, Kept>(_ kept: Kept) -> (Ignored) -> Kept {
+public static func Basics_always<ignored, kept>(_ kept: kept) -> (ignored) -> kept {
     { _ in kept }
+}
+public static func Basics_apR<a, b>(_ food: a) -> ((a) -> b) -> b {
+    { eat in eat(food) }
+}
+public static func Basics_apL<a, b>(_ toApply: @escaping (a) -> b) -> (a) -> b {
+    toApply
+}
+public static func Basics_composeR<a, b, c>(_ earlier: @escaping (a) -> b)
+    -> (@escaping (b) -> c) -> (a) -> c
+{
+    { later in { food in later(earlier(food)) } }
+}
+public static func Basics_composeL<a, b, c>(_ later: @escaping (b) -> c)
+    -> (@escaping (a) -> b) -> (a) -> c
+{
+    { earlier in { food in later(earlier(food)) } }
 }
 
 public static func Basics_never<a>(_: Never) -> a {
@@ -24959,7 +25804,7 @@ public static func Basics_max<a: Comparable>(_ a: a) -> (a) -> a {
     { b in if a > b { a } else { b } }
 }
 
-public static func Basics_clamp(low: Double) -> (Double) -> (Double) -> Double {
+public static func Basics_clamp(_ low: Double) -> (Double) -> (Double) -> Double {
     { high in
         { number in
             if number < low { low } else if number > high { high } else { number }
@@ -25441,7 +26286,7 @@ public static func String_foldr<Folded>(
     }
 }
 
-public static func Maybe_withDefault<a>(valueOnNothing: a) -> (Maybe_Maybe<a>) -> a {
+public static func Maybe_withDefault<a>(_ valueOnNothing: a) -> (Maybe_Maybe<a>) -> a {
     { maybe in
         switch maybe {
         case .Maybe_Nothing: valueOnNothing
@@ -25449,7 +26294,7 @@ public static func Maybe_withDefault<a>(valueOnNothing: a) -> (Maybe_Maybe<a>) -
         }
     }
 }
-public static func Maybe_map<a, b>(valueChange: @escaping (a) -> b) -> (Maybe_Maybe<a>) ->
+public static func Maybe_map<a, b>(_ valueChange: @escaping (a) -> b) -> (Maybe_Maybe<a>) ->
     Maybe_Maybe<b>
 {
     { maybe in
@@ -25459,7 +26304,7 @@ public static func Maybe_map<a, b>(valueChange: @escaping (a) -> b) -> (Maybe_Ma
         }
     }
 }
-public static func Maybe_map2<a, b, combined>(valueCombine: @escaping (a) -> (b) -> combined)
+public static func Maybe_map2<a, b, combined>(_ valueCombine: @escaping (a) -> (b) -> combined)
     -> (Maybe_Maybe<a>) -> (Maybe_Maybe<b>) -> Maybe_Maybe<combined>
 {
     { aMaybe in
@@ -25477,7 +26322,7 @@ public static func Maybe_map2<a, b, combined>(valueCombine: @escaping (a) -> (b)
     }
 }
 public static func Maybe_map3<a, b, c, combined>(
-    valueCombine: @escaping (a) -> (b) -> (c) -> combined
+    _ valueCombine: @escaping (a) -> (b) -> (c) -> combined
 )
     -> (Maybe_Maybe<a>) -> (Maybe_Maybe<b>) -> (Maybe_Maybe<c>) -> Maybe_Maybe<combined>
 {
@@ -25502,7 +26347,7 @@ public static func Maybe_map3<a, b, c, combined>(
     }
 }
 public static func Maybe_map4<a, b, c, d, combined>(
-    valueCombine: @escaping (a) -> (b) -> (c) -> (d) -> combined
+    _ valueCombine: @escaping (a) -> (b) -> (c) -> (d) -> combined
 )
     -> (Maybe_Maybe<a>) -> (Maybe_Maybe<b>) -> (Maybe_Maybe<c>) -> (Maybe_Maybe<d>) ->
     Maybe_Maybe<combined>
@@ -25534,7 +26379,7 @@ public static func Maybe_map4<a, b, c, d, combined>(
     }
 }
 public static func Maybe_map5<a, b, c, d, e, combined>(
-    valueCombine: @escaping (a) -> (b) -> (c) -> (d) -> (e) -> combined
+    _ valueCombine: @escaping (a) -> (b) -> (c) -> (d) -> (e) -> combined
 )
     -> (Maybe_Maybe<a>) -> (Maybe_Maybe<b>) -> (Maybe_Maybe<c>) -> (Maybe_Maybe<d>) -> (
         Maybe_Maybe<e>
@@ -25577,7 +26422,7 @@ public static func Maybe_map5<a, b, c, d, e, combined>(
     }
 }
 
-public static func Maybe_andThen<a, b>(valueToMaybe: @escaping (a) -> Maybe_Maybe<b>)
+public static func Maybe_andThen<a, b>(_ valueToMaybe: @escaping (a) -> Maybe_Maybe<b>)
     -> (Maybe_Maybe<a>) -> Maybe_Maybe<b>
 {
     { maybe in
