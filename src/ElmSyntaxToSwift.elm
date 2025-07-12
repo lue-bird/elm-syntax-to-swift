@@ -1009,8 +1009,7 @@ printSwiftTypeFunction position typeFunction =
                 "@Sendable @escaping "
 
             TypeOutgoing ->
-                -- TODO is "@Sendable " necessary?
-                ""
+                "@Sendable "
         )
         |> Print.followedBy
             (input0Print
@@ -8735,10 +8734,10 @@ printSwiftValueOrFunctionDeclaration swiftValueOrFunctionDeclaration =
                         ++ listFilledMapAndStringJoinWith ", "
                             (\typeParameter ->
                                 if typeParameter |> String.startsWith "comparable" then
-                                    typeParameter ++ ": Comparable"
+                                    typeParameter ++ ": Comparable & Sendable"
 
                                 else
-                                    typeParameter
+                                    typeParameter ++ ": Sendable"
                             )
                             typeParameter0
                             typeParameter1Up
