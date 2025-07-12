@@ -750,8 +750,6 @@ printSwiftTypealiasDeclaration swiftTypeAliasDeclaration =
                         )
                 )
             )
-        |> Print.followedBy
-            (Print.exactly ";")
 
 
 type_ : ElmSyntaxTypeInfer.Type -> SwiftType
