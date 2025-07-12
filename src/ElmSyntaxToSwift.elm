@@ -102,7 +102,9 @@ type SwiftExpression
         , part1 : SwiftExpression
         , part2Up : List SwiftExpression
         }
-    | SwiftExpressionIfElse
+    | -- maybe remove as it isn't useful in most situations
+      -- as swift does not allow e.g. parenthesized, in term etc
+      SwiftExpressionIfElse
         { condition : SwiftExpression
         , onTrue : SwiftExpression
         , onFalse : SwiftExpression
@@ -173,6 +175,11 @@ type SwiftStatement
         { recordBindingName : String
         , fieldName : String
         , assignedValue : SwiftExpression
+        }
+    | SwiftStatementIfElse
+        { condition : SwiftExpression
+        , onTrue : List SwiftStatement
+        , onFalse : List SwiftStatement
         }
     | SwiftStatementSwitch
         { matched : SwiftExpression
@@ -7235,17 +7242,49 @@ expression context expressionTypedNode =
         ElmSyntaxTypeInfer.ExpressionIfThenElse ifThenElse ->
             Result.map3
                 (\condition onTrue onFalse ->
-                    { statements =
-                        condition.statements
-                            ++ onTrue.statements
-                            ++ onFalse.statements
-                    , result =
-                        SwiftExpressionIfElse
-                            { condition = condition.result
-                            , onTrue = onTrue.result
-                            , onFalse = onFalse.result
-                            }
-                    }
+                    if
+                        (onTrue.statements |> List.isEmpty)
+                            && (onFalse.statements |> List.isEmpty)
+                    then
+                        let
+                            introducedIfResultVariable : String
+                            introducedIfResultVariable =
+                                generatedLocalReturnResult context.path
+                        in
+                        { statements =
+                            condition.statements
+                                ++ [ SwiftStatementLetDeclaration
+                                        { name = introducedIfResultVariable
+                                        , resultType =
+                                            expressionTypedNode.type_
+                                                |> type_
+                                        , result =
+                                            SwiftExpressionIfElse
+                                                { condition = condition.result
+                                                , onTrue = onTrue.result
+                                                , onFalse = onFalse.result
+                                                }
+                                        }
+                                   ]
+                        , result =
+                            SwiftExpressionReference
+                                { moduleOrigin = Nothing
+                                , name = introducedIfResultVariable
+                                }
+                        }
+
+                    else
+                        { statements =
+                            condition.statements
+                                ++ onTrue.statements
+                                ++ onFalse.statements
+                        , result =
+                            SwiftExpressionIfElse
+                                { condition = condition.result
+                                , onTrue = onTrue.result
+                                , onFalse = onFalse.result
+                                }
+                        }
                 )
                 (ifThenElse.condition
                     |> expression
@@ -7443,25 +7482,25 @@ expression context expressionTypedNode =
                 )
 
         ElmSyntaxTypeInfer.ExpressionRecordUpdate recordUpdate ->
-            let
-                originalRecordVariable : String
-                originalRecordVariable =
-                    referenceToSwiftName
-                        { moduleOrigin = recordUpdate.recordVariable.value.moduleOrigin
-                        , name =
-                            recordUpdate.recordVariable.value.name
-                        }
-                        |> variableNameDisambiguateFromSwiftKeywords
-
-                generatedUpdatedRecordVarName : String
-                generatedUpdatedRecordVarName =
-                    "generated_updated_"
-                        ++ originalRecordVariable
-                        ++ "_"
-                        ++ (context.path |> String.join "_")
-            in
             Result.map
                 (\fields ->
+                    let
+                        originalRecordVariable : String
+                        originalRecordVariable =
+                            referenceToSwiftName
+                                { moduleOrigin = recordUpdate.recordVariable.value.moduleOrigin
+                                , name =
+                                    recordUpdate.recordVariable.value.name
+                                }
+                                |> variableNameDisambiguateFromSwiftKeywords
+
+                        generatedUpdatedRecordVarName : String
+                        generatedUpdatedRecordVarName =
+                            "generated_updated_"
+                                ++ originalRecordVariable
+                                ++ "_"
+                                ++ (context.path |> String.join "_")
+                    in
                     { statements =
                         (fields
                             |> List.concatMap
@@ -7605,11 +7644,13 @@ expression context expressionTypedNode =
             in
             Result.map3
                 (\matched case0 case1Up ->
+                    -- TODO possibility for improvement:
+                    -- use SwiftExpressionSwitch when all case results have 0 statements
                     { statements =
                         matched.statements
                             ++ [ SwiftStatementLetDeclarationUninitialized
                                     { name = switchLocalResultVariableToInitialize
-                                    , type_ = caseOf.case0.result.type_ |> type_
+                                    , type_ = expressionTypedNode.type_ |> type_
                                     }
                                , SwiftStatementSwitch
                                     { matched = matched.result
@@ -11410,6 +11451,54 @@ printExactlyIf =
     Print.exactly "if"
 
 
+printSwiftStatementIfElse :
+    { condition : SwiftExpression
+    , onTrue : List SwiftStatement
+    , onFalse : List SwiftStatement
+    }
+    -> Print
+printSwiftStatementIfElse ifElse =
+    let
+        conditionPrint : Print
+        conditionPrint =
+            printSwiftExpressionNotParenthesized
+                ifElse.condition
+
+        conditionLineSpread : Print.LineSpread
+        conditionLineSpread =
+            conditionPrint |> Print.lineSpread
+    in
+    printExactlyIf
+        |> Print.followedBy
+            (Print.withIndentAtNextMultipleOf4
+                (Print.spaceOrLinebreakIndented conditionLineSpread
+                    |> Print.followedBy conditionPrint
+                )
+            )
+        |> Print.followedBy
+            (Print.spaceOrLinebreakIndented conditionLineSpread)
+        |> Print.followedBy (Print.exactly "{")
+        |> Print.followedBy
+            (Print.withIndentAtNextMultipleOf4
+                (Print.linebreakIndented
+                    |> Print.followedBy
+                        (printSwiftStatements ifElse.onTrue)
+                    |> Print.followedBy Print.linebreak
+                )
+            )
+        |> Print.followedBy Print.linebreakIndented
+        |> Print.followedBy (Print.exactly "} else {")
+        |> Print.followedBy
+            (Print.withIndentAtNextMultipleOf4
+                (Print.linebreakIndented
+                    |> Print.followedBy
+                        (printSwiftStatements ifElse.onFalse)
+                )
+            )
+        |> Print.followedBy Print.linebreakIndented
+        |> Print.followedBy printExactlyCurlyClosing
+
+
 printSwiftStatementSwitch :
     { matched : SwiftExpression
     , case0 :
@@ -11712,6 +11801,9 @@ printSwiftStatement swiftStatement =
                                 assignedValuePrint
                         )
                     )
+
+        SwiftStatementIfElse ifElse ->
+            printSwiftStatementIfElse ifElse
 
         SwiftStatementSwitch syntaxSwitch ->
             printSwiftStatementSwitch syntaxSwitch
@@ -27168,7 +27260,9 @@ where comparable: Comparable {
     return Array_toList(asArray)
 }
 
-public typealias Regex_Regex = Regex<Substring>
+// not alias for Regex<Substring> because Regex is not Sendable
+public enum Regex_Regex: Sendable { case Regex_Regex(String) }
+
 public typealias Regex_Options = (caseInsensitive: Bool, multiline: Bool)
 public typealias Regex_Match = (
     index: Int,
@@ -27177,40 +27271,73 @@ public typealias Regex_Match = (
     submatches: List_List<(Maybe_Maybe<String>)>
 )
 
-public static let Regex_never: Regex_Regex = #/.^/#
+public static let Regex_never: Regex_Regex = .Regex_Regex("/.^/")
 public static func Regex_fromString(_ string: String) -> Maybe_Maybe<Regex_Regex> {
     do {
-        return try .Maybe_Just(Regex(string))
+        try _ = Regex(string)
+        return .Maybe_Just(.Regex_Regex(string))
     } catch {
         return .Maybe_Nothing
     }
 }
 public static func Regex_contains(_ regex: Regex_Regex) -> (String) -> Bool {
-    { string in string.contains(regex) }
+    { string in
+        switch regex {
+        case let .Regex_Regex(regexString):
+            do {
+                return try string.contains(Regex(regexString))
+            } catch {
+                return false
+            }
+        }
+    }
 }
 public static func Regex_split(_ regex: Regex_Regex) -> (String) -> List_List<String> {
-    { string in Array_mapToList({ sub in String(sub) }, string.split(separator: regex)) }
+    { string in
+        switch regex {
+        case let .Regex_Regex(regexString):
+            do {
+                return try Array_mapToList(
+                    { sub in String(sub) },
+                    string.split(separator: Regex(regexString))
+                )
+            } catch {
+                return List_singleton(string)
+            }
+        }
+    }
 }
+
 public static func Regex_splitAtMost(_ maxSplitCount: Double) -> (Regex_Regex) -> (String) ->
     List_List<String>
 {
     { regex in
         { string in
-            Array_mapToList(
-                { sub in String(sub) },
-                string.split(separator: regex, maxSplits: Int(maxSplitCount))
-            )
+            switch regex {
+            case let .Regex_Regex(regexString):
+                do {
+                    return try Array_mapToList(
+                        { sub in String(sub) },
+                        string.split(
+                            separator: Regex(regexString),
+                            maxSplits: Int(maxSplitCount)
+                        )
+                    )
+                } catch {
+                    return List_singleton(string)
+                }
+            }
         }
     }
 }
 
-public enum Time_Posix { case Time_Posix(Double) }
+public enum Time_Posix: Sendable { case Time_Posix(Double) }
 
 public typealias Time_Era = (offset: Double, start: Double)
 
-public enum Time_Zone { case Time_Zone(Double, List_List<Time_Era>) }
+public enum Time_Zone: Sendable { case Time_Zone(Double, List_List<Time_Era>) }
 
-public enum Time_Weekday {
+public enum Time_Weekday: Sendable {
     case Time_Mon
     case Time_Tue
     case Time_Wed
@@ -27220,7 +27347,7 @@ public enum Time_Weekday {
     case Time_Sun
 }
 
-public enum Time_Month {
+public enum Time_Month: Sendable {
     case Time_Jan
     case Time_Feb
     case Time_Mar
@@ -27235,7 +27362,7 @@ public enum Time_Month {
     case Time_Dec
 }
 
-public enum Time_ZoneName {
+public enum Time_ZoneName: Sendable {
     case Time_Name(String)
     case Time_Offset(Double)
 }
@@ -27381,12 +27508,12 @@ public static func Time_toMillis(_ zone: Time_Zone) -> (Time_Posix) -> Double {
 
 public typealias Bytes_Bytes = [UInt8]
 
-public enum Bytes_Endianness {
+public enum Bytes_Endianness: Sendable {
     case Bytes_LE
     case Bytes_BE
 }
 
-public enum PlatformCmd_CmdSingle<event> {
+public enum PlatformCmd_CmdSingle<event>: Sendable {
     case PlatformCmd_PortOutgoing(name: String, value: Data)
 }
 public typealias PlatformCmd_Cmd<event> =
@@ -27414,8 +27541,8 @@ public static func PlatformCmd_map<event, eventMapped>(
     }
 }
 
-public enum PlatformSub_SubSingle<event> {
-    case PlatformSub_PortIncoming(name: String, onValue: (Data) -> event)
+public enum PlatformSub_SubSingle<event>: Sendable {
+    case PlatformSub_PortIncoming(name: String, onValue: @Sendable (Data) -> event)
 }
 public typealias PlatformSub_Sub<event> = [PlatformSub_SubSingle<event>]
 
@@ -27427,7 +27554,7 @@ public static func PlatformSub_batch<event>(_ subs: List_List<PlatformSub_Sub<ev
     Array_fromList(subs).flatMap({ sub in sub })
 }
 public static func PlatformSub_map<event, eventMapped>(
-    _ eventChange: @escaping (event) -> eventMapped
+    _ eventChange: @escaping @Sendable (event) -> eventMapped
 )
     -> (PlatformSub_Sub<event>) -> PlatformSub_Sub<eventMapped>
 {
