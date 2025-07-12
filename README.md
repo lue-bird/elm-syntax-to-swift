@@ -39,23 +39,6 @@ public enum Elm {
 
 ### be aware
 
-TODO MERGE START
--   only a subset of elm is currently supported. not supported:
-    - 🚧 accessing record fields before their type is concretely known can sometimes not be inferred by swift
-    - 🚧 constructing variants of a generic type before their type is concretely known can sometimes not be inferred by swift
-    -   `elm/regex`, `elm/file`, `elm/bytes`, `elm/http`, `elm/random`, `elm/url`, `elm/json`, `elm/parser`, `elm/virtual-dom`,
-        `elm/html`, `elm/svg`, `elm/browser`, `elm/time`, `elm-explorations/markdown`, `elm-explorations/webgl`, `elm-explorations/benchmark`, `elm-explorations/linear-algebra`
-    -   `Platform`, `Platform.Cmd`, `Platform.Sub`, `Task`, `Process`
-    -   **record update**, currying, ports, glsl, `(>>)` and `(<<)`, extensible records of any kind inferred or annotated
-      When I finish implementing type inference, this will be fixed.
-    -   `++` will default to `List.append` unless one of the arguments is a string literal. So e.g. use `a ++ b ++ ""` to append string variables (which is also faster in elm)
-    - `List.minimum`, `List.maximum`, `Basics.min`, `Basics.max` will only work with numbers.
-    -   potential future candidates: `Basics.clamp`, `Basics.degrees`, `Basics.turns`,
-        `Basics.radians`, `Basics.logBase`, `Basics.toPolar`, `Basics.fromPolar`, `Basics.never`, `Basics.sin`, `Basics.cos`, `Basics.tan`, `Basics.asin`, `Basics.acos`, `Basics.atan`, `Basics.atan2`, `Basics.e`, `Basics.pi`,
-        `List.map3/4/5`, `List.head`, `List.tail`, `List.partition`, `Char.toLocaleLower`, `Char.toLocaleUpper`, `Char.isAlpha`, `Char.isAlphaNum`, `Char.isDigit`, `Char.isOctDigit`, `Bitwise`, `Array`.
-        Any help appreciated!
-TODO MERGE END
-
 -   not supported are
     -   ports that use non-json values like `port sendMessage : String -> Cmd msg`, glsl
     -   `elm/file`, `elm/http`, `elm/browser`, `elm-explorations/markdown`, `elm-explorations/webgl`, `elm-explorations/benchmark`
@@ -80,14 +63,18 @@ TODO MERGE END
 Please [report any issues](https://github.com/lue-bird/elm-syntax-to-swift/issues/new) you notice <3
 
 ### why swift?
--   it runs decently fast natively (and not-quite-officially as wasm)
--   it's pretty much a superset of elm which makes transpiling easy
+-   it runs decently fast natively (and semi-officially as wasm)
+-   it's a kind-of superset of elm which makes transpiling easier
 
 ### how do I use the transpiled output?
 An example can be found in [`example-hello-world/`](https://github.com/lue-bird/elm-syntax-to-swift/tree/main/example-hello-world).
 
+In your elm project, add a file `Sources/main.swift` that uses `Elm.swift`:
+```swift
+print(Elm.Hello_greet("visitor"))
+```
 
-where `Elm.YourModule_yourFunction` is the transpiled elm function `Your.Module.yourFunction`. (If the value/function contains `number` type variables or extensible records, search for `Elm.YourModule_yourFunction__` to see the different specialized options)
+where `Elm.YourModule_yourFunction(firstArgument)(secondArgument)` is the transpiled elm function `Your.Module.yourFunction firstArgument secondArgument`. (If the value/function contains extensible records, search for `Elm.YourModule_yourFunction__` to see the different specialized options)
 
 You will find these types:
   - elm `Bool` (`True` or `False`) → swift `Bool` (`true` or `false`), `String` → `String`, `()` → `()`, `Array Float` → `Array<Double>`, `Set Float` -> `Set<Double>`, `Dict Float Char` → `Map<Double, char>`, `Never` → [`Never`](https://developer.apple.com/documentation/swift/never)
@@ -97,25 +84,26 @@ You will find these types:
     will be of type `( Double, Double )`
   - elm records like `{ y : Float, x : Float }` will be of type `( x: Double, y: Double )` with the fields sorted. Single-field records like `{ min : Float }` will have an extra field because swift does not support single-field anonymous records/tuples: `( min: Double, unusedDummyFieldBecauseSwiftDoesNotSupportSingleFieldRecord: () )`.
     If you'd like a shorter name or an alternative solution, please open an issue
-  - elm `Json.Encode.Value`/`Json.Decode.Value` will be of type
+  - TODO elm `Json.Encode.Value`/`Json.Decode.Value` will be of type
     [`System.Text.Json.Nodes.JsonNode`](https://learn.microsoft.com/en-us/dotnet/api/system.text.json.nodes.jsonnode?view=net-9.0).
     Encode and decode them like you would in elm, like `Elm.JsonEncode_float 2.2`
   - a transpiled elm app does not run itself.
     An elm main `Platform.worker` program type will literally just consist of fields `Init`, `Update` and `Subscriptions` where
     subscriptions/commands are returned as a list of `Elm.PlatformSub_SubSingle`/`Elm.PlatformCmd_CmdSingle` with possible elm subscriptions/commands in a choice type.
     It's then your responsibility as "the platform" to perform effects, create events and manage the state. For an example see [example-worker/](https://github.com/lue-bird/elm-syntax-to-swift/tree/main/example-worker)
-  - elm `Regex` will be of type [`System.Text.RegularExpressions.Regex`](https://learn.microsoft.com/en-us/dotnet/api/system.text.regularexpressions.regex?view=net-9.0).
+  - TODO elm `Regex` will be of type [`System.Text.RegularExpressions.Regex`](https://learn.microsoft.com/en-us/dotnet/api/system.text.regularexpressions.regex?view=net-9.0).
     Create them like you would in elm with `Elm.Regex_fromString`, `Elm.Regex_fromStringWith` or `Elm.Regex_never`
-  - elm-exploration/linear-algebra's `Math.Matrix2.Vec2`, `Math.Matrix3.Vec3`, `Math.Matrix4.Vec4`, `Math.Matrix4.Mat4` will be of type [`System.Numerics.Vector2`](https://learn.microsoft.com/en-us/dotnet/api/system.numerics.vector2?view=net-9.0), [`System.Numerics.Vector3`](https://learn.microsoft.com/en-us/dotnet/api/system.numerics.vector3?view=net-9.0), [`System.Numerics.Vector4`](https://learn.microsoft.com/en-us/dotnet/api/system.numerics.vector4?view=net-9.0), [`System.Numerics.Matrix4x4`](https://learn.microsoft.com/en-us/dotnet/api/system.numerics.matrix4x4?view=net-9.0)
+  - TODO elm-exploration/linear-algebra's `Math.Matrix2.Vec2`, `Math.Matrix3.Vec3`, `Math.Matrix4.Vec4`, `Math.Matrix4.Mat4` will be of type [`System.Numerics.Vector2`](https://learn.microsoft.com/en-us/dotnet/api/system.numerics.vector2?view=net-9.0), [`System.Numerics.Vector3`](https://learn.microsoft.com/en-us/dotnet/api/system.numerics.vector3?view=net-9.0), [`System.Numerics.Vector4`](https://learn.microsoft.com/en-us/dotnet/api/system.numerics.vector4?view=net-9.0), [`System.Numerics.Matrix4x4`](https://learn.microsoft.com/en-us/dotnet/api/system.numerics.matrix4x4?view=net-9.0)
 
 Compile the resulting swift to an executable:
 ```bash
+swiftc Sources/main.swift Sources/Elm.swift
 ```
-The built executable can now be found at ``.
+The built executable can now be found at `main`; append ` -o your-path` to set a different output path.
 
-Or build and run it once:
+When in a project that has a `Package.swift`, you can also use
 ```bash
-dotnet run
+swift build
 ```
 
 If something unexpected happened,
