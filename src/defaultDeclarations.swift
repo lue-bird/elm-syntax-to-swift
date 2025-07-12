@@ -54,8 +54,24 @@ public enum Elm {
         a
     }
 
-    public static func Basics_always<Ignored, Kept>(_ kept: Kept) -> (Ignored) -> Kept {
+    public static func Basics_always<ignored, kept>(_ kept: kept) -> (ignored) -> kept {
         { _ in kept }
+    }
+    public static func Basics_apR<a, b>(_ food: a) -> ((a) -> b) -> b {
+        { eat in eat(food) }
+    }
+    public static func Basics_apL<a, b>(_ toApply: @escaping (a) -> b) -> (a) -> b {
+        toApply
+    }
+    public static func Basics_composeR<a, b, c>(_ earlier: @escaping (a) -> b)
+        -> (@escaping (b) -> c) -> (a) -> c
+    {
+        { later in { food in later(earlier(food)) } }
+    }
+    public static func Basics_composeL<a, b, c>(_ later: @escaping (b) -> c)
+        -> (@escaping (a) -> b) -> (a) -> c
+    {
+        { earlier in { food in later(earlier(food)) } }
     }
 
     public static func Basics_never<a>(_: Never) -> a {
@@ -175,7 +191,9 @@ public enum Elm {
         { b in if a > b { a } else { b } }
     }
 
-    public static func Basics_clamp(low: Double) -> (Double) -> (Double) -> Double {
+    public static let Basics_e: Double = exp(1.0)
+
+    public static func Basics_clamp(_ low: Double) -> (Double) -> (Double) -> Double {
         { high in
             { number in
                 if number < low { low } else if number > high { high } else { number }
@@ -387,6 +405,17 @@ public enum Elm {
             .Maybe_Just(parseResult)
         case .none:
             .Maybe_Nothing
+        }
+    }
+
+    public static func String_uncons(_ string: String) -> Maybe_Maybe<(UnicodeScalar, String)> {
+        if string.isEmpty {
+            return .Maybe_Nothing
+        } else {
+            // TODO is there something more performant?
+            var stringMutable = string
+            let poppedChar = stringMutable.unicodeScalars.removeFirst()
+            return .Maybe_Just((poppedChar, stringMutable))
         }
     }
 
@@ -657,7 +686,7 @@ public enum Elm {
         }
     }
 
-    public static func Maybe_withDefault<a>(valueOnNothing: a) -> (Maybe_Maybe<a>) -> a {
+    public static func Maybe_withDefault<a>(_ valueOnNothing: a) -> (Maybe_Maybe<a>) -> a {
         { maybe in
             switch maybe {
             case .Maybe_Nothing: valueOnNothing
@@ -665,7 +694,7 @@ public enum Elm {
             }
         }
     }
-    public static func Maybe_map<a, b>(valueChange: @escaping (a) -> b) -> (Maybe_Maybe<a>) ->
+    public static func Maybe_map<a, b>(_ valueChange: @escaping (a) -> b) -> (Maybe_Maybe<a>) ->
         Maybe_Maybe<b>
     {
         { maybe in
@@ -675,7 +704,7 @@ public enum Elm {
             }
         }
     }
-    public static func Maybe_map2<a, b, combined>(valueCombine: @escaping (a) -> (b) -> combined)
+    public static func Maybe_map2<a, b, combined>(_ valueCombine: @escaping (a) -> (b) -> combined)
         -> (Maybe_Maybe<a>) -> (Maybe_Maybe<b>) -> Maybe_Maybe<combined>
     {
         { aMaybe in
@@ -693,7 +722,7 @@ public enum Elm {
         }
     }
     public static func Maybe_map3<a, b, c, combined>(
-        valueCombine: @escaping (a) -> (b) -> (c) -> combined
+        _ valueCombine: @escaping (a) -> (b) -> (c) -> combined
     )
         -> (Maybe_Maybe<a>) -> (Maybe_Maybe<b>) -> (Maybe_Maybe<c>) -> Maybe_Maybe<combined>
     {
@@ -718,7 +747,7 @@ public enum Elm {
         }
     }
     public static func Maybe_map4<a, b, c, d, combined>(
-        valueCombine: @escaping (a) -> (b) -> (c) -> (d) -> combined
+        _ valueCombine: @escaping (a) -> (b) -> (c) -> (d) -> combined
     )
         -> (Maybe_Maybe<a>) -> (Maybe_Maybe<b>) -> (Maybe_Maybe<c>) -> (Maybe_Maybe<d>) ->
         Maybe_Maybe<combined>
@@ -750,7 +779,7 @@ public enum Elm {
         }
     }
     public static func Maybe_map5<a, b, c, d, e, combined>(
-        valueCombine: @escaping (a) -> (b) -> (c) -> (d) -> (e) -> combined
+        _ valueCombine: @escaping (a) -> (b) -> (c) -> (d) -> (e) -> combined
     )
         -> (Maybe_Maybe<a>) -> (Maybe_Maybe<b>) -> (Maybe_Maybe<c>) -> (Maybe_Maybe<d>) -> (
             Maybe_Maybe<e>
@@ -793,7 +822,7 @@ public enum Elm {
         }
     }
 
-    public static func Maybe_andThen<a, b>(valueToMaybe: @escaping (a) -> Maybe_Maybe<b>)
+    public static func Maybe_andThen<a, b>(_ valueToMaybe: @escaping (a) -> Maybe_Maybe<b>)
         -> (Maybe_Maybe<a>) -> Maybe_Maybe<b>
     {
         { maybe in

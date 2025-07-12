@@ -26019,6 +26019,17 @@ public static func String_toFloat(_ string: String) -> Maybe_Maybe<Double> {
     }
 }
 
+public static func String_uncons(_ string: String) -> Maybe_Maybe<(UnicodeScalar, String)> {
+    if string.isEmpty {
+        return .Maybe_Nothing
+    } else {
+        // TODO is there something more performant?
+        var stringMutable = string
+        let poppedChar = stringMutable.unicodeScalars.removeFirst()
+        return .Maybe_Just((poppedChar, stringMutable))
+    }
+}
+
 public static func String_toList(_ string: String) -> List_List<UnicodeScalar> {
     var chars: List_List<UnicodeScalar> = .List_Empty
     for char in string.unicodeScalars.reversed() {
