@@ -149,8 +149,7 @@ public enum Elm {
 
     // TODO is this overload necessary?
     public static func Basics_compare<comparable: RawRepresentable>(_ a: comparable) -> (comparable)
-        ->
-        Basics_Order
+        -> Basics_Order
     where comparable.RawValue: Comparable {
         { b in
             if a.rawValue < b.rawValue {
@@ -412,7 +411,7 @@ public enum Elm {
         if string.isEmpty {
             return .Maybe_Nothing
         } else {
-            // TODO is there something more performant?
+            // is there something more performant?
             var stringMutable = string
             let poppedChar = stringMutable.unicodeScalars.removeFirst()
             return .Maybe_Just((poppedChar, stringMutable))
@@ -618,30 +617,25 @@ public enum Elm {
         { string in string.unicodeScalars.contains(where: isOdd) }
     }
 
-    public static func String_slice(_ start: Double) -> (Double) -> (String) -> String {
-        { end in
+    public static func String_slice(_ startInclusivePossiblyNegativeAsDouble: Double) -> (Double) ->
+        (String) -> String
+    {
+        { endExclusivePossiblyNegative in
             { string in
-                if (start >= 0) && (start + 1 == end) {
-                    return String(
-                        string.utf16[
-                            string.utf16.index(
-                                string.utf16.startIndex, offsetBy: Int(start))
-                        ])
+                let realStartIndexInclusive: Int =
+                    possiblyNegativeIndexForCount(
+                        index: Int(startInclusivePossiblyNegativeAsDouble),
+                        count: string.utf16.count
+                    )
+                let realEndIndexExclusive: Int =
+                    possiblyNegativeIndexForCount(
+                        index: Int(endExclusivePossiblyNegative),
+                        count: string.utf16.count
+                    )
+                return if realStartIndexInclusive >= realEndIndexExclusive {
+                    ""
                 } else {
-                    // likely slow. Check, then find something faster
-                    let realStartIndexInclusive: Int =
-                        if start >= 0 {
-                            Int(start)
-                        } else {
-                            string.count + Int(start)
-                        }
-                    let realEndIndexExclusive: Int =
-                        if end >= 0 {
-                            Int(end)
-                        } else {
-                            string.count + Int(end)
-                        }
-                    return String(
+                    String(
                         decoding: string.utf16[
                             string.utf16.index(
                                 string.utf16.startIndex, offsetBy: realStartIndexInclusive
@@ -653,6 +647,15 @@ public enum Elm {
                     )
                 }
             }
+        }
+    }
+    // For an index where -1 meaning one before the last element, 1 meaning one after the first element,
+    // normalize to valid index from the start
+    static func possiblyNegativeIndexForCount(index: Int, count: Int) -> Int {
+        if index >= 0 {
+            min(index, count)
+        } else {
+            max(count + index, 0)
         }
     }
 
@@ -1028,6 +1031,15 @@ public enum Elm {
         }
         return soFar
     }
+    public static func Array_toIndexedList<a>(_ array: [a]) -> List_List<(Double, a)> {
+        var soFar: List_List<(Double, a)> = .List_Empty
+        var index: Int = array.count - 1
+        for element in array.reversed() {
+            soFar = .List_Cons((Double(index), element), soFar)
+            index = index - 1
+        }
+        return soFar
+    }
 
     private static func Array_fromList<a>(_ fullList: List_List<a>) -> [a] {
         var soFar: [a] = Array()
@@ -1039,6 +1051,152 @@ public enum Elm {
             case .List_Cons(let remainingHead, let remainingTail):
                 soFar.append(remainingHead)
                 remainingList = remainingTail
+            }
+        }
+    }
+
+    public static func Array_isEmpty<a>(_ array: [a]) -> Bool {
+        array.isEmpty
+    }
+    public static func Array_length<a>(_ array: [a]) -> Double {
+        Double(array.count)
+    }
+    public static func Array_get<a>(_ indexAsDouble: Double) -> ([a]) -> Maybe_Maybe<a> {
+        { array in
+            let index = Int(indexAsDouble)
+            if (index >= 0) && (index < array.count) {
+                return .Maybe_Just(array[index])
+            } else {
+                return .Maybe_Nothing
+            }
+        }
+    }
+    public static func Array_empty<a>() -> [a] {
+        []
+    }
+    public static func Array_repeat<a>(_ finalLengthAsDouble: Double)
+        -> (a) -> [a]
+    {
+        { elementToRepeat in
+            let finalLength: Int = Int(finalLengthAsDouble)
+            return if finalLength < 0 {
+                []
+            } else {
+                Array(repeating: elementToRepeat, count: finalLength)
+            }
+        }
+    }
+    public static func Array_initialize<a>(_ finalLengthAsDouble: Double)
+        -> (@escaping (Double) -> a) -> [a]
+    {
+        { indexToElement in
+            let finalLength: Int = Int(finalLengthAsDouble)
+            return if finalLength < 0 {
+                []
+            } else {
+                Array((0..<finalLength).lazy.map({ index in indexToElement(Double(index)) }))
+                // alternatively
+                // var resultArray: [a] = Array(repeating: indexToElement(0.0), count: finalLength)
+                // for index in 1..<finalLength {
+                //     resultArray[index] = indexToElement(Double(index))
+                // }
+                // return resultArray
+                // which avoids @escaping
+            }
+        }
+    }
+    public static func Array_push<a>(_ newElement: a) -> ([a]) -> [a] {
+        { array in
+            var arrayMutable = array
+            arrayMutable.append(newElement)
+            return arrayMutable
+        }
+    }
+    public static func Array_set<a>(_ indexAsDouble: Double) -> (a) -> ([a]) -> [a] {
+        { newElement in
+            { array in
+                let index = Int(indexAsDouble)
+                if (index >= 0) && (index < array.count) {
+                    var arrayMutable = array
+                    arrayMutable[index] = newElement
+                    return arrayMutable
+                } else {
+                    return []
+                }
+            }
+        }
+    }
+    public static func Array_reverse<a>(_ array: [a]) -> [a] {
+        array.reversed()
+    }
+    public static func Array_filter<a>(_ keepElement: @escaping (a) -> Bool) -> ([a]) -> [a] {
+        { array in array.filter(keepElement) }
+    }
+    public static func Array_map<a, b>(_ elementChange: @escaping (a) -> b) -> ([a]) -> [b] {
+        { array in array.map(elementChange) }
+    }
+    public static func Array_indexedMap<a, b>(
+        _ indexAndElementToNew: @escaping (Double) -> (a) -> b
+    ) -> ([a]) -> [b] {
+        { array in
+            array.enumerated()
+                .map({ (index, element) in
+                    indexAndElementToNew(Double(index))(element)
+                })
+        }
+    }
+    public static func Array_slice<a>(
+        _ startInclusivePossiblyNegativeAsDouble: Double
+    ) -> (Double) -> ([a]) -> [a] {
+        { endExclusivePossiblyNegative in
+            { array in
+                let realStartIndexInclusive: Int =
+                    possiblyNegativeIndexForCount(
+                        index: Int(startInclusivePossiblyNegativeAsDouble),
+                        count: array.count
+                    )
+                let realEndIndexExclusive: Int =
+                    possiblyNegativeIndexForCount(
+                        index: Int(endExclusivePossiblyNegative),
+                        count: array.count
+                    )
+                return if realStartIndexInclusive >= realEndIndexExclusive {
+                    []
+                } else {
+                    Array(array[realStartIndexInclusive..<realEndIndexExclusive])
+                }
+            }
+        }
+    }
+
+    public static func Array_append<a>(_ left: [a]) -> ([a]) -> [a] {
+        { right in left + right }
+    }
+
+    public static func Array_foldl<a, state>(_ reduce: @escaping (a) -> (state) -> state)
+        -> (state) -> ([a]) -> state
+    {
+        { initialState in
+            { array in
+                array.reduce(
+                    initialState,
+                    { soFar, element in
+                        reduce(element)(soFar)
+                    }
+                )
+            }
+        }
+    }
+    public static func Array_foldr<a, state>(_ reduce: @escaping (a) -> (state) -> state)
+        -> (state) -> ([a]) -> state
+    {
+        { initialState in
+            { array in
+                var currentState = initialState
+                for indexFromTheEnd in array.indices {
+                    currentState = reduce(array[array.count - 1 - indexFromTheEnd])(currentState)
+                }
+                return currentState
             }
         }
     }
@@ -1217,11 +1375,10 @@ public enum Elm {
         -> List_List<b>
     {
         { list in
-            // TODO mutating version
+            // can be optimized
             List_foldr(
                 { (element, soFar) in
                     .List_Cons(elementChange(element), soFar)
-
                 },
                 .List_Empty,
                 list
@@ -1233,7 +1390,7 @@ public enum Elm {
         _ indexedElementChange: @escaping (Double) -> (a) -> b,
     ) -> (List_List<a>) -> List_List<b> {
         { list in
-            // TODO mutating version
+            // can be optimized
             List_foldr(
                 { (element, soFar: (index: Double, list: List_List<b>)) in
                     (
@@ -1380,13 +1537,11 @@ public enum Elm {
         )
     }
 
-    public static func List_filter<a>(_ keepElement: @escaping (a) -> Bool) -> (List_List<a>) ->
-        List_List<
-            a
-        >
+    public static func List_filter<a>(_ keepElement: @escaping (a) -> Bool)
+        -> (List_List<a>) -> List_List<a>
     {
         { list in
-            // TODO mutating version
+            // can be optimized
             List_foldr(
                 { (element, soFar) in
                     if keepElement(element) {
@@ -1422,7 +1577,7 @@ public enum Elm {
 
     public static func List_append<a>(_ earlier: List_List<a>) -> (List_List<a>) -> List_List<a> {
         { later in
-            // TODO mutating version
+            // can be optimized
             List_foldr(
                 { (earlierElement, soFar) in
                     .List_Cons(earlierElement, soFar)
@@ -1433,13 +1588,11 @@ public enum Elm {
         }
     }
 
-    public static func List_concatMap<a, b>(_ elementToList: @escaping (a) -> List_List<b>) -> (
-        List_List<a>
-    )
-        -> List_List<b>
+    public static func List_concatMap<a, b>(_ elementToList: @escaping (a) -> List_List<b>)
+        -> (List_List<a>) -> List_List<b>
     {
         { list in
-            // TODO mutating version
+            // can be optimized
             List_foldr(
                 { (element, soFar) in
                     List_append(elementToList(element))(soFar)
@@ -1451,7 +1604,7 @@ public enum Elm {
     }
 
     public static func List_concat<a>(_ list: List_List<List_List<a>>) -> List_List<a> {
-        // TODO mutating versions
+        // can be optimized
         List_foldr(
             { (element, soFar) in
                 List_append(element)(soFar)
@@ -1481,6 +1634,7 @@ public enum Elm {
                 return .List_Empty
             } else {
                 var soFar: List_List<Double> = .List_Empty
+                // can be optimized
                 for i in (Int(start)...Int(end)).reversed() {
                     soFar = .List_Cons(Double(i), soFar)
                 }
@@ -1491,7 +1645,7 @@ public enum Elm {
     public static func List_sum(_ list: List_List<Double>) -> Double {
         var sumSoFar: Double = 0.0
         var remainingList = list
-        while case .List_Cons(let head, let tail) = remainingList {
+        while case let .List_Cons(head, tail) = remainingList {
             sumSoFar = sumSoFar + head
             remainingList = tail
         }
@@ -1500,7 +1654,7 @@ public enum Elm {
     public static func List_product(_ list: List_List<Double>) -> Double {
         var productSoFar: Double = 1.0
         var remainingList = list
-        while case .List_Cons(let head, let tail) = remainingList {
+        while case let .List_Cons(head, tail) = remainingList {
             productSoFar = productSoFar * head
             remainingList = tail
         }
@@ -1508,7 +1662,7 @@ public enum Elm {
     }
 
     public static func List_maximum<a: Comparable>(_ list: List_List<a>) -> Maybe_Maybe<a> {
-        return switch list {
+        switch list {
         case .List_Empty:
             .Maybe_Nothing
         case .List_Cons(let head, let tail):
@@ -1517,7 +1671,7 @@ public enum Elm {
     }
 
     public static func List_minimum<a: Comparable>(_ list: List_List<a>) -> Maybe_Maybe<a> {
-        return switch list {
+        switch list {
         case .List_Empty:
             .Maybe_Nothing
         case .List_Cons(let head, let tail):
