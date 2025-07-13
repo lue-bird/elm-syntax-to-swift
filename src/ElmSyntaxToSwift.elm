@@ -56,8 +56,7 @@ type SwiftType
 type SwiftPattern
     = SwiftPatternIgnore
     | SwiftPatternBool Bool
-    | -- TODO change to Double?
-      SwiftPatternInt64 Int
+    | SwiftPatternInteger Int
     | SwiftPatternUnicodeScalar Char
     | SwiftPatternStringLiteral String
     | SwiftPatternVariable String
@@ -1693,7 +1692,7 @@ inferredPatternUntilAsPatterns patternTypedNode =
             }
 
         ElmSyntaxTypeInfer.PatternInt intValue ->
-            { pattern = SwiftPatternInt64 intValue.value
+            { pattern = SwiftPatternInteger intValue.value
             , patternAliases = []
             }
 
@@ -2153,7 +2152,7 @@ swiftPatternIntroducedVariables swiftPattern =
         SwiftPatternBool _ ->
             []
 
-        SwiftPatternInt64 _ ->
+        SwiftPatternInteger _ ->
             []
 
         SwiftPatternUnicodeScalar _ ->
@@ -2199,7 +2198,7 @@ swiftPatternAlterVariables variableNameChange swiftPattern =
         SwiftPatternBool _ ->
             swiftPattern
 
-        SwiftPatternInt64 _ ->
+        SwiftPatternInteger _ ->
             swiftPattern
 
         SwiftPatternUnicodeScalar _ ->
@@ -2259,7 +2258,7 @@ swiftPatternCanBeUsedInSwiftDestructuring swiftPattern =
         SwiftPatternIgnore ->
             True
 
-        SwiftPatternInt64 _ ->
+        SwiftPatternInteger _ ->
             False
 
         SwiftPatternUnicodeScalar _ ->
@@ -2331,7 +2330,7 @@ patternInPath path patternInferred =
             }
 
         ElmSyntaxTypeInfer.PatternInt intValue ->
-            { pattern = SwiftPatternInt64 intValue.value
+            { pattern = SwiftPatternInteger intValue.value
             , introducedVariables = FastSet.empty
             , variableAsPatternAliases = FastDict.empty
             }
@@ -2702,7 +2701,7 @@ patternFillingOutIgnoredPartsWithNewVariables path patternInferred =
             }
 
         ElmSyntaxTypeInfer.PatternInt intValue ->
-            { pattern = SwiftPatternInt64 intValue.value
+            { pattern = SwiftPatternInteger intValue.value
             , introducedVariables = FastSet.empty
             , variableAsPatternAliases = FastDict.empty
             }
@@ -4963,7 +4962,7 @@ printSwiftPatternNotParenthesized swiftPattern =
             else
                 Print.exactly "true"
 
-        SwiftPatternInt64 int64 ->
+        SwiftPatternInteger int64 ->
             -- TODO currently represented as Double
             Print.exactly (int64 |> Basics.toFloat |> String.fromFloat)
 
@@ -11391,7 +11390,7 @@ patternIsSpaceSeparated swiftPattern =
         SwiftPatternBool _ ->
             False
 
-        SwiftPatternInt64 _ ->
+        SwiftPatternInteger _ ->
             False
 
         SwiftPatternUnicodeScalar _ ->
@@ -11842,7 +11841,7 @@ swiftPatternContainsBindings swiftPattern =
         SwiftPatternBool _ ->
             False
 
-        SwiftPatternInt64 _ ->
+        SwiftPatternInteger _ ->
             False
 
         SwiftPatternUnicodeScalar _ ->
@@ -12034,7 +12033,7 @@ swiftPatternAsExpression swiftPattern =
             else
                 swiftExpressionReferenceFalse
 
-        SwiftPatternInt64 int ->
+        SwiftPatternInteger int ->
             -- TODO currently represented as Double
             SwiftExpressionDouble (int |> Basics.toFloat)
 
