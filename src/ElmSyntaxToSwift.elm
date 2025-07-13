@@ -46,9 +46,7 @@ type SwiftType
     | SwiftTypeRecord (FastDict.Dict String SwiftType)
     | SwiftTypeVariable String
     | SwiftTypeFunction
-        { input :
-            -- TODO List
-            SwiftType
+        { input : List SwiftType
         , output : SwiftType
         }
 
@@ -851,7 +849,7 @@ typeNotVariable inferredTypeNotVariable =
 
         ElmSyntaxTypeInfer.TypeFunction typeFunction ->
             SwiftTypeFunction
-                { input = typeFunction.input |> type_
+                { input = [ typeFunction.input |> type_ ]
                 , output = typeFunction.output |> type_
                 }
 
@@ -956,20 +954,47 @@ printSwiftTypeRecord position fields =
             |> Print.followedBy (Print.exactly ")")
 
 
+printSwiftTypeFunctionInput : List SwiftType -> Print
+printSwiftTypeFunctionInput input =
+    let
+        input0PartPrints : List Print
+        input0PartPrints =
+            input
+                |> List.map
+                    (\inputPart ->
+                        inputPart |> printSwiftTypeNotParenthesized TypeIncoming
+                    )
+
+        input0LineSpread : Print.LineSpread
+        input0LineSpread =
+            input0PartPrints
+                |> Print.lineSpreadListMapAndCombine Print.lineSpread
+    in
+    printParenthesized
+        (input0PartPrints
+            |> Print.listMapAndIntersperseAndFlatten
+                (\inputPart ->
+                    inputPart
+                )
+                (Print.exactly ","
+                    |> Print.followedBy
+                        (Print.spaceOrLinebreakIndented input0LineSpread)
+                )
+        )
+
+
 printSwiftTypeFunction :
     TypeIncomingOrOutgoing
-    -> { input : SwiftType, output : SwiftType }
+    -> { input : List SwiftType, output : SwiftType }
     -> Print
 printSwiftTypeFunction position typeFunction =
     let
         input0Print : Print
         input0Print =
-            printParenthesized
-                (printSwiftTypeNotParenthesized TypeIncoming
-                    typeFunction.input
-                )
+            typeFunction.input
+                |> printSwiftTypeFunctionInput
 
-        outputExpanded : { inputs : List SwiftType, output : SwiftType }
+        outputExpanded : { inputs : List (List SwiftType), output : SwiftType }
         outputExpanded =
             swiftTypeExpandToFunction typeFunction.output
 
@@ -981,13 +1006,7 @@ printSwiftTypeFunction position typeFunction =
         input1UpPrints : List Print
         input1UpPrints =
             outputExpanded.inputs
-                |> List.map
-                    (\inputType ->
-                        printParenthesized
-                            (printSwiftTypeNotParenthesized TypeIncoming
-                                inputType
-                            )
-                    )
+                |> List.map printSwiftTypeFunctionInput
 
         fullLineSpread : Print.LineSpread
         fullLineSpread =
@@ -1027,15 +1046,15 @@ printSwiftTypeFunction position typeFunction =
             )
 
 
-swiftTypeExpandToFunction : SwiftType -> { inputs : List SwiftType, output : SwiftType }
+swiftTypeExpandToFunction : SwiftType -> { inputs : List (List SwiftType), output : SwiftType }
 swiftTypeExpandToFunction swiftType =
     swiftTypeExpandFunctionIntoReverse [] swiftType
 
 
 swiftTypeExpandFunctionIntoReverse :
-    List SwiftType
+    List (List SwiftType)
     -> SwiftType
-    -> { inputs : List SwiftType, output : SwiftType }
+    -> { inputs : List (List SwiftType), output : SwiftType }
 swiftTypeExpandFunctionIntoReverse soFarReverse swiftType =
     case swiftType of
         SwiftTypeFunction function ->
@@ -1062,6 +1081,62 @@ swiftTypeExpandFunctionIntoReverse soFarReverse swiftType =
             { inputs = soFarReverse |> List.reverse
             , output = SwiftTypeVariable variable
             }
+
+
+inferredTypeExpandToFunction :
+    ElmSyntaxTypeInfer.Type
+    -> { inputs : List ElmSyntaxTypeInfer.Type, output : ElmSyntaxTypeInfer.Type }
+inferredTypeExpandToFunction inferredType =
+    inferredTypeExpandFunctionIntoReverse [] inferredType
+
+
+inferredTypeExpandFunctionIntoReverse :
+    List ElmSyntaxTypeInfer.Type
+    -> ElmSyntaxTypeInfer.Type
+    -> { inputs : List ElmSyntaxTypeInfer.Type, output : ElmSyntaxTypeInfer.Type }
+inferredTypeExpandFunctionIntoReverse soFarReverse inferredType =
+    case inferredType of
+        ElmSyntaxTypeInfer.TypeVariable _ ->
+            { inputs = soFarReverse |> List.reverse
+            , output = inferredType
+            }
+
+        ElmSyntaxTypeInfer.TypeNotVariable inferredTypeNotVariable ->
+            case inferredTypeNotVariable of
+                ElmSyntaxTypeInfer.TypeFunction function ->
+                    inferredTypeExpandFunctionIntoReverse
+                        (function.input :: soFarReverse)
+                        function.output
+
+                ElmSyntaxTypeInfer.TypeUnit ->
+                    { inputs = soFarReverse |> List.reverse
+                    , output = inferredType
+                    }
+
+                ElmSyntaxTypeInfer.TypeConstruct _ ->
+                    { inputs = soFarReverse |> List.reverse
+                    , output = inferredType
+                    }
+
+                ElmSyntaxTypeInfer.TypeTuple _ ->
+                    { inputs = soFarReverse |> List.reverse
+                    , output = inferredType
+                    }
+
+                ElmSyntaxTypeInfer.TypeTriple _ ->
+                    { inputs = soFarReverse |> List.reverse
+                    , output = inferredType
+                    }
+
+                ElmSyntaxTypeInfer.TypeRecord _ ->
+                    { inputs = soFarReverse |> List.reverse
+                    , output = inferredType
+                    }
+
+                ElmSyntaxTypeInfer.TypeRecordExtension _ ->
+                    { inputs = soFarReverse |> List.reverse
+                    , output = inferredType
+                    }
 
 
 printSwiftTypeTuple :
@@ -6531,7 +6606,7 @@ valueOrFunctionDeclaration moduleContext syntaxDeclarationValueOrFunction =
                             |> List.foldr
                                 (\parameter outputTypeSoFar ->
                                     SwiftTypeFunction
-                                        { input = parameter.type_ |> type_
+                                        { input = [ parameter.type_ |> type_ ]
                                         , output = outputTypeSoFar
                                         }
                                 )
@@ -7085,10 +7160,10 @@ expression context expressionTypedNode =
 
                         fieldName0 :: fieldName1Up ->
                             let
-                                parameterTypes : List SwiftType
+                                parameterTypes : List ElmSyntaxTypeInfer.Type
                                 parameterTypes =
-                                    swiftTypeExpandToFunction
-                                        (expressionTypedNode.type_ |> type_)
+                                    inferredTypeExpandToFunction
+                                        expressionTypedNode.type_
                                         |> .inputs
                             in
                             Ok
@@ -7107,7 +7182,7 @@ expression context expressionTypedNode =
                                                 SwiftExpressionLambda
                                                     { parameters =
                                                         [ { name = parameter.name
-                                                          , type_ = parameter.type_
+                                                          , type_ = parameter.type_ |> type_
                                                           }
                                                         ]
                                                     , statements = []
@@ -8463,7 +8538,7 @@ letValueOrFunctionDeclaration context syntaxLetDeclarationValueOrFunction =
                                 |> List.foldr
                                     (\parameter outputTypeSoFar ->
                                         SwiftTypeFunction
-                                            { input = parameter.type_ |> type_
+                                            { input = [ parameter.type_ |> type_ ]
                                             , output = outputTypeSoFar
                                             }
                                     )
@@ -8956,7 +9031,9 @@ swiftTypeContainedVariables swiftType =
 
         SwiftTypeFunction typeFunction ->
             FastSet.union
-                (typeFunction.input |> swiftTypeContainedVariables)
+                (typeFunction.input
+                    |> listMapToFastSetsAndUnify swiftTypeContainedVariables
+                )
                 (typeFunction.output |> swiftTypeContainedVariables)
 
 
@@ -9244,7 +9321,9 @@ swiftTypeContainedLocalReferences swiftType =
 
         SwiftTypeFunction typeFunction ->
             FastSet.union
-                (typeFunction.input |> swiftTypeContainedLocalReferences)
+                (typeFunction.input
+                    |> listMapToFastSetsAndUnify swiftTypeContainedLocalReferences
+                )
                 (typeFunction.output |> swiftTypeContainedLocalReferences)
 
 
