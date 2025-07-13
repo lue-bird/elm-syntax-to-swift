@@ -1,6 +1,7 @@
 # overall TODO
 - split let and func declarations in result of `ElmSyntaxToSwift.modules`
 - when original inferred type contains type variables (ignoring number an specialized records), declare it as `func _() { _ }` and call with `()`
+- avoid or eliminate `generated_` variable names if possible
 
 
 Print [`elm-syntax`](https://dark.elm.dmy.fr/packages/stil4m/elm-syntax/latest/) declarations as [swift](https://swift.org/) code.
