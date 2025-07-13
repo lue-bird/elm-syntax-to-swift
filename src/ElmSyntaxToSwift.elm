@@ -6479,10 +6479,6 @@ valueOrFunctionDeclaration moduleContext syntaxDeclarationValueOrFunction =
             Result.map
                 (\result ->
                     let
-                        parameterNameForIndex : Int -> String
-                        parameterNameForIndex parameterIndex =
-                            "generated_" ++ (parameterIndex |> String.fromInt)
-
                         resultAndStatementsToAdd :
                             { statementsToAdd : List SwiftStatement
                             , result : SwiftExpression
@@ -6500,7 +6496,7 @@ valueOrFunctionDeclaration moduleContext syntaxDeclarationValueOrFunction =
                                         { result =
                                             SwiftExpressionLambda
                                                 { parameters =
-                                                    [ { name = parameterNameForIndex parameter.index
+                                                    [ { name = generatedParameterNameForIndex parameter.index
                                                       , type_ = parameter.type_ |> type_
                                                       }
                                                     ]
@@ -6520,7 +6516,7 @@ valueOrFunctionDeclaration moduleContext syntaxDeclarationValueOrFunction =
                                                         , expression =
                                                             SwiftExpressionReference
                                                                 { moduleOrigin = Nothing
-                                                                , name = parameterNameForIndex parameterIndex
+                                                                , name = generatedParameterNameForIndex parameterIndex
                                                                 }
                                                         }
                                                 )
@@ -6530,7 +6526,7 @@ valueOrFunctionDeclaration moduleContext syntaxDeclarationValueOrFunction =
                                     }
                     in
                     { parameters =
-                        [ { name = parameterNameForIndex 0
+                        [ { name = generatedParameterNameForIndex 0
                           , type_ = parameter0.type_ |> type_
                           }
                         ]
@@ -6559,6 +6555,11 @@ valueOrFunctionDeclaration moduleContext syntaxDeclarationValueOrFunction =
                         , path = [ "declarationResult" ]
                         }
                 )
+
+
+generatedParameterNameForIndex : Int -> String
+generatedParameterNameForIndex parameterIndex =
+    "generated_" ++ (parameterIndex |> String.fromInt)
 
 
 variableNameDisambiguateFromSwiftKeywords : String -> String
@@ -7094,17 +7095,13 @@ expression context expressionTypedNode =
                                     swiftTypeExpandToFunction
                                         (expressionTypedNode.type_ |> type_)
                                         |> .inputs
-
-                                fieldValueParameterName : String -> String
-                                fieldValueParameterName fieldName =
-                                    "generated_" ++ fieldName
                             in
                             Ok
                                 { statements = []
                                 , result =
                                     List.map2
                                         (\fieldName fieldType ->
-                                            { name = fieldValueParameterName fieldName
+                                            { name = generatedFieldValueParameterName fieldName
                                             , type_ = fieldType
                                             }
                                         )
@@ -7130,7 +7127,7 @@ expression context expressionTypedNode =
                                                                 |> FastDict.insert fieldName
                                                                     (SwiftExpressionReference
                                                                         { moduleOrigin = Nothing
-                                                                        , name = fieldValueParameterName fieldName
+                                                                        , name = generatedFieldValueParameterName fieldName
                                                                         }
                                                                     )
                                                         )
@@ -7873,6 +7870,11 @@ generatedAccessedRecordVariableName =
     "generated_record"
 
 
+generatedFieldValueParameterName : String -> String
+generatedFieldValueParameterName fieldName =
+    "generated_" ++ fieldName
+
+
 okResultSwiftExpressionUnitStatementsEmpty :
     Result
         error_
@@ -8407,10 +8409,6 @@ letValueOrFunctionDeclaration context syntaxLetDeclarationValueOrFunction =
             Result.map
                 (\result ->
                     let
-                        parameterNameForIndex : Int -> String
-                        parameterNameForIndex parameterIndex =
-                            "generated_" ++ (parameterIndex |> String.fromInt)
-
                         resultAndStatementsToAdd :
                             { statementsToAdd : List SwiftStatement
                             , result : SwiftExpression
@@ -8428,7 +8426,7 @@ letValueOrFunctionDeclaration context syntaxLetDeclarationValueOrFunction =
                                         { result =
                                             SwiftExpressionLambda
                                                 { parameters =
-                                                    [ { name = parameterNameForIndex parameter.index
+                                                    [ { name = generatedParameterNameForIndex parameter.index
                                                       , type_ = parameter.type_ |> type_
                                                       }
                                                     ]
@@ -8448,7 +8446,7 @@ letValueOrFunctionDeclaration context syntaxLetDeclarationValueOrFunction =
                                                         , expression =
                                                             SwiftExpressionReference
                                                                 { moduleOrigin = Nothing
-                                                                , name = parameterNameForIndex parameterIndex
+                                                                , name = generatedParameterNameForIndex parameterIndex
                                                                 }
                                                         }
                                                 )
@@ -8460,7 +8458,7 @@ letValueOrFunctionDeclaration context syntaxLetDeclarationValueOrFunction =
                     SwiftStatementFuncDeclaration
                         { name = syntaxLetDeclarationValueOrFunction.name
                         , parameters =
-                            [ { name = parameterNameForIndex 0
+                            [ { name = generatedParameterNameForIndex 0
                               , type_ = parameter0.type_ |> type_
                               }
                             ]
