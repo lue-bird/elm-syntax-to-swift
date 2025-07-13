@@ -87,9 +87,6 @@ You will find these types:
     will be of type `( Double, Double )`
   - elm records like `{ y : Float, x : Float }` will be of type `( x: Double, y: Double )` with the fields sorted. Single-field records like `{ min : Float }` will have an extra field because swift does not support single-field anonymous records/tuples: `( min: Double, unusedDummyFieldBecauseSwiftDoesNotSupportSingleFieldRecord: () )`.
     If you'd like a shorter name or an alternative solution, please open an issue
-  - elm `Json.Encode.Value`/`Json.Decode.Value` will be of type
-    [`Data`](https://developer.apple.com/documentation/foundation/data).
-    Encode and decode them like you would in elm, like `Elm.JsonEncode_float 2.2`
   - a transpiled elm app does not run itself.
     An elm main `Platform.worker` program type will literally just consist of fields `Init`, `Update` and `Subscriptions` where
     subscriptions/commands are returned as a list of `Elm.PlatformSub_SubSingle`/`Elm.PlatformCmd_CmdSingle` with possible elm subscriptions/commands in a choice type.

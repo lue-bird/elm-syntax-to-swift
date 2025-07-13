@@ -14,7 +14,8 @@ const elmString =
     "\"\"\"\n"
     + defaultDeclarationsSwiftFile
         .replaceAll(
-            `import Foundation
+            `import CoreFoundation
+import Foundation
 
 // using enum to create a namespace can't be instantiated
 public enum Elm {

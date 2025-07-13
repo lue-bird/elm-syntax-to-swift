@@ -1,3 +1,4 @@
+import CoreFoundation
 import Foundation
 
 // using enum to create a namespace can't be instantiated
@@ -885,9 +886,9 @@ public enum Elm {
         }
     }
 
-    public static func Result_map<a, value, x>(_ valueChange: @escaping (a) -> value) -> (
-        Result_Result<x, a>
-    ) -> Result_Result<x, value> {
+    public static func Result_map<a, b, x>(_ valueChange: @escaping (a) -> b)
+        -> (Result_Result<x, a>) -> Result_Result<x, b>
+    {
         { (result: Result_Result<x, a>) in
             switch result {
             case let .Result_Err(error): .Result_Err(error)
@@ -897,9 +898,9 @@ public enum Elm {
         }
     }
 
-    public static func Result_map2<a, b, value, x>(
-        _ combine: @escaping (a) -> (b) -> value
-    ) -> (Result_Result<x, a>) -> (Result_Result<x, b>) -> Result_Result<x, value> {
+    public static func Result_map2<a, b, combined, x>(
+        _ combine: @escaping (a) -> (b) -> combined
+    ) -> (Result_Result<x, a>) -> (Result_Result<x, b>) -> Result_Result<x, combined> {
         { (aResult: Result_Result<x, a>) in
             { (bResult: Result_Result<x, b>) in
                 switch aResult {
@@ -915,11 +916,11 @@ public enum Elm {
         }
     }
 
-    public static func Result_map3<a, b, c, value, x>(
-        _ combine: @escaping (a) -> (b) -> (c) -> value
-    ) -> (Result_Result<x, a>) -> (Result_Result<x, b>) -> (Result_Result<x, c>) -> Result_Result<
-        x, value
-    > {
+    public static func Result_map3<a, b, c, combined, x>(
+        _ combine: @escaping (a) -> (b) -> (c) -> combined
+    ) -> (Result_Result<x, a>) -> (Result_Result<x, b>) -> (Result_Result<x, c>)
+        -> Result_Result<x, combined>
+    {
         { (aResult: Result_Result<x, a>) in
             { (bResult: Result_Result<x, b>) in
                 { (cResult: Result_Result<x, c>) in
@@ -941,11 +942,11 @@ public enum Elm {
         }
     }
 
-    public static func Result_map4<a, b, c, d, value, x>(
-        _ combine: @escaping (a) -> (b) -> (c) -> (d) -> value
-    ) -> (Result_Result<x, a>) -> (Result_Result<x, b>) -> (Result_Result<x, c>) -> (
-        Result_Result<x, d>
-    ) -> Result_Result<x, value> {
+    public static func Result_map4<a, b, c, d, combined, x>(
+        _ combine: @escaping (a) -> (b) -> (c) -> (d) -> combined
+    ) -> (Result_Result<x, a>) -> (Result_Result<x, b>) -> (Result_Result<x, c>)
+        -> (Result_Result<x, d>) -> Result_Result<x, combined>
+    {
         { (aResult: Result_Result<x, a>) in
             { (bResult: Result_Result<x, b>) in
                 { (cResult: Result_Result<x, c>) in
@@ -975,11 +976,11 @@ public enum Elm {
         }
     }
 
-    public static func Result_map5<a, b, c, d, e, value, x>(
-        _ combine: @escaping (a) -> (b) -> (c) -> (d) -> (e) -> value
-    ) -> (Result_Result<x, a>) -> (Result_Result<x, b>) -> (Result_Result<x, c>) -> (
-        Result_Result<x, d>
-    ) -> (Result_Result<x, e>) -> Result_Result<x, value> {
+    public static func Result_map5<a, b, c, d, e, combined, x>(
+        _ combine: @escaping (a) -> (b) -> (c) -> (d) -> (e) -> combined
+    ) -> (Result_Result<x, a>) -> (Result_Result<x, b>) -> (Result_Result<x, c>)
+        -> (Result_Result<x, d>) -> (Result_Result<x, e>) -> Result_Result<x, combined>
+    {
         { (aResult: Result_Result<x, a>) in
             { (bResult: Result_Result<x, b>) in
                 { (cResult: Result_Result<x, c>) in
@@ -1006,6 +1007,126 @@ public enum Elm {
                                     }
                                 }
 
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    static func Result_map6<a, b, c, d, e, f, combined, x>(
+        _ combine: (a) -> (b) -> (c) -> (d) -> (e) -> (f) -> combined,
+        _ aResult: Result_Result<x, a>,
+        _ bResult: Result_Result<x, b>,
+        _ cResult: Result_Result<x, c>,
+        _ dResult: Result_Result<x, d>,
+        _ eResult: Result_Result<x, e>,
+        _ fResult: Result_Result<x, f>
+    ) -> Result_Result<x, combined> {
+        switch aResult {
+        case let .Result_Err(x): .Result_Err(x)
+        case let .Result_Ok(a):
+            switch bResult {
+            case let .Result_Err(x): .Result_Err(x)
+            case let .Result_Ok(b):
+                switch cResult {
+                case let .Result_Err(x): .Result_Err(x)
+                case let .Result_Ok(c):
+                    switch dResult {
+                    case let .Result_Err(x): .Result_Err(x)
+                    case let .Result_Ok(d):
+                        switch eResult {
+                        case let .Result_Err(x): .Result_Err(x)
+                        case let .Result_Ok(e):
+                            switch fResult {
+                            case let .Result_Err(x): .Result_Err(x)
+                            case let .Result_Ok(f):
+                                .Result_Ok(combine(a)(b)(c)(d)(e)(f))
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    static func Result_map7<a, b, c, d, e, f, g, combined, x>(
+        _ combine: (a) -> (b) -> (c) -> (d) -> (e) -> (f) -> (g) -> combined,
+        _ aResult: Result_Result<x, a>,
+        _ bResult: Result_Result<x, b>,
+        _ cResult: Result_Result<x, c>,
+        _ dResult: Result_Result<x, d>,
+        _ eResult: Result_Result<x, e>,
+        _ fResult: Result_Result<x, f>,
+        _ gResult: Result_Result<x, g>
+    ) -> Result_Result<x, combined> {
+        switch aResult {
+        case let .Result_Err(x): .Result_Err(x)
+        case let .Result_Ok(a):
+            switch bResult {
+            case let .Result_Err(x): .Result_Err(x)
+            case let .Result_Ok(b):
+                switch cResult {
+                case let .Result_Err(x): .Result_Err(x)
+                case let .Result_Ok(c):
+                    switch dResult {
+                    case let .Result_Err(x): .Result_Err(x)
+                    case let .Result_Ok(d):
+                        switch eResult {
+                        case let .Result_Err(x): .Result_Err(x)
+                        case let .Result_Ok(e):
+                            switch fResult {
+                            case let .Result_Err(x): .Result_Err(x)
+                            case let .Result_Ok(f):
+                                switch gResult {
+                                case let .Result_Err(x): .Result_Err(x)
+                                case let .Result_Ok(g):
+                                    .Result_Ok(combine(a)(b)(c)(d)(e)(f)(g))
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    static func Result_map8<a, b, c, d, e, f, g, h, combined, x>(
+        _ combine: (a) -> (b) -> (c) -> (d) -> (e) -> (f) -> (g) -> (h) -> combined,
+        _ aResult: Result_Result<x, a>,
+        _ bResult: Result_Result<x, b>,
+        _ cResult: Result_Result<x, c>,
+        _ dResult: Result_Result<x, d>,
+        _ eResult: Result_Result<x, e>,
+        _ fResult: Result_Result<x, f>,
+        _ gResult: Result_Result<x, g>,
+        _ hResult: Result_Result<x, h>
+    ) -> Result_Result<x, combined> {
+        switch aResult {
+        case let .Result_Err(x): .Result_Err(x)
+        case let .Result_Ok(a):
+            switch bResult {
+            case let .Result_Err(x): .Result_Err(x)
+            case let .Result_Ok(b):
+                switch cResult {
+                case let .Result_Err(x): .Result_Err(x)
+                case let .Result_Ok(c):
+                    switch dResult {
+                    case let .Result_Err(x): .Result_Err(x)
+                    case let .Result_Ok(d):
+                        switch eResult {
+                        case let .Result_Err(x): .Result_Err(x)
+                        case let .Result_Ok(e):
+                            switch fResult {
+                            case let .Result_Err(x): .Result_Err(x)
+                            case let .Result_Ok(f):
+                                switch gResult {
+                                case let .Result_Err(x): .Result_Err(x)
+                                case let .Result_Ok(g):
+                                    switch hResult {
+                                    case let .Result_Err(x): .Result_Err(x)
+                                    case let .Result_Ok(h):
+                                        .Result_Ok(combine(a)(b)(c)(d)(e)(f)(g)(h))
+                                    }
+                                }
                             }
                         }
                     }
@@ -1041,14 +1162,30 @@ public enum Elm {
         return soFar
     }
 
-    private static func Array_fromList<a>(_ fullList: List_List<a>) -> [a] {
+    static func Array_mapFromList<a, b>(_ elementChange: (a) -> b, _ fullList: List_List<a>)
+        -> [b]
+    {
+        var soFar: [b] = Array()
+        var remainingList = fullList
+        while true {
+            switch remainingList {
+            case .List_Empty:
+                return soFar
+            case let .List_Cons(remainingHead, remainingTail):
+                soFar.append(elementChange(remainingHead))
+                remainingList = remainingTail
+            }
+        }
+    }
+
+    public static func Array_fromList<a>(_ fullList: List_List<a>) -> [a] {
         var soFar: [a] = Array()
         var remainingList = fullList
         while true {
             switch remainingList {
             case .List_Empty:
                 return soFar
-            case .List_Cons(let remainingHead, let remainingTail):
+            case let .List_Cons(remainingHead, remainingTail):
                 soFar.append(remainingHead)
                 remainingList = remainingTail
             }
@@ -1634,8 +1771,7 @@ public enum Elm {
                 return .List_Empty
             } else {
                 var soFar: List_List<Double> = .List_Empty
-                // can be optimized
-                for i in (Int(start)...Int(end)).reversed() {
+                for i in stride(from: Int(end), through: Int(start), by: -1) {
                     soFar = .List_Cons(Double(i), soFar)
                 }
                 return soFar
@@ -2033,4 +2169,866 @@ public enum Elm {
         config
     }
 
+    public struct JsonDecode_Value: @unchecked Sendable {
+        // documented: NSString | NSNumber (covering Int, Float, Bool) | NSArray | NSDictionary | NSNull
+        let value: Any
+    }
+    public typealias JsonEncode_Value = JsonDecode_Value
+
+    public static let JsonEncode_null: JsonEncode_Value =
+        JsonDecode_Value(value: NSNull())
+    public static func JsonEncode_int(_ int: Double) -> JsonEncode_Value {
+        JsonDecode_Value(value: NSNumber(value: int))
+    }
+    public static func JsonEncode_float(_ float: Double) -> JsonEncode_Value {
+        JsonDecode_Value(value: NSNumber(value: float))
+    }
+    public static func JsonEncode_string(_ string: String) -> JsonEncode_Value {
+        JsonDecode_Value(value: NSString(string: string))
+    }
+    public static func JsonEncode_bool(_ bool: Bool) -> JsonEncode_Value {
+        JsonDecode_Value(value: NSNumber(value: bool))
+    }
+    public static func JsonEncode_list<a>(
+        _ elementToJson: @escaping @Sendable (a) -> JsonEncode_Value
+    )
+        -> (List_List<a>) -> JsonEncode_Value
+    {
+        { elements in
+            JsonDecode_Value(
+                value: NSArray(
+                    array: Array_mapFromList(elementToJson, elements)
+                )
+            )
+        }
+    }
+    public static func JsonEncode_array<a>(
+        _ elementToJson: @escaping @Sendable (a) -> JsonEncode_Value
+    )
+        -> ([a]) -> JsonEncode_Value
+    {
+        { elements in
+            JsonDecode_Value(
+                value: NSArray(
+                    array: elements.map(elementToJson)
+                )
+            )
+        }
+    }
+    public static func JsonEncode_set<a: Sendable>(
+        _ elementToJson: @escaping @Sendable (a) -> JsonEncode_Value
+    )
+        -> (Set<a>) -> JsonEncode_Value
+    {
+        { elements in
+            JsonDecode_Value(
+                value: NSArray(
+                    array: Array(elements).map(elementToJson)
+                )
+            )
+        }
+    }
+    public static func JsonEncode_object(_ fields: List_List<(String, JsonEncode_Value)>)
+        -> JsonEncode_Value
+    {
+        var fieldsRemaining = fields
+        var fieldsDictionary: [String: JsonEncode_Value] = Dictionary()
+        while case let .List_Cons(head, tail) = fieldsRemaining {
+            fieldsDictionary[head.0] = head.1
+            fieldsRemaining = tail
+        }
+        return JsonDecode_Value(value: NSDictionary(dictionary: fieldsDictionary))
+    }
+    public static func JsonEncode_dict(_ fields: [String: JsonEncode_Value])
+        -> JsonEncode_Value
+    {
+        JsonDecode_Value(value: NSDictionary(dictionary: fields))
+    }
+
+    public static func JsonEncode_encode(_ indentSize: Double) -> (JsonEncode_Value) -> String {
+        { encoded in
+            do {
+                let options: JSONSerialization.WritingOptions =
+                    if indentSize <= 0 {
+                        []
+                    } else {
+                        [.prettyPrinted]  // indent size 2
+                    }
+                let prettyPrintedData = try JSONSerialization.data(
+                    withJSONObject: encoded,
+                    options: options
+                )
+                return switch String(data: prettyPrintedData, encoding: .utf8) {
+                case let .some(encodedJsonAsString):
+                    if (indentSize <= 0) || (indentSize == 2) {
+                        encodedJsonAsString
+                    } else {
+                        // set indent size
+                        encodedJsonAsString.replacing(
+                            "\n  ",
+                            with: "\n" + String(repeating: " ", count: Int(indentSize))
+                        )
+                    }
+                case .none:
+                    "null"
+                }
+            } catch {
+                return "null"
+            }
+        }
+    }
+
+    public indirect enum JsonDecode_Error: Sendable {
+        case JsonDecode_Field(String, JsonDecode_Error)
+        case JsonDecode_Index(Double, JsonDecode_Error)
+        case JsonDecode_OneOf(List_List<JsonDecode_Error>)
+        case JsonDecode_Failure(String, JsonDecode_Value)
+    }
+    public typealias JsonDecode_Decoder<value> =
+        @Sendable (JsonDecode_Value) -> Result_Result<JsonDecode_Error, value>
+
+    public static func JsonDecode_decodeValue<value: Sendable>(
+        _ decoder: @escaping JsonDecode_Decoder<value>
+    )
+        -> (JsonDecode_Value) -> Result_Result<JsonDecode_Error, value>
+    {
+        { toDecode in decoder(toDecode) }
+    }
+    public static func JsonDecode_decodeString<value: Sendable>(
+        _ decoder: @escaping JsonDecode_Decoder<value>
+    )
+        -> (String) -> Result_Result<JsonDecode_Error, value>
+    {
+        { toDecode in
+            do {
+                return decoder(
+                    JsonDecode_Value(
+                        value: try JSONSerialization.jsonObject(
+                            with: Data(toDecode.utf8)
+                        )
+                    )
+                )
+            } catch {
+                return .Result_Err(
+                    .JsonDecode_Failure(
+                        "This is not valid JSON!",
+                        JsonEncode_string(toDecode)
+                    )
+                )
+            }
+        }
+    }
+
+    public static let JsonDecode_value: JsonDecode_Decoder<JsonDecode_Value> =
+        { toDecode in .Result_Ok(toDecode) }
+    public static func JsonDecode_succeed<a: Sendable>(_ value: (a))
+        -> JsonDecode_Decoder<a>
+    {
+        { _ in .Result_Ok(value) }
+    }
+    public static func JsonDecode_fail<a: Sendable>(_ errorMessage: String)
+        -> JsonDecode_Decoder<a>
+    {
+        { toDecode in .Result_Err(.JsonDecode_Failure(errorMessage, toDecode)) }
+    }
+    public static func JsonDecode_lazy<a: Sendable>(
+        _ buildDecoder: @escaping @Sendable () -> JsonDecode_Decoder<a>
+    )
+        -> JsonDecode_Decoder<a>
+    {
+        { toDecode in buildDecoder()(toDecode) }
+    }
+    public static func JsonDecode_andThen<a: Sendable, b: Sendable>(
+        _ valueToDecoder: @escaping @Sendable (a) -> JsonDecode_Decoder<b>
+    )
+        -> (@escaping JsonDecode_Decoder<a>) -> JsonDecode_Decoder<b>
+    {
+        { decoder in
+            { toDecode in
+                switch decoder(toDecode) {
+                case let .Result_Err(error):
+                    .Result_Err(error)
+                case let .Result_Ok(value):
+                    valueToDecoder(value)(toDecode)
+                }
+            }
+        }
+    }
+    public static func JsonDecode_map<a: Sendable, b: Sendable>(
+        _ valueChange: @escaping @Sendable (a) -> b
+    )
+        -> (@escaping JsonDecode_Decoder<a>) -> JsonDecode_Decoder<b>
+    {
+        { decoder in
+            { toDecode in
+                Result_map(valueChange)(decoder(toDecode))
+            }
+        }
+    }
+    public static func JsonDecode_map2<a: Sendable, b: Sendable, combined: Sendable>(
+        _ combine: @escaping @Sendable (a) -> (b) -> combined
+    )
+        -> (@escaping JsonDecode_Decoder<a>)
+        -> (@escaping JsonDecode_Decoder<b>)
+        -> JsonDecode_Decoder<combined>
+    {
+        { aDecoder in
+            { bDecoder in
+                { toDecode in
+                    Result_map2(combine)(aDecoder(toDecode))(bDecoder(toDecode))
+                }
+            }
+        }
+    }
+    public static func JsonDecode_map3<a: Sendable, b: Sendable, c: Sendable, combined: Sendable>(
+        _ combine: @escaping @Sendable (a) -> (b) -> (c) -> combined
+    )
+        -> (@escaping JsonDecode_Decoder<a>)
+        -> (@escaping JsonDecode_Decoder<b>)
+        -> (@escaping JsonDecode_Decoder<c>)
+        -> JsonDecode_Decoder<combined>
+    {
+        { aDecoder in
+            { bDecoder in
+                { cDecoder in
+                    { toDecode in
+                        Result_map3(combine)(aDecoder(toDecode))(bDecoder(toDecode))(
+                            cDecoder(toDecode))
+                    }
+                }
+            }
+        }
+    }
+    public static func JsonDecode_map4<
+        a: Sendable, b: Sendable, c: Sendable, d: Sendable, combined: Sendable
+    >(
+        _ combine: @escaping @Sendable (a) -> (b) -> (c) -> (d) -> combined
+    )
+        -> (@escaping JsonDecode_Decoder<a>)
+        -> (@escaping JsonDecode_Decoder<b>)
+        -> (@escaping JsonDecode_Decoder<c>)
+        -> (@escaping JsonDecode_Decoder<d>)
+        -> JsonDecode_Decoder<combined>
+    {
+        { aDecoder in
+            { bDecoder in
+                { cDecoder in
+                    { dDecoder in
+                        { toDecode in
+                            Result_map4(combine)(aDecoder(toDecode))(bDecoder(toDecode))(
+                                cDecoder(toDecode))(dDecoder(toDecode))
+                        }
+                    }
+                }
+            }
+        }
+    }
+    public static func JsonDecode_map5<
+        a: Sendable, b: Sendable, c: Sendable, d: Sendable, e: Sendable, combined: Sendable
+    >(
+        _ combine: @escaping @Sendable (a) -> (b) -> (c) -> (d) -> (e) -> combined
+    )
+        -> (@escaping JsonDecode_Decoder<a>)
+        -> (@escaping JsonDecode_Decoder<b>)
+        -> (@escaping JsonDecode_Decoder<c>)
+        -> (@escaping JsonDecode_Decoder<d>)
+        -> (@escaping JsonDecode_Decoder<e>)
+        -> JsonDecode_Decoder<combined>
+    {
+        { aDecoder in
+            { bDecoder in
+                { cDecoder in
+                    { dDecoder in
+                        { eDecoder in
+                            { toDecode in
+                                Result_map5(combine)(aDecoder(toDecode))(bDecoder(toDecode))(
+                                    cDecoder(toDecode))(dDecoder(toDecode))(eDecoder(toDecode))
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    public static func JsonDecode_map6<
+        a: Sendable, b: Sendable, c: Sendable, d: Sendable, e: Sendable, f: Sendable,
+        combined: Sendable
+    >(
+        _ combine: @escaping @Sendable (a) -> (b) -> (c) -> (d) -> (e) -> (f) -> combined
+    )
+        -> (@escaping JsonDecode_Decoder<a>)
+        -> (@escaping JsonDecode_Decoder<b>)
+        -> (@escaping JsonDecode_Decoder<c>)
+        -> (@escaping JsonDecode_Decoder<d>)
+        -> (@escaping JsonDecode_Decoder<e>)
+        -> (@escaping JsonDecode_Decoder<f>)
+        -> JsonDecode_Decoder<combined>
+    {
+        { aDecoder in
+            { bDecoder in
+                { cDecoder in
+                    { dDecoder in
+                        { eDecoder in
+                            { fDecoder in
+                                { toDecode in
+                                    Result_map6(
+                                        combine,
+                                        aDecoder(toDecode), bDecoder(toDecode), cDecoder(toDecode),
+                                        dDecoder(toDecode), eDecoder(toDecode), fDecoder(toDecode)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    public static func JsonDecode_map7<
+        a: Sendable, b: Sendable, c: Sendable, d: Sendable, e: Sendable, f: Sendable, g: Sendable,
+        combined: Sendable
+    >(
+        _ combine: @escaping @Sendable (a) -> (b) -> (c) -> (d) -> (e) -> (f) -> (g) -> combined
+    )
+        -> (@escaping JsonDecode_Decoder<a>)
+        -> (@escaping JsonDecode_Decoder<b>)
+        -> (@escaping JsonDecode_Decoder<c>)
+        -> (@escaping JsonDecode_Decoder<d>)
+        -> (@escaping JsonDecode_Decoder<e>)
+        -> (@escaping JsonDecode_Decoder<f>)
+        -> (@escaping JsonDecode_Decoder<g>)
+        -> JsonDecode_Decoder<combined>
+    {
+        { aDecoder in
+            { bDecoder in
+                { cDecoder in
+                    { dDecoder in
+                        { eDecoder in
+                            { fDecoder in
+                                { gDecoder in
+                                    { toDecode in
+                                        Result_map7(
+                                            combine,
+                                            aDecoder(toDecode), bDecoder(toDecode),
+                                            cDecoder(toDecode), dDecoder(toDecode),
+                                            eDecoder(toDecode), fDecoder(toDecode),
+                                            gDecoder(toDecode)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    public static func JsonDecode_map8<
+        a: Sendable, b: Sendable, c: Sendable, d: Sendable, e: Sendable, f: Sendable, g: Sendable,
+        h: Sendable, combined: Sendable
+    >(
+        _ combine: @escaping @Sendable (a) -> (b) -> (c) -> (d) -> (e) -> (f) -> (g) -> (h) ->
+            combined
+    )
+        -> (@escaping JsonDecode_Decoder<a>)
+        -> (@escaping JsonDecode_Decoder<b>)
+        -> (@escaping JsonDecode_Decoder<c>)
+        -> (@escaping JsonDecode_Decoder<d>)
+        -> (@escaping JsonDecode_Decoder<e>)
+        -> (@escaping JsonDecode_Decoder<f>)
+        -> (@escaping JsonDecode_Decoder<g>)
+        -> (@escaping JsonDecode_Decoder<h>)
+        -> JsonDecode_Decoder<combined>
+    {
+        { aDecoder in
+            { bDecoder in
+                { cDecoder in
+                    { dDecoder in
+                        { eDecoder in
+                            { fDecoder in
+                                { gDecoder in
+                                    { hDecoder in
+                                        { toDecode in
+                                            Result_map8(
+                                                combine,
+                                                aDecoder(toDecode), bDecoder(toDecode),
+                                                cDecoder(toDecode), dDecoder(toDecode),
+                                                eDecoder(toDecode), fDecoder(toDecode),
+                                                gDecoder(toDecode), hDecoder(toDecode)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    public static func JsonDecode_oneOf<value: Sendable>(
+        _ options: List_List<JsonDecode_Decoder<value>>
+    )
+        -> JsonDecode_Decoder<value>
+    {
+        { toDecode in
+            var remainingOptions = options
+            var optionDecodeErrors: [JsonDecode_Error] = []
+            while case let .List_Cons(nextOption, afterNextOption) = remainingOptions {
+                switch nextOption(toDecode) {
+                case let .Result_Ok(value): return .Result_Ok(value)
+                case let .Result_Err(optionDecodeError):
+                    optionDecodeErrors.append(optionDecodeError)
+                    remainingOptions = afterNextOption
+                }
+            }
+            return .Result_Err(.JsonDecode_OneOf(Array_toList(optionDecodeErrors)))
+        }
+    }
+
+    public static func JsonDecode_null<a: Sendable>(_ value: a) -> JsonDecode_Decoder<a> {
+        { toDecode in
+            switch toDecode.value {
+            case _ as NSNull:
+                .Result_Ok(value)
+            case _:
+                .Result_Err(
+                    .JsonDecode_Failure("Expecting NULL", toDecode)
+                )
+            }
+        }
+    }
+    public static let JsonDecode_bool: JsonDecode_Decoder<Bool> =
+        { toDecode in
+            switch toDecode.value {
+            case let nsNumber as NSNumber:
+                // https://stackoverflow.com/questions/30215680/is-there-a-correct-way-to-determine-that-an-nsnumber-is-derived-from-a-bool-usin
+                if CFGetTypeID(nsNumber) == CFBooleanGetTypeID() {
+                    .Result_Ok(nsNumber.boolValue)
+                } else {
+                    .Result_Err(
+                        .JsonDecode_Failure("Expecting a BOOL", toDecode)
+                    )
+                }
+            case _:
+                .Result_Err(
+                    .JsonDecode_Failure("Expecting a BOOL", toDecode)
+                )
+            }
+        }
+    public static let JsonDecode_int: JsonDecode_Decoder<Double> =
+        { toDecode in
+            switch toDecode.value {
+            case let nsNumber as NSNumber:
+                switch Int(exactly: nsNumber.doubleValue) {
+                case .some(_): .Result_Ok(nsNumber.doubleValue)
+                case .none:
+                    .Result_Err(
+                        .JsonDecode_Failure("Expecting an INT", toDecode)
+                    )
+                }
+            case _:
+                .Result_Err(
+                    .JsonDecode_Failure("Expecting an INT", toDecode)
+                )
+            }
+        }
+    public static let JsonDecode_float: JsonDecode_Decoder<Double> =
+        { toDecode in
+            switch toDecode.value {
+            case let nsNumber as NSNumber:
+                .Result_Ok(nsNumber.doubleValue)
+            case _:
+                .Result_Err(
+                    .JsonDecode_Failure("Expecting a NUMBER", toDecode)
+                )
+            }
+        }
+    public static let JsonDecode_string: JsonDecode_Decoder<String> =
+        { toDecode in
+            switch toDecode.value {
+            case let nsString as NSString:
+                .Result_Ok(String(nsString))
+            case _:
+                .Result_Err(
+                    .JsonDecode_Failure("Expecting a NUMBER", toDecode)
+                )
+            }
+        }
+
+    public static func JsonDecode_field<value: Sendable>(_ fieldName: String)
+        -> (@escaping JsonDecode_Decoder<value>) -> JsonDecode_Decoder<value>
+    {
+        { valueDecoder in
+            { toDecode in
+                Result_andThen(valueDecoder)(JsonDecode_fieldValue(fieldName)(toDecode))
+            }
+        }
+    }
+    static func JsonDecode_fieldValue(_ fieldName: String)
+        -> JsonDecode_Decoder<JsonDecode_Value>
+    {
+        { toDecode in
+            switch toDecode.value {
+            case let dictToDecode as NSDictionary:
+                switch dictToDecode.value(forKey: fieldName) {
+                case let .some(valueJson):
+                    .Result_Ok(JsonDecode_Value(value: valueJson))
+                case .none:
+                    .Result_Err(
+                        .JsonDecode_Failure(
+                            "Expecting an OBJECT with a field named '"
+                                + fieldName
+                                + "'",
+                            toDecode
+                        )
+                    )
+                }
+            case _:
+                .Result_Err(
+                    .JsonDecode_Failure(
+                        "Expecting an OBJECT with a field named '"
+                            + fieldName
+                            + "'",
+                        toDecode
+                    )
+                )
+            }
+        }
+    }
+
+    public static func JsonDecode_at<value: Sendable>(_ fieldNames: List_List<String>)
+        -> (@escaping JsonDecode_Decoder<value>) -> JsonDecode_Decoder<value>
+    {
+        { valueDecoder in
+            { toDecode in
+                var remainingFieldNames = fieldNames
+                var successfullyDecodedFieldNames: [String] = []
+                var remainingToDecode = toDecode
+                while case let .List_Cons(nextFieldName, afterNextFieldName) = remainingFieldNames {
+                    switch JsonDecode_fieldValue(nextFieldName)(remainingToDecode) {
+                    case let .Result_Ok(fieldValueJson):
+                        remainingFieldNames = afterNextFieldName
+                        remainingToDecode = fieldValueJson
+                        successfullyDecodedFieldNames.append(nextFieldName)
+                    case let .Result_Err(fieldValueDecodeError):
+                        return .Result_Err(
+                            successfullyDecodedFieldNames.reduce(
+                                fieldValueDecodeError,
+                                { soFar, fieldName in
+                                    .JsonDecode_Field(fieldName, soFar)
+                                }
+                            )
+                        )
+                    }
+                }
+                return valueDecoder(remainingToDecode)
+            }
+        }
+    }
+    public static func JsonDecode_dict<value: Sendable>(
+        _ valueDecoder: @escaping JsonDecode_Decoder<value>
+    )
+        -> JsonDecode_Decoder<[String: value]>
+    {
+        { toDecode in
+            switch toDecode.value {
+            case let dictToDecode as NSDictionary:
+                var decodedDictionary: [String: value] = Dictionary()
+                for entryToDecode in dictToDecode {
+                    let key: String
+                    switch entryToDecode.key {
+                    case let castedKey as String:
+                        key = castedKey
+                    case _:
+                        switch JsonDecode_string(JsonDecode_Value(value: entryToDecode.key)) {
+                        case let .Result_Ok(decodedKey):
+                            key = decodedKey
+                        case .Result_Err(_):
+                            return .Result_Err(
+                                .JsonDecode_Failure(
+                                    "Expecting an OBJECT with STRING keys",
+                                    toDecode
+                                )
+                            )
+                        }
+                    }
+                    switch valueDecoder(JsonDecode_Value(value: entryToDecode.value)) {
+                    case let .Result_Err(error):
+                        return .Result_Err(.JsonDecode_Field(key, error))
+                    case let .Result_Ok(decodedValue):
+                        decodedDictionary[key] = decodedValue
+                    }
+                }
+                return .Result_Ok(decodedDictionary)
+            case _:
+                return .Result_Err(
+                    .JsonDecode_Failure("Expecting an OBJECT", toDecode)
+                )
+            }
+        }
+    }
+    public static func JsonDecode_keyValuePairs<value: Sendable>(
+        _ valueDecoder: @escaping JsonDecode_Decoder<value>
+    )
+        -> JsonDecode_Decoder<List_List<(String, value)>>
+    {
+        { toDecode in
+            switch toDecode.value {
+            case let dictToDecode as NSDictionary:
+                var decodedDictionary: List_List<(String, value)> = .List_Empty
+                for entryToDecode in dictToDecode.reversed() {
+                    let key: String
+                    switch entryToDecode.key {
+                    case let castedKey as String:
+                        key = castedKey
+                    case _:
+                        switch JsonDecode_string(JsonDecode_Value(value: entryToDecode.key)) {
+                        case let .Result_Ok(decodedKey):
+                            key = decodedKey
+                        case .Result_Err(_):
+                            return .Result_Err(
+                                .JsonDecode_Failure(
+                                    "Expecting an OBJECT with STRING keys",
+                                    toDecode
+                                )
+                            )
+                        }
+                    }
+                    switch valueDecoder(JsonDecode_Value(value: entryToDecode.value)) {
+                    case let .Result_Err(error):
+                        return .Result_Err(.JsonDecode_Field(key, error))
+                    case let .Result_Ok(decodedValue):
+                        decodedDictionary = .List_Cons((key, decodedValue), decodedDictionary)
+                    }
+                }
+                return .Result_Ok(decodedDictionary)
+            case _:
+                return .Result_Err(
+                    .JsonDecode_Failure("Expecting an OBJECT", toDecode)
+                )
+            }
+        }
+    }
+    public static func JsonDecode_array<a: Sendable>(
+        _ elementDecoder: @escaping JsonDecode_Decoder<a>
+    )
+        -> JsonDecode_Decoder<[a]>
+    {
+        { toDecode in
+            switch toDecode.value {
+            case let arrayToDecode as NSArray:
+                var decodedArray: [a] = Array()
+                for (index, elementToDecode) in arrayToDecode.enumerated() {
+                    switch elementDecoder(JsonDecode_Value(value: elementToDecode)) {
+                    case let .Result_Err(error):
+                        return .Result_Err(.JsonDecode_Index(Double(index), error))
+                    case let .Result_Ok(elementDecoded):
+                        decodedArray.append(elementDecoded)
+                    }
+                }
+                return .Result_Ok(decodedArray)
+            case _:
+                return .Result_Err(
+                    .JsonDecode_Failure("Expecting an ARRAY", toDecode)
+                )
+            }
+        }
+    }
+    public static func JsonDecode_index<a: Sendable>(_ indexAsDouble: Double)
+        -> (@escaping JsonDecode_Decoder<a>)
+        -> JsonDecode_Decoder<a>
+    {
+        { elementDecoder in
+            { toDecode in
+                switch toDecode.value {
+                case let arrayToDecode as NSArray:
+                    let index = Int(indexAsDouble)
+                    return if index >= 0 && index < arrayToDecode.count {
+                        switch elementDecoder(JsonDecode_Value(value: arrayToDecode[index])) {
+                        case let .Result_Err(error):
+                            .Result_Err(.JsonDecode_Index(indexAsDouble, error))
+                        case let .Result_Ok(elementDecoded):
+                            .Result_Ok(elementDecoded)
+                        }
+                    } else {
+                        .Result_Err(
+                            .JsonDecode_Failure(
+                                "Expecting an ARRAY with an index ["
+                                    + String(index)
+                                    + "]",
+                                toDecode
+                            )
+                        )
+                    }
+                case _:
+                    return .Result_Err(
+                        .JsonDecode_Failure("Expecting an ARRAY", toDecode)
+                    )
+                }
+            }
+        }
+    }
+    public static func JsonDecode_list<a: Sendable>(
+        _ elementDecoder: @escaping JsonDecode_Decoder<a>
+    )
+        -> JsonDecode_Decoder<List_List<a>>
+    {
+        { toDecode in
+            switch toDecode.value {
+            case let arrayToDecode as NSArray:
+                var decodedList: List_List<a> = .List_Empty
+                for (index, elementToDecode) in arrayToDecode.enumerated().reversed() {
+                    switch elementDecoder(JsonDecode_Value(value: elementToDecode)) {
+                    case let .Result_Err(error):
+                        return .Result_Err(.JsonDecode_Index(Double(index), error))
+                    case let .Result_Ok(elementDecoded):
+                        decodedList = .List_Cons(elementDecoded, decodedList)
+                    }
+                }
+                return .Result_Ok(decodedList)
+            case _:
+                return .Result_Err(
+                    .JsonDecode_Failure("Expecting an ARRAY", toDecode)
+                )
+            }
+        }
+    }
+    public static func JsonDecode_oneOrMore<a: Sendable, combined: Sendable>(
+        _ combineHeadTail: @escaping @Sendable (a) -> (List_List<a>) -> combined
+    )
+        -> (@escaping JsonDecode_Decoder<a>)
+        -> JsonDecode_Decoder<combined>
+    {
+        { elementDecoder in
+            JsonDecode_map2(combineHeadTail)(
+                elementDecoder)(JsonDecode_list(elementDecoder))
+        }
+    }
+    public static func JsonDecode_maybe<a: Sendable>(
+        _ valueDecoder: @escaping JsonDecode_Decoder<a>
+    )
+        -> JsonDecode_Decoder<Maybe_Maybe<a>>
+    {
+        { toDecode in
+            switch valueDecoder(toDecode) {
+            case let .Result_Ok(value):
+                .Result_Ok(.Maybe_Just(value))
+            case .Result_Err(_):
+                .Result_Ok(.Maybe_Nothing)
+            }
+        }
+    }
+    public static func JsonDecode_nullable<a>(_ valueDecoder: @escaping JsonDecode_Decoder<a>)
+        -> JsonDecode_Decoder<Maybe_Maybe<a>>
+    {
+        { toDecode in
+            switch JsonDecode_null(())(toDecode) {
+            case .Result_Ok(()):
+                .Result_Ok(.Maybe_Nothing)
+            case let .Result_Err(nullDecodeError):
+                switch valueDecoder(toDecode) {
+                case let .Result_Ok(value):
+                    .Result_Ok(.Maybe_Just(value))
+                case let .Result_Err(valueDecodeError):
+                    .Result_Err(
+                        .JsonDecode_OneOf(
+                            .List_Cons(nullDecodeError, .List_Cons(valueDecodeError, .List_Empty)))
+                    )
+                }
+            }
+        }
+    }
+
+    static func indent(_ str: String) -> String {
+        ((str.split(separator: "\n").joined(separator: "\n    ")))
+    }
+    public static func JsonDecode_errorToString(_ error: JsonDecode_Error) -> String {
+        JsonDecode_errorToStringHelp(error, .List_Empty)
+    }
+    static func JsonDecode_errorToStringHelp(
+        _ error: JsonDecode_Error, _ context: List_List<String>
+    )
+        -> String
+    {
+        switch error {
+        case let .JsonDecode_Field(f, err):
+            let isSimple =
+                switch String_uncons(f) {
+                case .Maybe_Nothing: false
+                case let .Maybe_Just((head, rest)):
+                    Char_isAlpha(head) && String_all(Char_isAlphaNum)(rest)
+                }
+
+            let fieldName =
+                if isSimple { "." + f } else { "['" + f + "']" }
+
+            return JsonDecode_errorToStringHelp(err, .List_Cons(fieldName, context))
+
+        case let .JsonDecode_Index(index, err):
+            let indexName = "[" + String(Int(index)) + "]"
+
+            return JsonDecode_errorToStringHelp(err, .List_Cons(indexName, context))
+
+        case let .JsonDecode_OneOf(errors):
+            switch errors {
+            case .List_Empty:
+                return switch context {
+                case .List_Empty: "Ran into a Json.Decode.oneOf with no possibilities!"
+                case .List_Cons(_, _):
+                    "Ran into a Json.Decode.oneOf with no possibilities at json"
+                        + String_concat(List_reverse(context))
+                }
+
+            case let .List_Cons(err, .List_Empty):
+                return JsonDecode_errorToStringHelp(err, context)
+
+            case _:
+                let starter =
+                    switch context {
+                    case .List_Empty: "Json.Decode.oneOf"
+                    case .List_Cons(_, _):
+                        "The Json.Decode.oneOf at json"
+                            + String_concat(List_reverse(context))
+                    }
+
+                let introduction =
+                    starter
+                    + " failed in the following "
+                    + String(Int(List_length(errors)))
+                    + " ways:"
+
+                return String_join("\n\n")(
+                    .List_Cons(
+                        introduction,
+                        List_indexedMap({ (i: Double) in
+                            { (error: JsonDecode_Error) in
+                                "\n\n("
+                                    + String(Int(i + 1))
+                                    + ") "
+                                    + indent(JsonDecode_errorToStringHelp(error, .List_Empty))
+                            }
+                        }
+                        )(errors)
+                    )
+                )
+            }
+
+        case let .JsonDecode_Failure(msg, json):
+            let introduction =
+                switch context {
+                case .List_Empty: "Problem with the given value:\n\n"
+                case .List_Cons(_, _):
+                    "Problem with the value at json"
+                        + String_concat(List_reverse(context))
+                        + ":\n\n    "
+                }
+
+            return introduction
+                + indent((JsonEncode_encode(4)(json)))
+                + "\n\n"
+                + msg
+        }
+    }
 }
