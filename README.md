@@ -1,8 +1,8 @@
-# overall TODO
-- split let and func declarations in result of `ElmSyntaxToSwift.modules`
-- when original inferred type contains type variables (ignoring number an specialized records), declare it as `func _() { _ }` and call with `()`
-- avoid or eliminate `generated_` variable names if possible
-- if argument is typealias that contains a function, add @escaping
+> ## overall TODO
+> - split let and func declarations in result of `ElmSyntaxToSwift.modules`
+> - when original inferred type contains type variables (ignoring number an specialized records), declare it as `func _() { _ }` and call with `()`
+> - avoid or eliminate `generated_` variable names if possible
+> - if argument is typealias that contains a function, add @escaping
 
 
 Print [`elm-syntax`](https://dark.elm.dmy.fr/packages/stil4m/elm-syntax/latest/) declarations as [swift](https://swift.org/) code.
@@ -34,7 +34,7 @@ public enum Elm {
     ..some default declarations..
 
     public static func sample_plus2(_ n: Double) -> Double {
-        basics_add(n, Array_toList([ 2.0 ]))
+        Basics_add(n, List_sum(Array_toList([ 2.0 ])))
     }
 }
 """
