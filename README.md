@@ -33,7 +33,7 @@ Ok """import Foundation
 public enum Elm {
     ..some default declarations..
 
-    public static func sample_plus2(_ n: Double) -> Double {
+    public static func Sample_plus2(_ n: Double) -> Double {
         Basics_add(n, List_sum(Array_toList([ 2.0 ])))
     }
 }
