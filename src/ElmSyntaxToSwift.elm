@@ -3936,7 +3936,7 @@ referenceToCoreSwift reference =
                     Just { moduleOrigin = Nothing, name = "Dict_size" }
 
                 "empty" ->
-                    Just { moduleOrigin = Just "Map", name = "empty" }
+                    Just { moduleOrigin = Nothing, name = "Dict_empty" }
 
                 "singleton" ->
                     Just { moduleOrigin = Nothing, name = "Dict_singleton" }
@@ -3954,13 +3954,13 @@ referenceToCoreSwift reference =
                     Just { moduleOrigin = Nothing, name = "Dict_values" }
 
                 "isEmpty" ->
-                    Just { moduleOrigin = Just "Map", name = "isEmpty" }
+                    Just { moduleOrigin = Nothing, name = "Dict_isEmpty" }
 
                 "map" ->
-                    Just { moduleOrigin = Just "Map", name = "map" }
+                    Just { moduleOrigin = Nothing, name = "Dict_map" }
 
                 "partition" ->
-                    Just { moduleOrigin = Just "Map", name = "partition" }
+                    Just { moduleOrigin = Nothing, name = "Dict_partition" }
 
                 "foldl" ->
                     Just { moduleOrigin = Nothing, name = "Dict_foldl" }
@@ -3969,22 +3969,22 @@ referenceToCoreSwift reference =
                     Just { moduleOrigin = Nothing, name = "Dict_foldr" }
 
                 "filter" ->
-                    Just { moduleOrigin = Just "Map", name = "filter" }
+                    Just { moduleOrigin = Nothing, name = "Dict_filter" }
 
                 "get" ->
                     Just { moduleOrigin = Nothing, name = "Dict_get" }
 
                 "member" ->
-                    Just { moduleOrigin = Just "Map", name = "containsKey" }
+                    Just { moduleOrigin = Nothing, name = "Dict_member" }
 
                 "insert" ->
-                    Just { moduleOrigin = Just "Map", name = "add" }
+                    Just { moduleOrigin = Nothing, name = "Dict_insert" }
 
                 "update" ->
                     Just { moduleOrigin = Nothing, name = "Dict_update" }
 
                 "remove" ->
-                    Just { moduleOrigin = Just "Map", name = "remove" }
+                    Just { moduleOrigin = Nothing, name = "Dict_remove" }
 
                 "union" ->
                     Just { moduleOrigin = Nothing, name = "Dict_union" }
@@ -4002,31 +4002,30 @@ referenceToCoreSwift reference =
                     Nothing
 
         "Set" ->
-            -- TODO
             case reference.name of
                 "size" ->
                     Just { moduleOrigin = Nothing, name = "Set_size" }
 
                 "empty" ->
-                    Just { moduleOrigin = Just "Set", name = "empty" }
+                    Just { moduleOrigin = Nothing, name = "Set_empty" }
 
                 "singleton" ->
-                    Just { moduleOrigin = Just "Set", name = "singleton" }
+                    Just { moduleOrigin = Nothing, name = "Set_singleton" }
 
                 "fromList" ->
-                    Just { moduleOrigin = Just "Set", name = "ofList" }
+                    Just { moduleOrigin = Nothing, name = "Set_fromList" }
 
                 "toList" ->
-                    Just { moduleOrigin = Just "Set", name = "toList" }
+                    Just { moduleOrigin = Nothing, name = "Set_toList" }
 
                 "isEmpty" ->
-                    Just { moduleOrigin = Just "Set", name = "isEmpty" }
+                    Just { moduleOrigin = Nothing, name = "Set_isEmpty" }
 
                 "insert" ->
-                    Just { moduleOrigin = Just "Set", name = "add" }
+                    Just { moduleOrigin = Nothing, name = "Set_insert" }
 
                 "partition" ->
-                    Just { moduleOrigin = Just "Set", name = "partition" }
+                    Just { moduleOrigin = Nothing, name = "Set_partition" }
 
                 "foldl" ->
                     Just { moduleOrigin = Nothing, name = "Set_foldl" }
@@ -4035,22 +4034,22 @@ referenceToCoreSwift reference =
                     Just { moduleOrigin = Nothing, name = "Set_foldr" }
 
                 "filter" ->
-                    Just { moduleOrigin = Just "Set", name = "filter" }
+                    Just { moduleOrigin = Nothing, name = "Set_filter" }
 
                 "member" ->
-                    Just { moduleOrigin = Just "Set", name = "contains" }
+                    Just { moduleOrigin = Nothing, name = "Set_member" }
 
                 "remove" ->
-                    Just { moduleOrigin = Just "Set", name = "remove" }
+                    Just { moduleOrigin = Nothing, name = "Set_remove" }
 
                 "union" ->
-                    Just { moduleOrigin = Just "Set", name = "union" }
+                    Just { moduleOrigin = Nothing, name = "Set_union" }
 
                 "diff" ->
-                    Just { moduleOrigin = Just "Set", name = "difference" }
+                    Just { moduleOrigin = Nothing, name = "Set_diff" }
 
                 "intersect" ->
-                    Just { moduleOrigin = Just "Set", name = "intersect" }
+                    Just { moduleOrigin = Nothing, name = "Set_intersect" }
 
                 _ ->
                     Nothing
@@ -27690,6 +27689,108 @@ where comparable: Comparable {
     var asArray = Array_fromList(list)
     asArray.sort(by: { (a, b) in a < b })  // mutate
     return Array_toList(asArray)
+}
+
+public static func Set_size<a>(_ set: Set<a>) -> Double {
+    Double(set.count)
+}
+public static func Set_empty<a>() -> Set<a> {
+    Set()
+}
+public static func Set_singleton<a>(_ onlyElement: a) -> Set<a> {
+    [onlyElement]
+}
+public static func Set_fromList<a>(_ list: List_List<a>) -> Set<a> {
+    var set: Set<a> = Set()
+    var remainingList = list
+    while case let .List_Cons(element, afterElement) = remainingList {
+        set.insert(element)
+        remainingList = afterElement
+    }
+    return set
+}
+public static func Set_toList<a>(_ set: Set<a>) -> List_List<a> {
+    var list: List_List<a> = .List_Empty
+    for element in set.reversed() {
+        list = .List_Cons(element, list)
+    }
+    return list
+}
+public static func Set_isEmpty<a>(_ set: Set<a>) -> Bool {
+    set.isEmpty
+}
+public static func Set_member<a>(_ needle: a) -> (Set<a>) -> Bool {
+    { set in set.contains(needle) }
+}
+public static func Set_insert<a>(_ newElement: a) -> (Set<a>) -> Set<a> {
+    { set in
+        var setMutable = set
+        setMutable.insert(newElement)
+        return setMutable
+    }
+}
+public static func Set_remove<a>(_ badApple: a) -> (Set<a>) -> Set<a> {
+    { set in
+        var setMutable = set
+        setMutable.remove(badApple)
+        return setMutable
+    }
+}
+public static func Set_diff<a>(_ baseSet: Set<a>) -> (Set<a>) -> Set<a> {
+    { badApples in
+        var setMutable = baseSet
+        setMutable.subtract(badApples)
+        return setMutable
+    }
+}
+public static func Set_intersect<a>(_ aSet: Set<a>) -> (Set<a>) -> Set<a> {
+    { bSet in aSet.intersection(bSet) }
+}
+public static func Set_union<a>(_ aSet: Set<a>) -> (Set<a>) -> Set<a> {
+    { bSet in aSet.union(bSet) }
+}
+public static func Set_filter<a>(_ keepElement: @escaping (a) -> Bool) -> (Set<a>) -> Set<a> {
+    { set in set.filter(keepElement) }
+}
+public static func Set_partition<a>(_ isLeft: @escaping (a) -> Bool) -> (Set<a>) -> (
+    Set<a>, Set<a>
+) {
+    { set in
+        var left: Set<a> = Set()
+        var right: Set<a> = Set()
+        for element in set {
+            if isLeft(element) {
+                left.insert(element)
+            } else {
+                right.insert(element)
+            }
+        }
+        return (left, right)
+    }
+}
+public static func Set_foldl<a, state>(_ reduce: @escaping (a) -> (state) -> state)
+    -> (state) -> (Set<a>) -> (state)
+{
+    { initialState in
+        { set in
+            set.reduce(
+                initialState,
+                { soFar, element in reduce(element)(soFar) }
+            )
+        }
+    }
+}
+public static func Set_foldr<a, state>(_ reduce: @escaping (a) -> (state) -> state)
+    -> (state) -> (Set<a>) -> (state)
+{
+    { initialState in
+        { set in
+            set.reversed().reduce(
+                initialState,
+                { soFar, element in reduce(element)(soFar) }
+            )
+        }
+    }
 }
 
 // not alias for Regex<Substring> because Regex is not Sendable
