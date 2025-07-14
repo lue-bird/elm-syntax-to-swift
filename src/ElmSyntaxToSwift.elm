@@ -8771,9 +8771,7 @@ inferredTypeString =
         )
 
 
-{-| Print a swift value/function declaration
--}
-printSwiftValueOrFunctionDeclaration :
+printSwiftLetOrFuncDeclaration :
     { name : String
     , parameters : Maybe (List { name : String, type_ : SwiftType })
     , statements : List SwiftStatement
@@ -8781,170 +8779,212 @@ printSwiftValueOrFunctionDeclaration :
     , resultType : SwiftType
     }
     -> Print
-printSwiftValueOrFunctionDeclaration swiftValueOrFunctionDeclaration =
+printSwiftLetOrFuncDeclaration swiftValueOrFunctionDeclaration =
+    case swiftValueOrFunctionDeclaration.parameters of
+        Just parameters ->
+            printSwiftFuncDeclaration
+                { name = swiftValueOrFunctionDeclaration.name
+                , parameters = parameters
+                , statements = swiftValueOrFunctionDeclaration.statements
+                , resultType = swiftValueOrFunctionDeclaration.resultType
+                , result = swiftValueOrFunctionDeclaration.result
+                }
+
+        Nothing ->
+            printSwiftLetDeclaration
+                { name = swiftValueOrFunctionDeclaration.name
+                , statements = swiftValueOrFunctionDeclaration.statements
+                , resultType = swiftValueOrFunctionDeclaration.resultType
+                , result =
+                    case swiftValueOrFunctionDeclaration.statements of
+                        [] ->
+                            swiftValueOrFunctionDeclaration.result
+
+                        statement0 :: statement1Up ->
+                            SwiftExpressionCall
+                                { called =
+                                    SwiftExpressionLambda
+                                        { parameters = []
+                                        , statements = statement0 :: statement1Up
+                                        , result = swiftValueOrFunctionDeclaration.result
+                                        }
+                                , arguments = []
+                                }
+                }
+
+
+printSwiftFuncDeclaration :
+    { name : String
+    , parameters : List { name : String, type_ : SwiftType }
+    , statements : List SwiftStatement
+    , result : SwiftExpression
+    , resultType : SwiftType
+    }
+    -> Print
+printSwiftFuncDeclaration swiftValueOrFunctionDeclaration =
     let
         resultTypePrint : Print
         resultTypePrint =
             printSwiftTypeNotParenthesized TypeOutgoing
                 swiftValueOrFunctionDeclaration.resultType
-    in
-    case swiftValueOrFunctionDeclaration.parameters of
-        Just parameters ->
-            let
-                parameterPrints : List Print
-                parameterPrints =
-                    parameters
-                        |> List.map
-                            (\parameter ->
-                                let
-                                    parameterTypePrint : Print
-                                    parameterTypePrint =
-                                        printSwiftTypeNotParenthesized TypeIncoming
-                                            parameter.type_
-                                in
-                                Print.exactly ("_ " ++ parameter.name)
-                                    |> Print.followedBy printExactlyColon
-                                    |> Print.followedBy
-                                        (Print.withIndentIncreasedBy 1
-                                            (Print.withIndentAtNextMultipleOf4
-                                                (Print.spaceOrLinebreakIndented
-                                                    (parameterTypePrint |> Print.lineSpread)
-                                                    |> Print.followedBy
-                                                        parameterTypePrint
-                                                )
-                                            )
-                                        )
-                            )
 
-                headerLineSpread : Print.LineSpread
-                headerLineSpread =
-                    resultTypePrint
-                        |> Print.lineSpread
-                        |> Print.lineSpreadMergeWith
-                            (\() ->
-                                parameterPrints
-                                    |> Print.lineSpreadListMapAndCombine
-                                        Print.lineSpread
-                            )
-
-                typeVariablesToDeclare : List String
-                typeVariablesToDeclare =
-                    swiftValueOrFunctionDeclaration.resultType
-                        |> swiftTypeContainedVariables
-                        |> FastSet.union
-                            (parameters
-                                |> listMapToFastSetsAndUnify
-                                    (\parameter ->
-                                        parameter.type_ |> swiftTypeContainedVariables
-                                    )
-                            )
-                        |> FastSet.toList
-
-                typeVariablesToDeclareAsGenericsString : String
-                typeVariablesToDeclareAsGenericsString =
-                    case typeVariablesToDeclare of
-                        [] ->
-                            ""
-
-                        typeParameter0 :: typeParameter1Up ->
-                            "<"
-                                ++ listFilledMapAndStringJoinWith ", "
-                                    (\typeParameter ->
-                                        if typeParameter |> String.startsWith "comparable" then
-                                            typeParameter ++ ": Comparable & Sendable"
-
-                                        else
-                                            typeParameter ++ ": Sendable"
-                                    )
-                                    typeParameter0
-                                    typeParameter1Up
-                                ++ ">"
-            in
-            Print.exactly
-                ("public static func "
-                    ++ swiftValueOrFunctionDeclaration.name
-                    ++ typeVariablesToDeclareAsGenericsString
-                )
-                |> Print.followedBy
-                    (Print.withIndentIncreasedBy 4
-                        (printParenthesized
-                            (parameterPrints
-                                |> Print.listMapAndIntersperseAndFlatten
-                                    (\parameterPrint ->
-                                        Print.spaceOrLinebreakIndented headerLineSpread
-                                            |> Print.followedBy parameterPrint
-                                    )
-                                    Print.empty
-                            )
+        parameterPrints : List Print
+        parameterPrints =
+            swiftValueOrFunctionDeclaration.parameters
+                |> List.map
+                    (\parameter ->
+                        let
+                            parameterTypePrint : Print
+                            parameterTypePrint =
+                                printSwiftTypeNotParenthesized TypeIncoming
+                                    parameter.type_
+                        in
+                        Print.exactly ("_ " ++ parameter.name)
+                            |> Print.followedBy printExactlyColon
                             |> Print.followedBy
-                                (Print.spaceOrLinebreakIndented headerLineSpread)
-                            |> Print.followedBy printExactlyMinusGreaterThanSpace
-                            |> Print.followedBy
-                                (Print.withIndentIncreasedBy 3
-                                    resultTypePrint
-                                )
-                            |> Print.followedBy printExactlySpaceCurlyOpening
-                            |> Print.followedBy Print.linebreakIndented
-                            |> Print.followedBy
-                                (case swiftValueOrFunctionDeclaration.statements of
-                                    [] ->
-                                        printSwiftExpressionNotParenthesized
-                                            swiftValueOrFunctionDeclaration.result
-
-                                    statement0 :: statement1Up ->
-                                        printSwiftStatements
-                                            (statement0 :: statement1Up)
-                                            |> Print.followedBy Print.linebreakIndented
+                                (Print.withIndentIncreasedBy 1
+                                    (Print.withIndentAtNextMultipleOf4
+                                        (Print.spaceOrLinebreakIndented
+                                            (parameterTypePrint |> Print.lineSpread)
                                             |> Print.followedBy
-                                                (printSwiftReturn
-                                                    swiftValueOrFunctionDeclaration.result
-                                                )
-                                )
-                        )
-                    )
-                |> Print.followedBy Print.linebreakIndented
-                |> Print.followedBy printExactlyCurlyClosing
-
-        Nothing ->
-            Print.exactly
-                ("public static let "
-                    ++ swiftValueOrFunctionDeclaration.name
-                )
-                |> Print.followedBy
-                    (Print.withIndentAtNextMultipleOf4
-                        ((let
-                            fullLineSpread : Print.LineSpread
-                            fullLineSpread =
-                                resultTypePrint |> Print.lineSpread
-                          in
-                          printExactlyColon
-                            |> Print.followedBy
-                                (Print.withIndentAtNextMultipleOf4
-                                    (Print.spaceOrLinebreakIndented fullLineSpread
-                                        |> Print.followedBy resultTypePrint
+                                                parameterTypePrint
+                                        )
                                     )
                                 )
-                         )
-                            |> Print.followedBy
-                                printExactlySpaceEqualsLinebreakIndented
-                            |> Print.followedBy
-                                (Print.linebreakIndented
+                    )
+
+        headerLineSpread : Print.LineSpread
+        headerLineSpread =
+            resultTypePrint
+                |> Print.lineSpread
+                |> Print.lineSpreadMergeWith
+                    (\() ->
+                        parameterPrints
+                            |> Print.lineSpreadListMapAndCombine
+                                Print.lineSpread
+                    )
+
+        typeVariablesToDeclare : List String
+        typeVariablesToDeclare =
+            swiftValueOrFunctionDeclaration.resultType
+                |> swiftTypeContainedVariables
+                |> FastSet.union
+                    (swiftValueOrFunctionDeclaration.parameters
+                        |> listMapToFastSetsAndUnify
+                            (\parameter ->
+                                parameter.type_ |> swiftTypeContainedVariables
+                            )
+                    )
+                |> FastSet.toList
+
+        typeVariablesToDeclareAsGenericsString : String
+        typeVariablesToDeclareAsGenericsString =
+            case typeVariablesToDeclare of
+                [] ->
+                    ""
+
+                typeParameter0 :: typeParameter1Up ->
+                    "<"
+                        ++ listFilledMapAndStringJoinWith ", "
+                            (\typeParameter ->
+                                if typeParameter |> String.startsWith "comparable" then
+                                    typeParameter ++ ": Comparable & Sendable"
+
+                                else
+                                    typeParameter ++ ": Sendable"
+                            )
+                            typeParameter0
+                            typeParameter1Up
+                        ++ ">"
+    in
+    Print.exactly
+        ("public static func "
+            ++ swiftValueOrFunctionDeclaration.name
+            ++ typeVariablesToDeclareAsGenericsString
+        )
+        |> Print.followedBy
+            (Print.withIndentIncreasedBy 4
+                (printParenthesized
+                    (parameterPrints
+                        |> Print.listMapAndIntersperseAndFlatten
+                            (\parameterPrint ->
+                                Print.spaceOrLinebreakIndented headerLineSpread
+                                    |> Print.followedBy parameterPrint
+                            )
+                            Print.empty
+                    )
+                    |> Print.followedBy
+                        (Print.spaceOrLinebreakIndented headerLineSpread)
+                    |> Print.followedBy printExactlyMinusGreaterThanSpace
+                    |> Print.followedBy
+                        (Print.withIndentIncreasedBy 3
+                            resultTypePrint
+                        )
+                    |> Print.followedBy printExactlySpaceCurlyOpening
+                    |> Print.followedBy Print.linebreakIndented
+                    |> Print.followedBy
+                        (case swiftValueOrFunctionDeclaration.statements of
+                            [] ->
+                                printSwiftExpressionNotParenthesized
+                                    swiftValueOrFunctionDeclaration.result
+
+                            statement0 :: statement1Up ->
+                                printSwiftStatements
+                                    (statement0 :: statement1Up)
+                                    |> Print.followedBy Print.linebreakIndented
                                     |> Print.followedBy
-                                        (printSwiftExpressionNotParenthesized
-                                            (SwiftExpressionCall
-                                                { called =
-                                                    SwiftExpressionLambda
-                                                        { parameters = []
-                                                        , statements = swiftValueOrFunctionDeclaration.statements
-                                                        , result = swiftValueOrFunctionDeclaration.result
-                                                        }
-                                                , arguments = []
-                                                }
-                                            )
+                                        (printSwiftReturn
+                                            swiftValueOrFunctionDeclaration.result
                                         )
+                        )
+                )
+            )
+        |> Print.followedBy Print.linebreakIndented
+        |> Print.followedBy printExactlyCurlyClosing
+
+
+printSwiftLetDeclaration :
+    { name : String
+    , statements : List SwiftStatement
+    , result : SwiftExpression
+    , resultType : SwiftType
+    }
+    -> Print
+printSwiftLetDeclaration swiftLetDeclaration =
+    let
+        resultTypePrint : Print
+        resultTypePrint =
+            printSwiftTypeNotParenthesized TypeOutgoing
+                swiftLetDeclaration.resultType
+
+        resultTypeFullLineSpread : Print.LineSpread
+        resultTypeFullLineSpread =
+            resultTypePrint |> Print.lineSpread
+    in
+    Print.exactly
+        ("public static let "
+            ++ swiftLetDeclaration.name
+        )
+        |> Print.followedBy
+            (Print.withIndentAtNextMultipleOf4
+                (printExactlyColon
+                    |> Print.followedBy
+                        (Print.withIndentAtNextMultipleOf4
+                            (Print.spaceOrLinebreakIndented resultTypeFullLineSpread
+                                |> Print.followedBy resultTypePrint
+                            )
+                        )
+                    |> Print.followedBy
+                        printExactlySpaceEqualsLinebreakIndented
+                    |> Print.followedBy
+                        (Print.linebreakIndented
+                            |> Print.followedBy
+                                (printSwiftExpressionNotParenthesized
+                                    swiftLetDeclaration.result
                                 )
                         )
-                    )
+                )
+            )
 
 
 printSwiftReturn : SwiftExpression -> Print
@@ -12205,7 +12245,7 @@ public enum Elm {
         ++ (valueAndFunctionDeclarationsOrdered
                 |> Print.listMapAndIntersperseAndFlatten
                     (\swiftValueOrFunction ->
-                        (swiftValueOrFunction |> printSwiftValueOrFunctionDeclaration)
+                        (swiftValueOrFunction |> printSwiftLetOrFuncDeclaration)
                             |> Print.followedBy printLinebreakLinebreakIndented
                     )
                     Print.empty
