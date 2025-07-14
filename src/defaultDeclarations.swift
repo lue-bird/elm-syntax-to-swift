@@ -10,10 +10,10 @@ public enum Elm {
     }
 
     // in theory Optional.none and Optional.some exist
-    // and they even correctly say
+    // and they even correctly adhere to
     //     Optional<Optional<Int>>.none == Optional.some(Optional<Int>.none))
-    //     is false
-    // Since they are
+    //     being false
+    // However, since they are
     //   - both displayed as nil
     //   - Optional.some(x) has the same type as x (hand-wave)
     // I'm a bit worried about how shaky to use they might be though
@@ -400,12 +400,7 @@ public enum Elm {
     }
 
     public static func String_toFloat(_ string: String) -> Maybe_Maybe<Double> {
-        switch Double(string) {
-        case .some(let parseResult):
-            .Maybe_Just(parseResult)
-        case .none:
-            .Maybe_Nothing
-        }
+        Maybe_fromOptional(Double(string))
     }
 
     public static func String_uncons(_ string: String) -> Maybe_Maybe<(UnicodeScalar, String)> {
@@ -690,6 +685,18 @@ public enum Elm {
         }
     }
 
+    public static func Maybe_toOptional<a>(_ optional: Maybe_Maybe<a>) -> a? {
+        switch optional {
+        case .Maybe_Nothing: .none
+        case let .Maybe_Just(value): .some(value)
+        }
+    }
+    public static func Maybe_fromOptional<a>(_ optional: a?) -> Maybe_Maybe<a> {
+        switch optional {
+        case .none: .Maybe_Nothing
+        case let .some(value): .Maybe_Just(value)
+        }
+    }
     public static func Maybe_withDefault<a>(_ valueOnNothing: a) -> (Maybe_Maybe<a>) -> a {
         { maybe in
             switch maybe {
@@ -1902,6 +1909,9 @@ public enum Elm {
     public static func Set_union<a>(_ aSet: Set<a>) -> (Set<a>) -> Set<a> {
         { bSet in aSet.union(bSet) }
     }
+    public static func Set_map<a, b>(_ elementChange: @escaping (a) -> b) -> (Set<a>) -> Set<b> {
+        { set in Set(set.map(elementChange)) }
+    }
     public static func Set_filter<a>(_ keepElement: @escaping (a) -> Bool) -> (Set<a>) -> Set<a> {
         { set in set.filter(keepElement) }
     }
@@ -1941,6 +1951,242 @@ public enum Elm {
                 set.reversed().reduce(
                     initialState,
                     { soFar, element in reduce(element)(soFar) }
+                )
+            }
+        }
+    }
+
+    public static func Dict_size<key, value>(_ dictionary: [key: value]) -> Double {
+        Double(dictionary.count)
+    }
+    public static func Dict_empty<key, value>() -> [key: value] {
+        Dictionary()
+    }
+    public static func Dict_singleton<key, value>(_ key: key) -> (value) -> [key: value] {
+        { value in [key: value] }
+    }
+    public static func Dict_fromList<key, value>(_ list: List_List<(key, value)>)
+        -> [key: value]
+    {
+        var dictionary: [key: value] = Dictionary()
+        var remainingList = list
+        while case let .List_Cons((key, value), afterElement) = remainingList {
+            dictionary[key] = value
+            remainingList = afterElement
+        }
+        return dictionary
+    }
+    public static func Dict_toList<key, value>(_ dictionary: [key: value])
+        -> List_List<(key, value)>
+    {
+        var list: List_List<(key, value)> = .List_Empty
+        for element in dictionary.reversed() {
+            list = .List_Cons((element.key, element.value), list)
+        }
+        return list
+    }
+    public static func Dict_keys<key, value>(_ dictionary: [key: value])
+        -> List_List<key>
+    {
+        var list: List_List<key> = .List_Empty
+        for key in dictionary.keys.reversed() {
+            list = .List_Cons(key, list)
+        }
+        return list
+    }
+    public static func Dict_keys<key, value>(_ dictionary: [key: value])
+        -> List_List<value>
+    {
+        var list: List_List<value> = .List_Empty
+        for value in dictionary.values.reversed() {
+            list = .List_Cons(value, list)
+        }
+        return list
+    }
+    public static func Dict_isEmpty<key, value>(_ dictionary: [key: value]) -> Bool {
+        dictionary.isEmpty
+    }
+    public static func Dict_member<key, value>(_ needle: key) -> ([key: value]) -> Bool {
+        { dictionary in
+            switch dictionary[needle] {
+            case .none: false
+            case .some(_): true
+            }
+        }
+    }
+    public static func Dict_get<key, value>(_ key: key) -> ([key: value]) -> Maybe_Maybe<value> {
+        { dictionary in Maybe_fromOptional(dictionary[key]) }
+    }
+    public static func Dict_insert<key, value>(_ key: key)
+        -> (value) -> ([key: value]) -> [key: value]
+    {
+        { value in
+            { dictionary in
+                var dictionaryMutable = dictionary
+                dictionaryMutable[key] = value
+                return dictionaryMutable
+            }
+        }
+    }
+    public static func Dict_update<key, value>(_ key: key)
+        -> (@escaping (Maybe_Maybe<value>) -> Maybe_Maybe<value>) -> ([key: value]) -> [key: value]
+    {
+        { maybeValueToMaybeValue in
+            { dictionary in
+                var dictionaryMutable = dictionary
+                dictionaryMutable[key] = Maybe_toOptional(
+                    maybeValueToMaybeValue(
+                        Maybe_fromOptional(dictionaryMutable[key])
+                    )
+                )
+                return dictionaryMutable
+            }
+        }
+    }
+    public static func Dict_remove<key, value>(_ badApple: key)
+        -> ([key: value]) -> [key: value]
+    {
+        { dictionary in
+            var dictionaryMutable = dictionary
+            dictionaryMutable.removeValue(forKey: badApple)
+            return dictionaryMutable
+        }
+    }
+    public static func Dict_diff<key, a, b>(_ baseDictionary: [key: a])
+        -> ([key: b]) -> [key: a]
+    {
+        { badApples in
+            baseDictionary.filter({ key, _ in
+                switch badApples[key] {
+                case .none: true
+                case .some(_): false
+                }
+            })
+        }
+    }
+    public static func Dict_intersect<key, value>(_ aDictionary: [key: value])
+        -> ([key: value]) -> [key: value]
+    {
+        { bDictionary in
+            aDictionary.filter({ aKey, aValue in
+                switch bDictionary[aKey] {
+                case .none: false
+                case .some(_): true
+                }
+            })
+        }
+    }
+    public static func Dict_union<key, value>(_ aDictionary: [key: value])
+        -> ([key: value]) -> [key: value]
+    {
+        { bDictionary in
+            var aDictionaryMutable = aDictionary
+            aDictionaryMutable.merge(bDictionary, uniquingKeysWith: { aValue, _ in aValue })
+            return aDictionaryMutable
+        }
+    }
+    public static func Dict_merge<key, a, b, state>(
+        _ onlyA: @escaping (key) -> (a) -> (state) -> state
+    )
+        -> (@escaping (key) -> (a) -> (b) -> (state) -> state)
+        -> (@escaping (key) -> (b) -> (state) -> state)
+        -> ([key: a])
+        -> ([key: b])
+        -> (state)
+        -> state
+    {
+        { bothAB in
+            { onlyB in
+                { aDictionary in
+                    { bDictionary in
+                        { initialState in
+                            var currentState: state = initialState
+                            for key in Set(Array(aDictionary.keys) + Array(bDictionary.keys)) {
+                                switch (aDictionary[key], bDictionary[key]) {
+                                case let (.some(a), .some(b)):
+                                    currentState = bothAB(key)(a)(b)(currentState)
+                                case let (.some(a), .none):
+                                    currentState = onlyA(key)(a)(currentState)
+                                case let (.none, .some(b)):
+                                    currentState = onlyB(key)(b)(currentState)
+                                case (.none, .none): break
+                                }
+                            }
+                            return currentState
+                        }
+                    }
+                }
+            }
+        }
+    }
+    public static func Dict_map<key, a, b>(
+        _ entryToNewValue: @escaping (key) -> (a) -> b
+    )
+        -> ([key: a]) -> [key: b]
+    {
+        { dictionary in
+            Dictionary(
+                uniqueKeysWithValues:
+                    dictionary.map({ key, value in
+                        (key, entryToNewValue(key)(value))
+                    })
+            )
+        }
+    }
+    public static func Dict_filter<key, value>(
+        _ keepElement: @escaping (key) -> (value) -> Bool
+    )
+        -> ([key: value]) -> [key: value]
+    {
+        { dictionary in
+            dictionary.filter(
+                { key, value in keepElement(key)(value) }
+            )
+        }
+    }
+    public static func Dict_partition<key, value>(
+        _ isLeft: @escaping (key) -> (value) -> Bool
+    )
+        -> ([key: value])
+        -> ([key: value], [key: value])
+    {
+        { dictionary in
+            var left: [key: value] = Dictionary()
+            var right: [key: value] = Dictionary()
+            for (key, value) in dictionary {
+                if isLeft(key)(value) {
+                    left[key] = value
+                } else {
+                    right[key] = value
+                }
+            }
+            return (left, right)
+        }
+    }
+    public static func Dict_foldl<key, value, state>(
+        _ reduce: @escaping (key) -> (value) -> (state) -> state
+    )
+        -> (state) -> ([key: value]) -> (state)
+    {
+        { initialState in
+            { dictionary in
+                dictionary.reduce(
+                    initialState,
+                    { soFar, entry in reduce(entry.key)(entry.value)(soFar) }
+                )
+            }
+        }
+    }
+    public static func Dict_foldr<key, value, state>(
+        _ reduce: @escaping (key) -> (value) -> (state) -> state
+    )
+        -> (state) -> ([key: value]) -> (state)
+    {
+        { initialState in
+            { dictionary in
+                dictionary.reversed().reduce(
+                    initialState,
+                    { soFar, entry in reduce(entry.key)(entry.value)(soFar) }
                 )
             }
         }
