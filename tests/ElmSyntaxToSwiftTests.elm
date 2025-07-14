@@ -9,10 +9,9 @@ to use this module to quickly inspect the transpiled code
 -}
 
 import Elm.Parser
-import ElmSyntaxToSwift exposing (SwiftStatement)
+import ElmSyntaxToSwift
 import Expect
 import FastDict
-import FastSet
 import Test exposing (Test)
 
 
@@ -97,11 +96,13 @@ elmModuleSourceTranspileToSwift source =
                             FastDict.Dict
                                 String
                                 { parameters :
-                                    List
-                                        { name : String
-                                        , type_ : ElmSyntaxToSwift.SwiftType
-                                        }
-                                , statements : List SwiftStatement
+                                    Maybe
+                                        (List
+                                            { name : String
+                                            , type_ : ElmSyntaxToSwift.SwiftType
+                                            }
+                                        )
+                                , statements : List ElmSyntaxToSwift.SwiftStatement
                                 , result : ElmSyntaxToSwift.SwiftExpression
                                 , resultType : ElmSyntaxToSwift.SwiftType
                                 }
