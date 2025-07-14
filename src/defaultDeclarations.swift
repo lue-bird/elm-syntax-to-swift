@@ -2632,24 +2632,25 @@ public enum Elm {
         case JsonDecode_OneOf(List_List<JsonDecode_Error>)
         case JsonDecode_Failure(String, JsonDecode_Value)
     }
-    public typealias JsonDecode_Decoder<value> =
-        @Sendable (JsonDecode_Value) -> Result_Result<JsonDecode_Error, value>
+    public struct JsonDecode_Decoder<value>: Sendable {
+        let decode: @Sendable (JsonDecode_Value) -> Result_Result<JsonDecode_Error, value>
+    }
 
     public static func JsonDecode_decodeValue<value: Sendable>(
-        _ decoder: @escaping JsonDecode_Decoder<value>
+        _ decoder: JsonDecode_Decoder<value>
     )
         -> (JsonDecode_Value) -> Result_Result<JsonDecode_Error, value>
     {
-        { toDecode in decoder(toDecode) }
+        { toDecode in decoder.decode(toDecode) }
     }
     public static func JsonDecode_decodeString<value: Sendable>(
-        _ decoder: @escaping JsonDecode_Decoder<value>
+        _ decoder: JsonDecode_Decoder<value>
     )
         -> (String) -> Result_Result<JsonDecode_Error, value>
     {
         { toDecode in
             do {
-                return decoder(
+                return decoder.decode(
                     JsonDecode_Value(
                         value: try JSONSerialization.jsonObject(
                             with: Data(toDecode.utf8)
@@ -2668,81 +2669,85 @@ public enum Elm {
     }
 
     public static let JsonDecode_value: JsonDecode_Decoder<JsonDecode_Value> =
-        { toDecode in .Result_Ok(toDecode) }
+        JsonDecode_Decoder(decode: { toDecode in .Result_Ok(toDecode) })
     public static func JsonDecode_succeed<a: Sendable>(_ value: (a))
         -> JsonDecode_Decoder<a>
     {
-        { _ in .Result_Ok(value) }
+        JsonDecode_Decoder(decode: { _ in .Result_Ok(value) })
     }
     public static func JsonDecode_fail<a: Sendable>(_ errorMessage: String)
         -> JsonDecode_Decoder<a>
     {
-        { toDecode in .Result_Err(.JsonDecode_Failure(errorMessage, toDecode)) }
+        JsonDecode_Decoder(decode: { toDecode in
+            .Result_Err(.JsonDecode_Failure(errorMessage, toDecode))
+        })
     }
     public static func JsonDecode_lazy<a: Sendable>(
         _ buildDecoder: @escaping @Sendable () -> JsonDecode_Decoder<a>
     )
         -> JsonDecode_Decoder<a>
     {
-        { toDecode in buildDecoder()(toDecode) }
+        JsonDecode_Decoder(decode: { toDecode in
+            buildDecoder().decode(toDecode)
+        })
     }
     public static func JsonDecode_andThen<a: Sendable, b: Sendable>(
         _ valueToDecoder: @escaping @Sendable (a) -> JsonDecode_Decoder<b>
     )
-        -> (@escaping JsonDecode_Decoder<a>) -> JsonDecode_Decoder<b>
+        -> (JsonDecode_Decoder<a>) -> JsonDecode_Decoder<b>
     {
         { decoder in
-            { toDecode in
-                switch decoder(toDecode) {
+            JsonDecode_Decoder(decode: { toDecode in
+                switch decoder.decode(toDecode) {
                 case let .Result_Err(error):
                     .Result_Err(error)
                 case let .Result_Ok(value):
-                    valueToDecoder(value)(toDecode)
+                    valueToDecoder(value).decode(toDecode)
                 }
-            }
+            })
         }
     }
     public static func JsonDecode_map<a: Sendable, b: Sendable>(
         _ valueChange: @escaping @Sendable (a) -> b
     )
-        -> (@escaping JsonDecode_Decoder<a>) -> JsonDecode_Decoder<b>
+        -> (JsonDecode_Decoder<a>) -> JsonDecode_Decoder<b>
     {
         { decoder in
-            { toDecode in
-                Result_map(valueChange)(decoder(toDecode))
-            }
+            JsonDecode_Decoder(decode: { toDecode in
+                Result_map(valueChange)(decoder.decode(toDecode))
+            })
         }
     }
     public static func JsonDecode_map2<a: Sendable, b: Sendable, combined: Sendable>(
         _ combine: @escaping @Sendable (a) -> (b) -> combined
     )
-        -> (@escaping JsonDecode_Decoder<a>)
-        -> (@escaping JsonDecode_Decoder<b>)
+        -> (JsonDecode_Decoder<a>)
+        -> (JsonDecode_Decoder<b>)
         -> JsonDecode_Decoder<combined>
     {
         { aDecoder in
             { bDecoder in
-                { toDecode in
-                    Result_map2(combine)(aDecoder(toDecode))(bDecoder(toDecode))
-                }
+                JsonDecode_Decoder(decode: { toDecode in
+                    Result_map2(combine)(aDecoder.decode(toDecode))(bDecoder.decode(toDecode))
+                })
             }
         }
     }
     public static func JsonDecode_map3<a: Sendable, b: Sendable, c: Sendable, combined: Sendable>(
         _ combine: @escaping @Sendable (a) -> (b) -> (c) -> combined
     )
-        -> (@escaping JsonDecode_Decoder<a>)
-        -> (@escaping JsonDecode_Decoder<b>)
-        -> (@escaping JsonDecode_Decoder<c>)
+        -> (JsonDecode_Decoder<a>)
+        -> (JsonDecode_Decoder<b>)
+        -> (JsonDecode_Decoder<c>)
         -> JsonDecode_Decoder<combined>
     {
         { aDecoder in
             { bDecoder in
                 { cDecoder in
-                    { toDecode in
-                        Result_map3(combine)(aDecoder(toDecode))(bDecoder(toDecode))(
-                            cDecoder(toDecode))
-                    }
+                    JsonDecode_Decoder(decode: { toDecode in
+                        Result_map3(combine)(aDecoder.decode(toDecode))(bDecoder.decode(toDecode))(
+                            cDecoder.decode(toDecode))
+                    })
                 }
             }
         }
@@ -2752,20 +2757,21 @@ public enum Elm {
     >(
         _ combine: @escaping @Sendable (a) -> (b) -> (c) -> (d) -> combined
     )
-        -> (@escaping JsonDecode_Decoder<a>)
-        -> (@escaping JsonDecode_Decoder<b>)
-        -> (@escaping JsonDecode_Decoder<c>)
-        -> (@escaping JsonDecode_Decoder<d>)
+        -> (JsonDecode_Decoder<a>)
+        -> (JsonDecode_Decoder<b>)
+        -> (JsonDecode_Decoder<c>)
+        -> (JsonDecode_Decoder<d>)
         -> JsonDecode_Decoder<combined>
     {
         { aDecoder in
             { bDecoder in
                 { cDecoder in
                     { dDecoder in
-                        { toDecode in
-                            Result_map4(combine)(aDecoder(toDecode))(bDecoder(toDecode))(
-                                cDecoder(toDecode))(dDecoder(toDecode))
-                        }
+                        JsonDecode_Decoder(decode: { toDecode in
+                            Result_map4(combine)(aDecoder.decode(toDecode))(
+                                bDecoder.decode(toDecode))(
+                                    cDecoder.decode(toDecode))(dDecoder.decode(toDecode))
+                        })
                     }
                 }
             }
@@ -2776,11 +2782,11 @@ public enum Elm {
     >(
         _ combine: @escaping @Sendable (a) -> (b) -> (c) -> (d) -> (e) -> combined
     )
-        -> (@escaping JsonDecode_Decoder<a>)
-        -> (@escaping JsonDecode_Decoder<b>)
-        -> (@escaping JsonDecode_Decoder<c>)
-        -> (@escaping JsonDecode_Decoder<d>)
-        -> (@escaping JsonDecode_Decoder<e>)
+        -> (JsonDecode_Decoder<a>)
+        -> (JsonDecode_Decoder<b>)
+        -> (JsonDecode_Decoder<c>)
+        -> (JsonDecode_Decoder<d>)
+        -> (JsonDecode_Decoder<e>)
         -> JsonDecode_Decoder<combined>
     {
         { aDecoder in
@@ -2788,10 +2794,12 @@ public enum Elm {
                 { cDecoder in
                     { dDecoder in
                         { eDecoder in
-                            { toDecode in
-                                Result_map5(combine)(aDecoder(toDecode))(bDecoder(toDecode))(
-                                    cDecoder(toDecode))(dDecoder(toDecode))(eDecoder(toDecode))
-                            }
+                            JsonDecode_Decoder(decode: { toDecode in
+                                Result_map5(combine)(aDecoder.decode(toDecode))(
+                                    bDecoder.decode(toDecode))(
+                                        cDecoder.decode(toDecode))(dDecoder.decode(toDecode))(
+                                        eDecoder.decode(toDecode))
+                            })
                         }
                     }
                 }
@@ -2804,12 +2812,12 @@ public enum Elm {
     >(
         _ combine: @escaping @Sendable (a) -> (b) -> (c) -> (d) -> (e) -> (f) -> combined
     )
-        -> (@escaping JsonDecode_Decoder<a>)
-        -> (@escaping JsonDecode_Decoder<b>)
-        -> (@escaping JsonDecode_Decoder<c>)
-        -> (@escaping JsonDecode_Decoder<d>)
-        -> (@escaping JsonDecode_Decoder<e>)
-        -> (@escaping JsonDecode_Decoder<f>)
+        -> (JsonDecode_Decoder<a>)
+        -> (JsonDecode_Decoder<b>)
+        -> (JsonDecode_Decoder<c>)
+        -> (JsonDecode_Decoder<d>)
+        -> (JsonDecode_Decoder<e>)
+        -> (JsonDecode_Decoder<f>)
         -> JsonDecode_Decoder<combined>
     {
         { aDecoder in
@@ -2818,13 +2826,15 @@ public enum Elm {
                     { dDecoder in
                         { eDecoder in
                             { fDecoder in
-                                { toDecode in
+                                JsonDecode_Decoder(decode: { toDecode in
                                     Result_map6(
                                         combine,
-                                        aDecoder(toDecode), bDecoder(toDecode), cDecoder(toDecode),
-                                        dDecoder(toDecode), eDecoder(toDecode), fDecoder(toDecode)
+                                        aDecoder.decode(toDecode), bDecoder.decode(toDecode),
+                                        cDecoder.decode(toDecode),
+                                        dDecoder.decode(toDecode), eDecoder.decode(toDecode),
+                                        fDecoder.decode(toDecode)
                                     )
-                                }
+                                })
                             }
                         }
                     }
@@ -2838,13 +2848,13 @@ public enum Elm {
     >(
         _ combine: @escaping @Sendable (a) -> (b) -> (c) -> (d) -> (e) -> (f) -> (g) -> combined
     )
-        -> (@escaping JsonDecode_Decoder<a>)
-        -> (@escaping JsonDecode_Decoder<b>)
-        -> (@escaping JsonDecode_Decoder<c>)
-        -> (@escaping JsonDecode_Decoder<d>)
-        -> (@escaping JsonDecode_Decoder<e>)
-        -> (@escaping JsonDecode_Decoder<f>)
-        -> (@escaping JsonDecode_Decoder<g>)
+        -> (JsonDecode_Decoder<a>)
+        -> (JsonDecode_Decoder<b>)
+        -> (JsonDecode_Decoder<c>)
+        -> (JsonDecode_Decoder<d>)
+        -> (JsonDecode_Decoder<e>)
+        -> (JsonDecode_Decoder<f>)
+        -> (JsonDecode_Decoder<g>)
         -> JsonDecode_Decoder<combined>
     {
         { aDecoder in
@@ -2854,15 +2864,15 @@ public enum Elm {
                         { eDecoder in
                             { fDecoder in
                                 { gDecoder in
-                                    { toDecode in
+                                    JsonDecode_Decoder(decode: { toDecode in
                                         Result_map7(
                                             combine,
-                                            aDecoder(toDecode), bDecoder(toDecode),
-                                            cDecoder(toDecode), dDecoder(toDecode),
-                                            eDecoder(toDecode), fDecoder(toDecode),
-                                            gDecoder(toDecode)
+                                            aDecoder.decode(toDecode), bDecoder.decode(toDecode),
+                                            cDecoder.decode(toDecode), dDecoder.decode(toDecode),
+                                            eDecoder.decode(toDecode), fDecoder.decode(toDecode),
+                                            gDecoder.decode(toDecode)
                                         )
-                                    }
+                                    })
                                 }
                             }
                         }
@@ -2878,14 +2888,14 @@ public enum Elm {
         _ combine: @escaping @Sendable (a) -> (b) -> (c) -> (d) -> (e) -> (f) -> (g) -> (h) ->
             combined
     )
-        -> (@escaping JsonDecode_Decoder<a>)
-        -> (@escaping JsonDecode_Decoder<b>)
-        -> (@escaping JsonDecode_Decoder<c>)
-        -> (@escaping JsonDecode_Decoder<d>)
-        -> (@escaping JsonDecode_Decoder<e>)
-        -> (@escaping JsonDecode_Decoder<f>)
-        -> (@escaping JsonDecode_Decoder<g>)
-        -> (@escaping JsonDecode_Decoder<h>)
+        -> (JsonDecode_Decoder<a>)
+        -> (JsonDecode_Decoder<b>)
+        -> (JsonDecode_Decoder<c>)
+        -> (JsonDecode_Decoder<d>)
+        -> (JsonDecode_Decoder<e>)
+        -> (JsonDecode_Decoder<f>)
+        -> (JsonDecode_Decoder<g>)
+        -> (JsonDecode_Decoder<h>)
         -> JsonDecode_Decoder<combined>
     {
         { aDecoder in
@@ -2896,15 +2906,18 @@ public enum Elm {
                             { fDecoder in
                                 { gDecoder in
                                     { hDecoder in
-                                        { toDecode in
+                                        JsonDecode_Decoder(decode: { toDecode in
                                             Result_map8(
                                                 combine,
-                                                aDecoder(toDecode), bDecoder(toDecode),
-                                                cDecoder(toDecode), dDecoder(toDecode),
-                                                eDecoder(toDecode), fDecoder(toDecode),
-                                                gDecoder(toDecode), hDecoder(toDecode)
+                                                aDecoder.decode(toDecode),
+                                                bDecoder.decode(toDecode),
+                                                cDecoder.decode(toDecode),
+                                                dDecoder.decode(toDecode),
+                                                eDecoder.decode(toDecode),
+                                                fDecoder.decode(toDecode),
+                                                gDecoder.decode(toDecode), hDecoder.decode(toDecode)
                                             )
-                                        }
+                                        })
                                     }
                                 }
                             }
@@ -2920,11 +2933,11 @@ public enum Elm {
     )
         -> JsonDecode_Decoder<value>
     {
-        { toDecode in
+        JsonDecode_Decoder(decode: { toDecode in
             var remainingOptions = options
             var optionDecodeErrors: [JsonDecode_Error] = []
-            while case let .List_Cons(nextOption, afterNextOption) = remainingOptions {
-                switch nextOption(toDecode) {
+            while case let .List_Cons(nextOptionDecoder, afterNextOption) = remainingOptions {
+                switch nextOptionDecoder.decode(toDecode) {
                 case let .Result_Ok(value): return .Result_Ok(value)
                 case let .Result_Err(optionDecodeError):
                     optionDecodeErrors.append(optionDecodeError)
@@ -2932,11 +2945,11 @@ public enum Elm {
                 }
             }
             return .Result_Err(.JsonDecode_OneOf(Array_toList(optionDecodeErrors)))
-        }
+        })
     }
 
     public static func JsonDecode_null<a: Sendable>(_ value: a) -> JsonDecode_Decoder<a> {
-        { toDecode in
+        JsonDecode_Decoder(decode: { toDecode in
             switch toDecode.value {
             case _ as NSNull:
                 .Result_Ok(value)
@@ -2945,10 +2958,10 @@ public enum Elm {
                     .JsonDecode_Failure("Expecting NULL", toDecode)
                 )
             }
-        }
+        })
     }
     public static let JsonDecode_bool: JsonDecode_Decoder<Bool> =
-        { toDecode in
+        JsonDecode_Decoder(decode: { toDecode in
             switch toDecode.value {
             case let nsNumber as NSNumber:
                 // https://stackoverflow.com/questions/30215680/is-there-a-correct-way-to-determine-that-an-nsnumber-is-derived-from-a-bool-usin
@@ -2964,9 +2977,9 @@ public enum Elm {
                     .JsonDecode_Failure("Expecting a BOOL", toDecode)
                 )
             }
-        }
+        })
     public static let JsonDecode_int: JsonDecode_Decoder<Double> =
-        { toDecode in
+        JsonDecode_Decoder(decode: { toDecode in
             switch toDecode.value {
             case let nsNumber as NSNumber:
                 switch Int(exactly: nsNumber.doubleValue) {
@@ -2981,9 +2994,9 @@ public enum Elm {
                     .JsonDecode_Failure("Expecting an INT", toDecode)
                 )
             }
-        }
+        })
     public static let JsonDecode_float: JsonDecode_Decoder<Double> =
-        { toDecode in
+        JsonDecode_Decoder(decode: { toDecode in
             switch toDecode.value {
             case let nsNumber as NSNumber:
                 .Result_Ok(nsNumber.doubleValue)
@@ -2992,9 +3005,9 @@ public enum Elm {
                     .JsonDecode_Failure("Expecting a NUMBER", toDecode)
                 )
             }
-        }
+        })
     public static let JsonDecode_string: JsonDecode_Decoder<String> =
-        { toDecode in
+        JsonDecode_Decoder(decode: { toDecode in
             switch toDecode.value {
             case let nsString as NSString:
                 .Result_Ok(String(nsString))
@@ -3003,21 +3016,22 @@ public enum Elm {
                     .JsonDecode_Failure("Expecting a NUMBER", toDecode)
                 )
             }
-        }
+        })
 
     public static func JsonDecode_field<value: Sendable>(_ fieldName: String)
-        -> (@escaping JsonDecode_Decoder<value>) -> JsonDecode_Decoder<value>
+        -> (JsonDecode_Decoder<value>) -> JsonDecode_Decoder<value>
     {
         { valueDecoder in
-            { toDecode in
-                Result_andThen(valueDecoder)(JsonDecode_fieldValue(fieldName)(toDecode))
-            }
+            JsonDecode_Decoder(decode: { toDecode in
+                Result_andThen(valueDecoder.decode)(
+                    JsonDecode_fieldValue(fieldName).decode(toDecode))
+            })
         }
     }
     static func JsonDecode_fieldValue(_ fieldName: String)
         -> JsonDecode_Decoder<JsonDecode_Value>
     {
-        { toDecode in
+        JsonDecode_Decoder(decode: { toDecode in
             switch toDecode.value {
             case let dictToDecode as NSDictionary:
                 switch dictToDecode.value(forKey: fieldName) {
@@ -3043,19 +3057,19 @@ public enum Elm {
                     )
                 )
             }
-        }
+        })
     }
 
     public static func JsonDecode_at<value: Sendable>(_ fieldNames: List_List<String>)
-        -> (@escaping JsonDecode_Decoder<value>) -> JsonDecode_Decoder<value>
+        -> (JsonDecode_Decoder<value>) -> JsonDecode_Decoder<value>
     {
         { valueDecoder in
-            { toDecode in
+            JsonDecode_Decoder(decode: { toDecode in
                 var remainingFieldNames = fieldNames
                 var successfullyDecodedFieldNames: [String] = []
                 var remainingToDecode = toDecode
                 while case let .List_Cons(nextFieldName, afterNextFieldName) = remainingFieldNames {
-                    switch JsonDecode_fieldValue(nextFieldName)(remainingToDecode) {
+                    switch JsonDecode_fieldValue(nextFieldName).decode(remainingToDecode) {
                     case let .Result_Ok(fieldValueJson):
                         remainingFieldNames = afterNextFieldName
                         remainingToDecode = fieldValueJson
@@ -3071,16 +3085,16 @@ public enum Elm {
                         )
                     }
                 }
-                return valueDecoder(remainingToDecode)
-            }
+                return valueDecoder.decode(remainingToDecode)
+            })
         }
     }
     public static func JsonDecode_dict<value: Sendable>(
-        _ valueDecoder: @escaping JsonDecode_Decoder<value>
+        _ valueDecoder: JsonDecode_Decoder<value>
     )
         -> JsonDecode_Decoder<[String: value]>
     {
-        { toDecode in
+        JsonDecode_Decoder(decode: { toDecode in
             switch toDecode.value {
             case let dictToDecode as NSDictionary:
                 var decodedDictionary: [String: value] = Dictionary()
@@ -3090,7 +3104,8 @@ public enum Elm {
                     case let castedKey as String:
                         key = castedKey
                     case _:
-                        switch JsonDecode_string(JsonDecode_Value(value: entryToDecode.key)) {
+                        switch JsonDecode_string.decode(JsonDecode_Value(value: entryToDecode.key))
+                        {
                         case let .Result_Ok(decodedKey):
                             key = decodedKey
                         case .Result_Err(_):
@@ -3102,7 +3117,7 @@ public enum Elm {
                             )
                         }
                     }
-                    switch valueDecoder(JsonDecode_Value(value: entryToDecode.value)) {
+                    switch valueDecoder.decode(JsonDecode_Value(value: entryToDecode.value)) {
                     case let .Result_Err(error):
                         return .Result_Err(.JsonDecode_Field(key, error))
                     case let .Result_Ok(decodedValue):
@@ -3115,14 +3130,14 @@ public enum Elm {
                     .JsonDecode_Failure("Expecting an OBJECT", toDecode)
                 )
             }
-        }
+        })
     }
     public static func JsonDecode_keyValuePairs<value: Sendable>(
-        _ valueDecoder: @escaping JsonDecode_Decoder<value>
+        _ valueDecoder: JsonDecode_Decoder<value>
     )
         -> JsonDecode_Decoder<List_List<(String, value)>>
     {
-        { toDecode in
+        JsonDecode_Decoder(decode: { toDecode in
             switch toDecode.value {
             case let dictToDecode as NSDictionary:
                 var decodedDictionary: List_List<(String, value)> = .List_Empty
@@ -3132,7 +3147,8 @@ public enum Elm {
                     case let castedKey as String:
                         key = castedKey
                     case _:
-                        switch JsonDecode_string(JsonDecode_Value(value: entryToDecode.key)) {
+                        switch JsonDecode_string.decode(JsonDecode_Value(value: entryToDecode.key))
+                        {
                         case let .Result_Ok(decodedKey):
                             key = decodedKey
                         case .Result_Err(_):
@@ -3144,7 +3160,7 @@ public enum Elm {
                             )
                         }
                     }
-                    switch valueDecoder(JsonDecode_Value(value: entryToDecode.value)) {
+                    switch valueDecoder.decode(JsonDecode_Value(value: entryToDecode.value)) {
                     case let .Result_Err(error):
                         return .Result_Err(.JsonDecode_Field(key, error))
                     case let .Result_Ok(decodedValue):
@@ -3157,19 +3173,19 @@ public enum Elm {
                     .JsonDecode_Failure("Expecting an OBJECT", toDecode)
                 )
             }
-        }
+        })
     }
     public static func JsonDecode_array<a: Sendable>(
-        _ elementDecoder: @escaping JsonDecode_Decoder<a>
+        _ elementDecoder: JsonDecode_Decoder<a>
     )
         -> JsonDecode_Decoder<[a]>
     {
-        { toDecode in
+        JsonDecode_Decoder(decode: { toDecode in
             switch toDecode.value {
             case let arrayToDecode as NSArray:
                 var decodedArray: [a] = Array()
                 for (index, elementToDecode) in arrayToDecode.enumerated() {
-                    switch elementDecoder(JsonDecode_Value(value: elementToDecode)) {
+                    switch elementDecoder.decode(JsonDecode_Value(value: elementToDecode)) {
                     case let .Result_Err(error):
                         return .Result_Err(.JsonDecode_Index(Double(index), error))
                     case let .Result_Ok(elementDecoded):
@@ -3182,19 +3198,20 @@ public enum Elm {
                     .JsonDecode_Failure("Expecting an ARRAY", toDecode)
                 )
             }
-        }
+        })
     }
     public static func JsonDecode_index<a: Sendable>(_ indexAsDouble: Double)
-        -> (@escaping JsonDecode_Decoder<a>)
+        -> (JsonDecode_Decoder<a>)
         -> JsonDecode_Decoder<a>
     {
         { elementDecoder in
-            { toDecode in
+            JsonDecode_Decoder(decode: { toDecode in
                 switch toDecode.value {
                 case let arrayToDecode as NSArray:
                     let index = Int(indexAsDouble)
                     return if index >= 0 && index < arrayToDecode.count {
-                        switch elementDecoder(JsonDecode_Value(value: arrayToDecode[index])) {
+                        switch elementDecoder.decode(JsonDecode_Value(value: arrayToDecode[index]))
+                        {
                         case let .Result_Err(error):
                             .Result_Err(.JsonDecode_Index(indexAsDouble, error))
                         case let .Result_Ok(elementDecoded):
@@ -3215,20 +3232,20 @@ public enum Elm {
                         .JsonDecode_Failure("Expecting an ARRAY", toDecode)
                     )
                 }
-            }
+            })
         }
     }
     public static func JsonDecode_list<a: Sendable>(
-        _ elementDecoder: @escaping JsonDecode_Decoder<a>
+        _ elementDecoder: JsonDecode_Decoder<a>
     )
         -> JsonDecode_Decoder<List_List<a>>
     {
-        { toDecode in
+        JsonDecode_Decoder(decode: { toDecode in
             switch toDecode.value {
             case let arrayToDecode as NSArray:
                 var decodedList: List_List<a> = .List_Empty
                 for (index, elementToDecode) in arrayToDecode.enumerated().reversed() {
-                    switch elementDecoder(JsonDecode_Value(value: elementToDecode)) {
+                    switch elementDecoder.decode(JsonDecode_Value(value: elementToDecode)) {
                     case let .Result_Err(error):
                         return .Result_Err(.JsonDecode_Index(Double(index), error))
                     case let .Result_Ok(elementDecoded):
@@ -3241,12 +3258,12 @@ public enum Elm {
                     .JsonDecode_Failure("Expecting an ARRAY", toDecode)
                 )
             }
-        }
+        })
     }
     public static func JsonDecode_oneOrMore<a: Sendable, combined: Sendable>(
         _ combineHeadTail: @escaping @Sendable (a) -> (List_List<a>) -> combined
     )
-        -> (@escaping JsonDecode_Decoder<a>)
+        -> (JsonDecode_Decoder<a>)
         -> JsonDecode_Decoder<combined>
     {
         { elementDecoder in
@@ -3255,28 +3272,28 @@ public enum Elm {
         }
     }
     public static func JsonDecode_maybe<a: Sendable>(
-        _ valueDecoder: @escaping JsonDecode_Decoder<a>
+        _ valueDecoder: JsonDecode_Decoder<a>
     )
         -> JsonDecode_Decoder<Maybe_Maybe<a>>
     {
-        { toDecode in
-            switch valueDecoder(toDecode) {
+        JsonDecode_Decoder(decode: { toDecode in
+            switch valueDecoder.decode(toDecode) {
             case let .Result_Ok(value):
                 .Result_Ok(.Maybe_Just(value))
             case .Result_Err(_):
                 .Result_Ok(.Maybe_Nothing)
             }
-        }
+        })
     }
-    public static func JsonDecode_nullable<a>(_ valueDecoder: @escaping JsonDecode_Decoder<a>)
+    public static func JsonDecode_nullable<a>(_ valueDecoder: JsonDecode_Decoder<a>)
         -> JsonDecode_Decoder<Maybe_Maybe<a>>
     {
-        { toDecode in
-            switch JsonDecode_null(())(toDecode) {
+        JsonDecode_Decoder(decode: { toDecode in
+            switch JsonDecode_null(()).decode(toDecode) {
             case .Result_Ok(()):
                 .Result_Ok(.Maybe_Nothing)
             case let .Result_Err(nullDecodeError):
-                switch valueDecoder(toDecode) {
+                switch valueDecoder.decode(toDecode) {
                 case let .Result_Ok(value):
                     .Result_Ok(.Maybe_Just(value))
                 case let .Result_Err(valueDecodeError):
@@ -3286,7 +3303,7 @@ public enum Elm {
                     )
                 }
             }
-        }
+        })
     }
 
     static func indent(_ str: String) -> String {
