@@ -92,18 +92,18 @@ elmModuleSourceTranspileToSwift source =
                 transpiledResult :
                     { errors : List String
                     , declarations :
-                        { valuesAndFunctions :
+                        { funcs :
                             FastDict.Dict
                                 String
-                                { parameters :
-                                    Maybe
-                                        (List
-                                            { name : String
-                                            , type_ : ElmSyntaxToSwift.SwiftType
-                                            }
-                                        )
+                                { parameters : List { name : String, type_ : ElmSyntaxToSwift.SwiftType }
                                 , statements : List ElmSyntaxToSwift.SwiftStatement
                                 , result : ElmSyntaxToSwift.SwiftExpression
+                                , resultType : ElmSyntaxToSwift.SwiftType
+                                }
+                        , lets :
+                            FastDict.Dict
+                                String
+                                { result : ElmSyntaxToSwift.SwiftExpression
                                 , resultType : ElmSyntaxToSwift.SwiftType
                                 }
                         , typeAliases :

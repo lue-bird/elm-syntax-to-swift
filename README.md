@@ -1,5 +1,4 @@
 > ## overall TODO
-> - split let and func declarations in result of `ElmSyntaxToSwift.modules`
 > - avoid or eliminate `generated_` variable names if possible
 > - if argument is typealias that contains a function, add @escaping
 

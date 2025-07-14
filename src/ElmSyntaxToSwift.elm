@@ -5078,12 +5078,18 @@ modules :
     ->
         { errors : List String
         , declarations :
-            { valuesAndFunctions :
+            { funcs :
                 FastDict.Dict
                     String
-                    { parameters : Maybe (List { name : String, type_ : SwiftType })
+                    { parameters : List { name : String, type_ : SwiftType }
                     , statements : List SwiftStatement
                     , result : SwiftExpression
+                    , resultType : SwiftType
+                    }
+            , lets :
+                FastDict.Dict
+                    String
+                    { result : SwiftExpression
                     , resultType : SwiftType
                     }
             , typeAliases :
@@ -5727,7 +5733,8 @@ modules syntaxDeclarationsIncludingOverwrittenOnes =
         Err error ->
             { errors = [ error ]
             , declarations =
-                { valuesAndFunctions = FastDict.empty
+                { lets = FastDict.empty
+                , funcs = FastDict.empty
                 , typeAliases = FastDict.empty
                 , enumTypes = FastDict.empty
                 }
@@ -5882,12 +5889,18 @@ modules syntaxDeclarationsIncludingOverwrittenOnes =
                 transpiledSwiftDeclarations :
                     { errors : List String
                     , declarations :
-                        { valuesAndFunctions :
+                        { funcs :
                             FastDict.Dict
                                 String
-                                { parameters : Maybe (List { name : String, type_ : SwiftType })
+                                { parameters : List { name : String, type_ : SwiftType }
                                 , statements : List SwiftStatement
                                 , result : SwiftExpression
+                                , resultType : SwiftType
+                                }
+                        , lets :
+                            FastDict.Dict
+                                String
+                                { result : SwiftExpression
                                 , resultType : SwiftType
                                 }
                         , typeAliases :
@@ -6004,7 +6017,8 @@ modules syntaxDeclarationsIncludingOverwrittenOnes =
                                                                 in
                                                                 { errors = soFar.errors
                                                                 , declarations =
-                                                                    { valuesAndFunctions = soFar.declarations.valuesAndFunctions
+                                                                    { lets = soFar.declarations.lets
+                                                                    , funcs = soFar.declarations.funcs
                                                                     , enumTypes = soFar.declarations.enumTypes
                                                                     , typeAliases =
                                                                         soFar.declarations.typeAliases
@@ -6054,7 +6068,8 @@ modules syntaxDeclarationsIncludingOverwrittenOnes =
                                                             in
                                                             { errors = soFar.errors
                                                             , declarations =
-                                                                { valuesAndFunctions = soFar.declarations.valuesAndFunctions
+                                                                { lets = soFar.declarations.lets
+                                                                , funcs = soFar.declarations.funcs
                                                                 , typeAliases = soFar.declarations.typeAliases
                                                                 , enumTypes =
                                                                     soFar.declarations.enumTypes
@@ -6100,20 +6115,58 @@ modules syntaxDeclarationsIncludingOverwrittenOnes =
                                                             |> valueOrFunctionDeclaration createdModuleContext
                                                     of
                                                         Ok swiftValueOrFunctionDeclaration ->
+                                                            let
+                                                                swiftName : String
+                                                                swiftName =
+                                                                    { moduleOrigin = moduleName
+                                                                    , name = valueOrFunctionDeclarationInferred.name
+                                                                    }
+                                                                        |> referenceToSwiftName
+                                                            in
                                                             { errors = soFarAcrossModulesWithInferredValeAndFunctionDeclarations.errors
                                                             , declarations =
-                                                                { typeAliases = soFarAcrossModulesWithInferredValeAndFunctionDeclarations.declarations.typeAliases
-                                                                , enumTypes = soFarAcrossModulesWithInferredValeAndFunctionDeclarations.declarations.enumTypes
-                                                                , valuesAndFunctions =
-                                                                    soFarAcrossModulesWithInferredValeAndFunctionDeclarations.declarations.valuesAndFunctions
-                                                                        |> FastDict.insert
-                                                                            ({ moduleOrigin = moduleName
-                                                                             , name = valueOrFunctionDeclarationInferred.name
-                                                                             }
-                                                                                |> referenceToSwiftName
-                                                                            )
-                                                                            swiftValueOrFunctionDeclaration
-                                                                }
+                                                                case swiftValueOrFunctionDeclaration.parameters of
+                                                                    Just parameters ->
+                                                                        { typeAliases = soFarAcrossModulesWithInferredValeAndFunctionDeclarations.declarations.typeAliases
+                                                                        , enumTypes = soFarAcrossModulesWithInferredValeAndFunctionDeclarations.declarations.enumTypes
+                                                                        , lets = soFarAcrossModulesWithInferredValeAndFunctionDeclarations.declarations.lets
+                                                                        , funcs =
+                                                                            soFarAcrossModulesWithInferredValeAndFunctionDeclarations.declarations.funcs
+                                                                                |> FastDict.insert
+                                                                                    swiftName
+                                                                                    { parameters = parameters
+                                                                                    , statements = swiftValueOrFunctionDeclaration.statements
+                                                                                    , resultType = swiftValueOrFunctionDeclaration.resultType
+                                                                                    , result = swiftValueOrFunctionDeclaration.result
+                                                                                    }
+                                                                        }
+
+                                                                    Nothing ->
+                                                                        { typeAliases = soFarAcrossModulesWithInferredValeAndFunctionDeclarations.declarations.typeAliases
+                                                                        , enumTypes = soFarAcrossModulesWithInferredValeAndFunctionDeclarations.declarations.enumTypes
+                                                                        , funcs = soFarAcrossModulesWithInferredValeAndFunctionDeclarations.declarations.funcs
+                                                                        , lets =
+                                                                            soFarAcrossModulesWithInferredValeAndFunctionDeclarations.declarations.lets
+                                                                                |> FastDict.insert
+                                                                                    swiftName
+                                                                                    { resultType = swiftValueOrFunctionDeclaration.resultType
+                                                                                    , result =
+                                                                                        case swiftValueOrFunctionDeclaration.statements of
+                                                                                            [] ->
+                                                                                                swiftValueOrFunctionDeclaration.result
+
+                                                                                            statement0 :: statement1Up ->
+                                                                                                SwiftExpressionCall
+                                                                                                    { called =
+                                                                                                        SwiftExpressionLambda
+                                                                                                            { parameters = []
+                                                                                                            , statements = statement0 :: statement1Up
+                                                                                                            , result = swiftValueOrFunctionDeclaration.result
+                                                                                                            }
+                                                                                                    , arguments = []
+                                                                                                    }
+                                                                                    }
+                                                                        }
                                                             }
 
                                                         Err error ->
@@ -6134,15 +6187,24 @@ modules syntaxDeclarationsIncludingOverwrittenOnes =
                             )
                             { errors = []
                             , declarations =
-                                { valuesAndFunctions = FastDict.empty
+                                { lets = FastDict.empty
+                                , funcs = FastDict.empty
                                 , typeAliases = FastDict.empty
                                 , enumTypes = FastDict.empty
                                 }
                             }
             in
             { declarations =
-                { valuesAndFunctions =
-                    transpiledSwiftDeclarations.declarations.valuesAndFunctions
+                { lets =
+                    transpiledSwiftDeclarations.declarations.lets
+                        |> FastDict.map
+                            (\_ valueOrFunctionInfo ->
+                                { result = valueOrFunctionInfo.result
+                                , resultType = valueOrFunctionInfo.resultType
+                                }
+                            )
+                , funcs =
+                    transpiledSwiftDeclarations.declarations.funcs
                         |> FastDict.map
                             (\_ valueOrFunctionInfo ->
                                 { parameters = valueOrFunctionInfo.parameters
@@ -8771,48 +8833,6 @@ inferredTypeString =
         )
 
 
-printSwiftLetOrFuncDeclaration :
-    { name : String
-    , parameters : Maybe (List { name : String, type_ : SwiftType })
-    , statements : List SwiftStatement
-    , result : SwiftExpression
-    , resultType : SwiftType
-    }
-    -> Print
-printSwiftLetOrFuncDeclaration swiftValueOrFunctionDeclaration =
-    case swiftValueOrFunctionDeclaration.parameters of
-        Just parameters ->
-            printSwiftFuncDeclaration
-                { name = swiftValueOrFunctionDeclaration.name
-                , parameters = parameters
-                , statements = swiftValueOrFunctionDeclaration.statements
-                , resultType = swiftValueOrFunctionDeclaration.resultType
-                , result = swiftValueOrFunctionDeclaration.result
-                }
-
-        Nothing ->
-            printSwiftLetDeclaration
-                { name = swiftValueOrFunctionDeclaration.name
-                , statements = swiftValueOrFunctionDeclaration.statements
-                , resultType = swiftValueOrFunctionDeclaration.resultType
-                , result =
-                    case swiftValueOrFunctionDeclaration.statements of
-                        [] ->
-                            swiftValueOrFunctionDeclaration.result
-
-                        statement0 :: statement1Up ->
-                            SwiftExpressionCall
-                                { called =
-                                    SwiftExpressionLambda
-                                        { parameters = []
-                                        , statements = statement0 :: statement1Up
-                                        , result = swiftValueOrFunctionDeclaration.result
-                                        }
-                                , arguments = []
-                                }
-                }
-
-
 printSwiftFuncDeclaration :
     { name : String
     , parameters : List { name : String, type_ : SwiftType }
@@ -8945,7 +8965,6 @@ printSwiftFuncDeclaration swiftValueOrFunctionDeclaration =
 
 printSwiftLetDeclaration :
     { name : String
-    , statements : List SwiftStatement
     , result : SwiftExpression
     , resultType : SwiftType
     }
@@ -12089,12 +12108,18 @@ an swift module called `Elm` in the global namespace that exposes all members.
 Will also add some internal wrapper declarations.
 -}
 swiftDeclarationsToModuleString :
-    { valuesAndFunctions :
+    { funcs :
         FastDict.Dict
             String
-            { parameters : Maybe (List { name : String, type_ : SwiftType })
+            { parameters : List { name : String, type_ : SwiftType }
             , statements : List SwiftStatement
             , result : SwiftExpression
+            , resultType : SwiftType
+            }
+    , lets :
+        FastDict.Dict
+            String
+            { result : SwiftExpression
             , resultType : SwiftType
             }
     , typeAliases :
@@ -12113,26 +12138,6 @@ swiftDeclarationsToModuleString :
     -> String
 swiftDeclarationsToModuleString swiftDeclarations =
     let
-        valueAndFunctionDeclarationsOrdered :
-            List
-                { name : String
-                , parameters : Maybe (List { name : String, type_ : SwiftType })
-                , statements : List SwiftStatement
-                , result : SwiftExpression
-                , resultType : SwiftType
-                }
-        valueAndFunctionDeclarationsOrdered =
-            swiftDeclarations.valuesAndFunctions
-                |> fastDictMapAndToList
-                    (\name valueOrFunctionInfo ->
-                        { name = name
-                        , parameters = valueOrFunctionInfo.parameters
-                        , statements = valueOrFunctionInfo.statements
-                        , result = valueOrFunctionInfo.result
-                        , resultType = valueOrFunctionInfo.resultType
-                        }
-                    )
-
         typeDeclarationsOrdered :
             { mostToLeastDependedOn :
                 List
@@ -12242,10 +12247,31 @@ public enum Elm {
 
 
 """
-        ++ (valueAndFunctionDeclarationsOrdered
+        ++ ((swiftDeclarations.lets
+                |> fastDictMapAndToList
+                    (\name valueOrFunctionInfo ->
+                        { name = name
+                        , result = valueOrFunctionInfo.result
+                        , resultType = valueOrFunctionInfo.resultType
+                        }
+                    )
+                |> List.map printSwiftLetDeclaration
+            )
+                ++ (swiftDeclarations.funcs
+                        |> fastDictMapAndToList
+                            (\name valueOrFunctionInfo ->
+                                { name = name
+                                , parameters = valueOrFunctionInfo.parameters
+                                , statements = valueOrFunctionInfo.statements
+                                , result = valueOrFunctionInfo.result
+                                , resultType = valueOrFunctionInfo.resultType
+                                }
+                            )
+                        |> List.map printSwiftFuncDeclaration
+                   )
                 |> Print.listMapAndIntersperseAndFlatten
-                    (\swiftValueOrFunction ->
-                        (swiftValueOrFunction |> printSwiftLetOrFuncDeclaration)
+                    (\swiftValueOrFunctionPrint ->
+                        swiftValueOrFunctionPrint
                             |> Print.followedBy printLinebreakLinebreakIndented
                     )
                     Print.empty
