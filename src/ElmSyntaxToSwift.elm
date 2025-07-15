@@ -614,7 +614,7 @@ printSwiftEnumCaseDeclaration swiftVariant =
                     (value0 :: value1Up)
                         |> List.map
                             (\value ->
-                                value |> printSwiftTypeNotParenthesized TypeIncoming
+                                value |> printSwiftTypeNotParenthesized Nothing
                             )
 
                 fullLineSpread : Print.LineSpread
@@ -697,7 +697,7 @@ printSwiftTypealiasDeclaration swiftTypeAliasDeclaration =
                 (Print.linebreakIndented
                     |> Print.followedBy
                         (swiftTypeAliasDeclaration.type_
-                            |> printSwiftTypeNotParenthesized TypeOutgoing
+                            |> printSwiftTypeNotParenthesized Nothing
                         )
                 )
             )
@@ -927,7 +927,7 @@ type TypeIncomingOrOutgoing
     | TypeOutgoing
 
 
-printSwiftTypeNotParenthesized : TypeIncomingOrOutgoing -> SwiftType -> Print
+printSwiftTypeNotParenthesized : Maybe TypeIncomingOrOutgoing -> SwiftType -> Print
 printSwiftTypeNotParenthesized position swiftType =
     -- IGNORE TCO
     case swiftType of
@@ -950,7 +950,7 @@ printSwiftTypeNotParenthesized position swiftType =
             printSwiftTypeFunction position typeFunction
 
 
-printSwiftTypeRecord : TypeIncomingOrOutgoing -> FastDict.Dict String SwiftType -> Print
+printSwiftTypeRecord : Maybe TypeIncomingOrOutgoing -> FastDict.Dict String SwiftType -> Print
 printSwiftTypeRecord position fields =
     if fields |> FastDict.isEmpty then
         Print.exactly "()"
@@ -993,15 +993,22 @@ printSwiftTypeRecord position fields =
             |> Print.followedBy (Print.exactly ")")
 
 
-printSwiftTypeFunctionInput : List SwiftType -> Print
-printSwiftTypeFunctionInput input =
+printSwiftTypeFunctionInput : { escaping : Bool } -> List SwiftType -> Print
+printSwiftTypeFunctionInput config input =
     let
         input0PartPrints : List Print
         input0PartPrints =
             input
                 |> List.map
                     (\inputPart ->
-                        inputPart |> printSwiftTypeNotParenthesized TypeIncoming
+                        inputPart
+                            |> printSwiftTypeNotParenthesized
+                                (if config.escaping then
+                                    Just TypeIncoming
+
+                                 else
+                                    Nothing
+                                )
                     )
 
         input0LineSpread : Print.LineSpread
@@ -1023,15 +1030,24 @@ printSwiftTypeFunctionInput input =
 
 
 printSwiftTypeFunction :
-    TypeIncomingOrOutgoing
+    Maybe TypeIncomingOrOutgoing
     -> { input : List SwiftType, output : SwiftType }
     -> Print
-printSwiftTypeFunction position typeFunction =
+printSwiftTypeFunction positionOrNothing typeFunction =
     let
+        inputIsEscaping =
+            case positionOrNothing of
+                Nothing ->
+                    False
+
+                Just _ ->
+                    True
+
         input0Print : Print
         input0Print =
             typeFunction.input
                 |> printSwiftTypeFunctionInput
+                    { escaping = inputIsEscaping }
 
         outputExpanded : { inputs : List (List SwiftType), output : SwiftType }
         outputExpanded =
@@ -1039,13 +1055,25 @@ printSwiftTypeFunction position typeFunction =
 
         outputPrint : Print
         outputPrint =
-            printSwiftTypeParenthesizedIfSpaceSeparated TypeOutgoing
+            printSwiftTypeParenthesizedIfSpaceSeparated
+                (case positionOrNothing of
+                    Nothing ->
+                        Nothing
+
+                    Just _ ->
+                        Just TypeOutgoing
+                )
                 outputExpanded.output
 
         input1UpPrints : List Print
         input1UpPrints =
             outputExpanded.inputs
-                |> List.map printSwiftTypeFunctionInput
+                |> List.map
+                    (\input ->
+                        input
+                            |> printSwiftTypeFunctionInput
+                                { escaping = inputIsEscaping }
+                    )
 
         fullLineSpread : Print.LineSpread
         fullLineSpread =
@@ -1061,13 +1089,17 @@ printSwiftTypeFunction position typeFunction =
                     )
     in
     Print.exactly
-        (case position of
-            TypeIncoming ->
-                -- TODO only escaping when necessary
-                "@Sendable @escaping "
-
-            TypeOutgoing ->
+        (case positionOrNothing of
+            Nothing ->
                 "@Sendable "
+
+            Just position ->
+                case position of
+                    TypeIncoming ->
+                        "@Sendable @escaping "
+
+                    TypeOutgoing ->
+                        "@Sendable "
         )
         |> Print.followedBy
             (input0Print
@@ -1179,7 +1211,7 @@ inferredTypeExpandFunctionIntoReverse soFarReverse inferredType =
 
 
 printSwiftTypeTuple :
-    TypeIncomingOrOutgoing
+    Maybe TypeIncomingOrOutgoing
     -> { part0 : SwiftType, part1 : SwiftType, part2Up : List SwiftType }
     -> Print
 printSwiftTypeTuple position parts =
@@ -1237,7 +1269,7 @@ printSwiftTypeTuple position parts =
 
 
 printSwiftTypeConstruct :
-    TypeIncomingOrOutgoing
+    Maybe TypeIncomingOrOutgoing
     ->
         { moduleOrigin : Maybe String
         , name : String
@@ -1245,21 +1277,26 @@ printSwiftTypeConstruct :
         , isFunction : Bool
         }
     -> Print
-printSwiftTypeConstruct position typeConstruct =
+printSwiftTypeConstruct positionOrNothing typeConstruct =
     let
         referencePrint : Print
         referencePrint =
             Print.exactly
-                ((case position of
-                    TypeIncoming ->
-                        if typeConstruct.isFunction then
-                            "@escaping "
-
-                        else
-                            ""
-
-                    TypeOutgoing ->
+                ((case positionOrNothing of
+                    Nothing ->
                         ""
+
+                    Just position ->
+                        case position of
+                            TypeIncoming ->
+                                if typeConstruct.isFunction then
+                                    "@escaping "
+
+                                else
+                                    ""
+
+                            TypeOutgoing ->
+                                ""
                  )
                     ++ swiftReferenceToString
                         { moduleOrigin = typeConstruct.moduleOrigin
@@ -1278,7 +1315,7 @@ printSwiftTypeConstruct position typeConstruct =
                     (argument0 :: argument1Up)
                         |> List.map
                             (\argument ->
-                                argument |> printSwiftTypeNotParenthesized position
+                                argument |> printSwiftTypeNotParenthesized positionOrNothing
                             )
 
                 fullLineSpread : Print.LineSpread
@@ -1301,10 +1338,10 @@ printSwiftTypeConstruct position typeConstruct =
                                 )
                             |> Print.followedBy
                                 (Print.emptyOrLinebreakIndented fullLineSpread)
-                            |> Print.followedBy
-                                printExactlyGreaterThan
                         )
                     )
+                |> Print.followedBy
+                    printExactlyGreaterThan
 
 
 printExactlyLessThan : Print
@@ -1336,7 +1373,7 @@ typeIsSpaceSeparated swiftType =
             True
 
 
-printSwiftTypeParenthesizedIfSpaceSeparated : TypeIncomingOrOutgoing -> SwiftType -> Print
+printSwiftTypeParenthesizedIfSpaceSeparated : Maybe TypeIncomingOrOutgoing -> SwiftType -> Print
 printSwiftTypeParenthesizedIfSpaceSeparated position swiftType =
     let
         notParenthesizedPrint : Print
@@ -3436,7 +3473,7 @@ referenceToCoreSwift reference =
                     Just { moduleOrigin = Nothing, name = "false" }
 
                 "not" ->
-                    Just { moduleOrigin = Nothing, name = "not" }
+                    Just { moduleOrigin = Nothing, name = "Basics_not" }
 
                 "xor" ->
                     Just { moduleOrigin = Nothing, name = "Basics_neq" }
@@ -9154,7 +9191,7 @@ printSwiftFuncDeclaration swiftValueOrFunctionDeclaration =
     let
         resultTypePrint : Print
         resultTypePrint =
-            printSwiftTypeNotParenthesized TypeOutgoing
+            printSwiftTypeNotParenthesized (Just TypeOutgoing)
                 swiftValueOrFunctionDeclaration.resultType
 
         parameterPrints : List Print
@@ -9165,7 +9202,7 @@ printSwiftFuncDeclaration swiftValueOrFunctionDeclaration =
                         let
                             parameterTypePrint : Print
                             parameterTypePrint =
-                                printSwiftTypeNotParenthesized TypeIncoming
+                                printSwiftTypeNotParenthesized (Just TypeIncoming)
                                     parameter.type_
                         in
                         Print.exactly ("_ " ++ parameter.name)
@@ -9282,7 +9319,9 @@ printSwiftLetDeclaration swiftLetDeclaration =
     let
         resultTypePrint : Print
         resultTypePrint =
-            printSwiftTypeNotParenthesized TypeOutgoing
+            printSwiftTypeNotParenthesized
+                -- TODO check if it's Just TypeOutgoing
+                Nothing
                 swiftLetDeclaration.resultType
 
         resultTypeFullLineSpread : Print.LineSpread
@@ -9305,11 +9344,8 @@ printSwiftLetDeclaration swiftLetDeclaration =
                     |> Print.followedBy
                         printExactlySpaceEqualsLinebreakIndented
                     |> Print.followedBy
-                        (Print.linebreakIndented
-                            |> Print.followedBy
-                                (printSwiftExpressionNotParenthesized
-                                    swiftLetDeclaration.result
-                                )
+                        (printSwiftExpressionNotParenthesized
+                            swiftLetDeclaration.result
                         )
                 )
             )
@@ -9427,7 +9463,7 @@ printSwiftLocalFuncDeclaration swiftValueOrFunctionDeclaration =
     let
         resultTypePrint : Print
         resultTypePrint =
-            printSwiftTypeNotParenthesized TypeOutgoing
+            printSwiftTypeNotParenthesized (Just TypeOutgoing)
                 swiftValueOrFunctionDeclaration.resultType
 
         parameterPrints : List Print
@@ -9438,7 +9474,7 @@ printSwiftLocalFuncDeclaration swiftValueOrFunctionDeclaration =
                         let
                             parameterTypePrint : Print
                             parameterTypePrint =
-                                printSwiftTypeNotParenthesized TypeIncoming
+                                printSwiftTypeNotParenthesized (Just TypeIncoming)
                                     parameter.type_
                         in
                         printParenthesized
@@ -9485,6 +9521,7 @@ printSwiftLocalFuncDeclaration swiftValueOrFunctionDeclaration =
                             resultTypePrint
                         )
                     |> Print.followedBy printExactlySpaceCurlyOpening
+                    |> Print.followedBy Print.linebreakIndented
                     |> Print.followedBy
                         (case swiftValueOrFunctionDeclaration.statements of
                             [] ->
@@ -9516,7 +9553,9 @@ printSwiftLocalLetDeclaration swiftLetDeclaration =
     let
         resultTypePrint : Print
         resultTypePrint =
-            printSwiftTypeNotParenthesized TypeOutgoing
+            printSwiftTypeNotParenthesized
+                -- TODO check if not Just TypeOutgoing
+                Nothing
                 swiftLetDeclaration.resultType
     in
     Print.exactly
@@ -11554,29 +11593,27 @@ printSwiftExpressionCall call =
                         |> List.map
                             printSwiftExpressionNotParenthesized
 
-                fullLineSpread : Print.LineSpread
-                fullLineSpread =
+                argumentSpread : Print.LineSpread
+                argumentSpread =
                     argumentPrints
                         |> Print.lineSpreadListMapAndCombine Print.lineSpread
-                        |> Print.lineSpreadMergeWith
-                            (\() -> calledPrint |> Print.lineSpread)
             in
             calledPrint
                 |> Print.followedBy printExactlyParenOpening
                 |> Print.followedBy
                     (Print.withIndentAtNextMultipleOf4
-                        (Print.emptyOrLinebreakIndented fullLineSpread
+                        (Print.emptyOrLinebreakIndented argumentSpread
                             |> Print.followedBy
                                 (argumentPrints
                                     |> Print.listIntersperseAndFlatten
                                         (Print.exactly ","
                                             |> Print.followedBy
-                                                (Print.spaceOrLinebreakIndented fullLineSpread)
+                                                (Print.spaceOrLinebreakIndented argumentSpread)
                                         )
                                 )
                         )
                     )
-                |> Print.followedBy (Print.emptyOrLinebreakIndented fullLineSpread)
+                |> Print.followedBy (Print.emptyOrLinebreakIndented argumentSpread)
                 |> Print.followedBy (Print.exactly ")")
 
 
@@ -11749,7 +11786,9 @@ printSwiftExpressionLambda lambda =
                                 let
                                     parameterTypePrint : Print
                                     parameterTypePrint =
-                                        printSwiftTypeNotParenthesized TypeIncoming
+                                        printSwiftTypeNotParenthesized
+                                            -- TODO check if not Nothing
+                                            (Just TypeIncoming)
                                             lambdaParameter.type_
                                 in
                                 printParenthesized
@@ -11778,17 +11817,20 @@ printSwiftExpressionLambda lambda =
             in
             printExactlyCurlyOpeningSpace
                 |> Print.followedBy
-                    (parameterPrints
-                        |> Print.listMapAndIntersperseAndFlatten
-                            (\lambdaParameter -> lambdaParameter)
-                            (Print.exactly ","
-                                |> Print.followedBy
-                                    (Print.spaceOrLinebreakIndented
-                                        parametersLineSpread
-                                    )
-                            )
+                    (Print.withIndentIncreasedBy 2
+                        ((parameterPrints
+                            |> Print.listMapAndIntersperseAndFlatten
+                                (\lambdaParameter -> lambdaParameter)
+                                (Print.exactly ","
+                                    |> Print.followedBy
+                                        (Print.spaceOrLinebreakIndented
+                                            parametersLineSpread
+                                        )
+                                )
+                         )
+                            |> Print.followedBy (Print.exactly " in")
+                        )
                     )
-                |> Print.followedBy (Print.exactly " in")
                 |> Print.followedBy
                     (Print.withIndentAtNextMultipleOf4
                         (Print.spaceOrLinebreakIndented fullLineSpread
@@ -11974,10 +12016,6 @@ printSwiftStatementSwitchCase branch =
         |> Print.followedBy
             (Print.withIndentIncreasedBy 2
                 patternPrint
-            )
-        |> Print.followedBy
-            (Print.spaceOrLinebreakIndented
-                (patternPrint |> Print.lineSpread)
             )
         |> Print.followedBy (Print.exactly ":")
         |> Print.followedBy
@@ -12213,7 +12251,9 @@ printSwiftStatementLetDeclarationUninitialized letDeclarationUnassigned =
     let
         typePrint : Print
         typePrint =
-            printSwiftTypeNotParenthesized TypeOutgoing
+            printSwiftTypeNotParenthesized
+                -- TODO check if not Just TypeOutgoing
+                Nothing
                 letDeclarationUnassigned.type_
     in
     Print.exactly
@@ -12451,11 +12491,8 @@ swiftDeclarationsToModuleString swiftDeclarations =
     """import CoreFoundation
 import Foundation
 
-// TODO quite sketchy
-extension NSDictionary: @unchecked @retroactive Sendable {}
-extension NSArray: @unchecked @retroactive Sendable {}
-extension NSString: @unchecked @retroactive Sendable {}
-extension NSNull: @unchecked @retroactive Sendable {}
+extension Elm.List_List: Equatable where a: Equatable {}
+extension Elm.List_List: Hashable where a: Hashable {}
 
 // using enum to create a namespace can't be instantiated
 public enum Elm {
