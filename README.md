@@ -1,6 +1,5 @@
 > ## overall TODO
-> - avoid or eliminate `generated_` variable names if possible
-> - if argument is typealias that contains a function, add @escaping
+> - reduce amount of `generated_` variable names
 
 
 Print [`elm-syntax`](https://dark.elm.dmy.fr/packages/stil4m/elm-syntax/latest/) declarations as [swift](https://swift.org/) code.

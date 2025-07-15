@@ -37,6 +37,7 @@ type SwiftType
         { moduleOrigin : Maybe String
         , name : String
         , arguments : List SwiftType
+        , isFunction : Bool
         }
     | SwiftTypeTuple
         { part0 : SwiftType
@@ -494,16 +495,28 @@ syntaxExpressionContainedConstructedRecords syntaxExpressionNode =
 
 
 choiceTypeDeclaration :
-    { name : String
-    , parameters : List String
-    , variants : FastDict.Dict String (List ElmSyntaxTypeInfer.Type)
-    }
+    (String
+     ->
+        Maybe
+            (FastDict.Dict
+                String
+                { parameters : List String
+                , recordFieldOrder : Maybe (List String)
+                , type_ : ElmSyntaxTypeInfer.Type
+                }
+            )
+    )
+    ->
+        { name : String
+        , parameters : List String
+        , variants : FastDict.Dict String (List ElmSyntaxTypeInfer.Type)
+        }
     ->
         { name : String
         , parameters : List String
         , variants : FastDict.Dict String (List SwiftType)
         }
-choiceTypeDeclaration syntaxChoiceType =
+choiceTypeDeclaration typeAliasesInModule syntaxChoiceType =
     { name = syntaxChoiceType.name
     , parameters =
         syntaxChoiceType.parameters
@@ -512,7 +525,11 @@ choiceTypeDeclaration syntaxChoiceType =
         syntaxChoiceType.variants
             |> FastDict.map
                 (\_ variantValues ->
-                    variantValues |> List.map type_
+                    variantValues
+                        |> List.map
+                            (\value ->
+                                value |> type_ typeAliasesInModule
+                            )
                 )
     }
 
@@ -629,16 +646,28 @@ printSwiftEnumCaseDeclaration swiftVariant =
 
 
 typeAliasDeclaration :
-    { name : String
-    , parameters : List String
-    , type_ : ElmSyntaxTypeInfer.Type
-    }
+    (String
+     ->
+        Maybe
+            (FastDict.Dict
+                String
+                { parameters : List String
+                , recordFieldOrder : Maybe (List String)
+                , type_ : ElmSyntaxTypeInfer.Type
+                }
+            )
+    )
+    ->
+        { name : String
+        , parameters : List String
+        , type_ : ElmSyntaxTypeInfer.Type
+        }
     ->
         { name : String
         , parameters : List String
         , type_ : SwiftType
         }
-typeAliasDeclaration inferredTypeAlias =
+typeAliasDeclaration typeAliasesInModule inferredTypeAlias =
     { name = inferredTypeAlias.name
     , parameters =
         inferredTypeAlias.parameters
@@ -646,7 +675,7 @@ typeAliasDeclaration inferredTypeAlias =
                 variableNameDisambiguateFromSwiftKeywords
     , type_ =
         inferredTypeAlias.type_
-            |> type_
+            |> type_ typeAliasesInModule
     }
 
 
@@ -674,8 +703,21 @@ printSwiftTypealiasDeclaration swiftTypeAliasDeclaration =
             )
 
 
-type_ : ElmSyntaxTypeInfer.Type -> SwiftType
-type_ inferredType =
+type_ :
+    (String
+     ->
+        Maybe
+            (FastDict.Dict
+                String
+                { parameters : List String
+                , recordFieldOrder : Maybe (List String)
+                , type_ : ElmSyntaxTypeInfer.Type
+                }
+            )
+    )
+    -> ElmSyntaxTypeInfer.Type
+    -> SwiftType
+type_ typeAliasesInModule inferredType =
     case inferredType of
         ElmSyntaxTypeInfer.TypeVariable variable ->
             if variable.name |> String.startsWith "number" then
@@ -685,7 +727,8 @@ type_ inferredType =
                 SwiftTypeVariable (variable.name |> variableNameDisambiguateFromSwiftKeywords)
 
         ElmSyntaxTypeInfer.TypeNotVariable inferredTypeNotVariable ->
-            typeNotVariable inferredTypeNotVariable
+            typeNotVariable typeAliasesInModule
+                inferredTypeNotVariable
 
 
 swiftTypeDouble : SwiftType
@@ -694,11 +737,25 @@ swiftTypeDouble =
         { moduleOrigin = swiftReferenceDouble.moduleOrigin
         , name = swiftReferenceDouble.name
         , arguments = []
+        , isFunction = False
         }
 
 
-typeNotVariable : ElmSyntaxTypeInfer.TypeNotVariable -> SwiftType
-typeNotVariable inferredTypeNotVariable =
+typeNotVariable :
+    (String
+     ->
+        Maybe
+            (FastDict.Dict
+                String
+                { parameters : List String
+                , recordFieldOrder : Maybe (List String)
+                , type_ : ElmSyntaxTypeInfer.Type
+                }
+            )
+    )
+    -> ElmSyntaxTypeInfer.TypeNotVariable
+    -> SwiftType
+typeNotVariable typeAliasesInModule inferredTypeNotVariable =
     -- IGNORE TCO
     case inferredTypeNotVariable of
         ElmSyntaxTypeInfer.TypeUnit ->
@@ -706,46 +763,108 @@ typeNotVariable inferredTypeNotVariable =
 
         ElmSyntaxTypeInfer.TypeConstruct typeConstruct ->
             let
-                swiftReference : { moduleOrigin : Maybe String, name : String }
-                swiftReference =
-                    case
-                        { moduleOrigin = typeConstruct.moduleOrigin
-                        , name = typeConstruct.name
-                        }
-                            |> typeConstructReferenceToCoreSwift
-                    of
-                        Just coreSwift ->
-                            coreSwift
-
-                        Nothing ->
-                            { moduleOrigin = Nothing
-                            , name =
-                                { moduleOrigin = typeConstruct.moduleOrigin
-                                , name = typeConstruct.name
-                                }
-                                    |> referenceToSwiftName
-                            }
-            in
-            SwiftTypeConstruct
-                { moduleOrigin = swiftReference.moduleOrigin
-                , name = swiftReference.name
-                , arguments =
+                swiftArguments : List SwiftType
+                swiftArguments =
                     typeConstruct.arguments
-                        |> List.map type_
+                        |> List.map
+                            (\argument ->
+                                argument |> type_ typeAliasesInModule
+                            )
+            in
+            case
+                { moduleOrigin = typeConstruct.moduleOrigin
+                , name = typeConstruct.name
                 }
+                    |> typeConstructReferenceToCoreSwift
+            of
+                Just coreSwift ->
+                    SwiftTypeConstruct
+                        { arguments = swiftArguments
+                        , name = coreSwift.name
+                        , moduleOrigin = coreSwift.moduleOrigin
+                        , isFunction =
+                            -- core elm declarations don't have a function type alias
+                            False
+                        }
+
+                Nothing ->
+                    SwiftTypeConstruct
+                        { arguments = swiftArguments
+                        , moduleOrigin = Nothing
+                        , name =
+                            { moduleOrigin = typeConstruct.moduleOrigin
+                            , name = typeConstruct.name
+                            }
+                                |> referenceToSwiftName
+                        , isFunction =
+                            case
+                                typeAliasesInModule typeConstruct.moduleOrigin
+                                    |> Maybe.andThen
+                                        (\byName ->
+                                            byName |> FastDict.get typeConstruct.name
+                                        )
+                            of
+                                Nothing ->
+                                    False
+
+                                Just referencedTypeAlias ->
+                                    case referencedTypeAlias.type_ of
+                                        ElmSyntaxTypeInfer.TypeVariable _ ->
+                                            -- identity type alias
+                                            case
+                                                inferredTypeNotVariable
+                                                    |> inferredTypeNotVariableExpandInnerAliases typeAliasesInModule
+                                            of
+                                                ElmSyntaxTypeInfer.TypeNotVariable (ElmSyntaxTypeInfer.TypeFunction _) ->
+                                                    True
+
+                                                _ ->
+                                                    False
+
+                                        ElmSyntaxTypeInfer.TypeNotVariable aliasTypeNotVariable ->
+                                            case aliasTypeNotVariable of
+                                                ElmSyntaxTypeInfer.TypeUnit ->
+                                                    False
+
+                                                ElmSyntaxTypeInfer.TypeTuple _ ->
+                                                    False
+
+                                                ElmSyntaxTypeInfer.TypeTriple _ ->
+                                                    False
+
+                                                ElmSyntaxTypeInfer.TypeRecord _ ->
+                                                    False
+
+                                                ElmSyntaxTypeInfer.TypeRecordExtension _ ->
+                                                    False
+
+                                                ElmSyntaxTypeInfer.TypeFunction _ ->
+                                                    True
+
+                                                ElmSyntaxTypeInfer.TypeConstruct _ ->
+                                                    case
+                                                        inferredTypeNotVariable
+                                                            |> inferredTypeNotVariableExpandInnerAliases typeAliasesInModule
+                                                    of
+                                                        ElmSyntaxTypeInfer.TypeNotVariable (ElmSyntaxTypeInfer.TypeFunction _) ->
+                                                            True
+
+                                                        _ ->
+                                                            False
+                        }
 
         ElmSyntaxTypeInfer.TypeTuple typeTuple ->
             SwiftTypeTuple
-                { part0 = typeTuple.part0 |> type_
-                , part1 = typeTuple.part1 |> type_
+                { part0 = typeTuple.part0 |> type_ typeAliasesInModule
+                , part1 = typeTuple.part1 |> type_ typeAliasesInModule
                 , part2Up = []
                 }
 
         ElmSyntaxTypeInfer.TypeTriple typeTriple ->
             SwiftTypeTuple
-                { part0 = typeTriple.part0 |> type_
-                , part1 = typeTriple.part1 |> type_
-                , part2Up = [ typeTriple.part2 |> type_ ]
+                { part0 = typeTriple.part0 |> type_ typeAliasesInModule
+                , part1 = typeTriple.part1 |> type_ typeAliasesInModule
+                , part2Up = [ typeTriple.part2 |> type_ typeAliasesInModule ]
                 }
 
         ElmSyntaxTypeInfer.TypeRecord recordFields ->
@@ -758,7 +877,7 @@ typeNotVariable inferredTypeNotVariable =
                                 soFar
                                     |> FastDict.insert
                                         (name |> variableNameDisambiguateFromSwiftKeywords)
-                                        (valueType |> type_)
+                                        (valueType |> type_ typeAliasesInModule)
                             )
                             FastDict.empty
             in
@@ -766,8 +885,8 @@ typeNotVariable inferredTypeNotVariable =
 
         ElmSyntaxTypeInfer.TypeFunction typeFunction ->
             SwiftTypeFunction
-                { input = [ typeFunction.input |> type_ ]
-                , output = typeFunction.output |> type_
+                { input = [ typeFunction.input |> type_ typeAliasesInModule ]
+                , output = typeFunction.output |> type_ typeAliasesInModule
                 }
 
         ElmSyntaxTypeInfer.TypeRecordExtension typeRecordExtension ->
@@ -784,7 +903,7 @@ typeNotVariable inferredTypeNotVariable =
                                 soFar
                                     |> FastDict.insert
                                         (name |> variableNameDisambiguateFromSwiftKeywords)
-                                        (valueType |> type_)
+                                        (valueType |> type_ typeAliasesInModule)
                             )
                             FastDict.empty
             in
@@ -816,12 +935,15 @@ printSwiftTypeNotParenthesized position swiftType =
             Print.exactly variable
 
         SwiftTypeConstruct typeConstruct ->
+            -- TODO check if arguments actually need to be @escaping if TypeIncoming
             printSwiftTypeConstruct position typeConstruct
 
         SwiftTypeTuple parts ->
+            -- TODO check if parts actually need to be @escaping if TypeIncoming
             printSwiftTypeTuple position parts
 
         SwiftTypeRecord fields ->
+            -- TODO check if values actually need to be @escaping if TypeIncoming
             printSwiftTypeRecord position fields
 
         SwiftTypeFunction typeFunction ->
@@ -1120,6 +1242,7 @@ printSwiftTypeConstruct :
         { moduleOrigin : Maybe String
         , name : String
         , arguments : List SwiftType
+        , isFunction : Bool
         }
     -> Print
 printSwiftTypeConstruct position typeConstruct =
@@ -1127,10 +1250,21 @@ printSwiftTypeConstruct position typeConstruct =
         referencePrint : Print
         referencePrint =
             Print.exactly
-                (swiftReferenceToString
-                    { moduleOrigin = typeConstruct.moduleOrigin
-                    , name = typeConstruct.name
-                    }
+                ((case position of
+                    TypeIncoming ->
+                        if typeConstruct.isFunction then
+                            "@escaping "
+
+                        else
+                            ""
+
+                    TypeOutgoing ->
+                        ""
+                 )
+                    ++ swiftReferenceToString
+                        { moduleOrigin = typeConstruct.moduleOrigin
+                        , name = typeConstruct.name
+                        }
                 )
     in
     case typeConstruct.arguments of
@@ -1536,13 +1670,25 @@ charIsLatinAlphaNumOrUnderscoreFast c =
 and populate them in switches and let destructurings
 -}
 destructuringToSwiftStatements :
-    { pattern :
-        ElmSyntaxTypeInfer.TypedNode
-            ElmSyntaxTypeInfer.Pattern
-    , expression : SwiftExpression
-    }
+    (String
+     ->
+        Maybe
+            (FastDict.Dict
+                String
+                { parameters : List String
+                , recordFieldOrder : Maybe (List String)
+                , type_ : ElmSyntaxTypeInfer.Type
+                }
+            )
+    )
+    ->
+        { pattern :
+            ElmSyntaxTypeInfer.TypedNode
+                ElmSyntaxTypeInfer.Pattern
+        , expression : SwiftExpression
+        }
     -> List SwiftStatement
-destructuringToSwiftStatements toDestructure =
+destructuringToSwiftStatements typeAliasesInModule toDestructure =
     (toDestructure.pattern
         |> inferredPatternIntroducedVariables
         |> List.map
@@ -1551,7 +1697,9 @@ destructuringToSwiftStatements toDestructure =
                     { name =
                         variableNameDisambiguateFromSwiftKeywords
                             bindingToIntroduce.name
-                    , type_ = bindingToIntroduce.type_ |> type_
+                    , type_ =
+                        bindingToIntroduce.type_
+                            |> type_ typeAliasesInModule
                     }
             )
     )
@@ -2984,7 +3132,6 @@ casePattern :
         ElmSyntaxTypeInfer.Pattern
     ->
         { pattern : SwiftPattern
-        , type_ : SwiftType
         , introducedVariables : FastSet.Set String
         , variableAsPatternAliases : FastDict.Dict String SwiftPattern
         }
@@ -2999,8 +3146,8 @@ casePattern patternTypedNode =
             patternTypedNode |> pattern
     in
     { pattern = swiftPattern.pattern
-    , type_ = patternTypedNode.type_ |> type_
-    , introducedVariables = swiftPattern.introducedVariables
+    , --, type_ = patternTypedNode.type_ |> type_ typeAliasesInModule
+      introducedVariables = swiftPattern.introducedVariables
     , variableAsPatternAliases = swiftPattern.variableAsPatternAliases
     }
 
@@ -6010,6 +6157,11 @@ modules syntaxDeclarationsIncludingOverwrittenOnes =
                                                                         }
                                                                     swiftTypeAliasDeclaration =
                                                                         typeAliasDeclaration
+                                                                            (\moduleNameToAccess ->
+                                                                                modulesInferred.types
+                                                                                    |> FastDict.get moduleNameToAccess
+                                                                                    |> Maybe.map .typeAliases
+                                                                            )
                                                                             { name = typeAliasName
                                                                             , parameters = inferredTypeAliasDeclaration.parameters
                                                                             , type_ = inferredTypeAliasDeclaration.type_
@@ -6061,6 +6213,11 @@ modules syntaxDeclarationsIncludingOverwrittenOnes =
                                                                     }
                                                                 swiftTypeAliasDeclaration =
                                                                     choiceTypeDeclaration
+                                                                        (\moduleNameToAccess ->
+                                                                            modulesInferred.types
+                                                                                |> FastDict.get moduleNameToAccess
+                                                                                |> Maybe.map .typeAliases
+                                                                        )
                                                                         { name = choiceTypeName
                                                                         , parameters = inferredChoiceAliasDeclaration.parameters
                                                                         , variants = inferredChoiceAliasDeclaration.variants
@@ -6500,6 +6657,13 @@ valueOrFunctionDeclaration :
             , resultType : SwiftType
             }
 valueOrFunctionDeclaration moduleContext syntaxDeclarationValueOrFunction =
+    let
+        typeAliasesInModule : String -> Maybe (FastDict.Dict String { parameters : List String, recordFieldOrder : Maybe (List String), type_ : ElmSyntaxTypeInfer.Type })
+        typeAliasesInModule moduleNameToAccess =
+            moduleContext
+                |> FastDict.get moduleNameToAccess
+                |> Maybe.map .typeAliases
+    in
     case syntaxDeclarationValueOrFunction.parameters of
         [] ->
             Result.map
@@ -6507,7 +6671,8 @@ valueOrFunctionDeclaration moduleContext syntaxDeclarationValueOrFunction =
                     let
                         resultType : SwiftType
                         resultType =
-                            syntaxDeclarationValueOrFunction.type_ |> type_
+                            syntaxDeclarationValueOrFunction.type_
+                                |> type_ typeAliasesInModule
                     in
                     { parameters =
                         if resultType |> swiftTypeIsConcrete then
@@ -6551,7 +6716,9 @@ valueOrFunctionDeclaration moduleContext syntaxDeclarationValueOrFunction =
                                             SwiftExpressionLambda
                                                 { parameters =
                                                     [ { name = generatedParameterNameForIndex parameter.index
-                                                      , type_ = parameter.type_ |> type_
+                                                      , type_ =
+                                                            parameter.type_
+                                                                |> type_ typeAliasesInModule
                                                       }
                                                     ]
                                                 , statements = soFar.statementsToAdd
@@ -6566,6 +6733,7 @@ valueOrFunctionDeclaration moduleContext syntaxDeclarationValueOrFunction =
                                             |> List.indexedMap
                                                 (\parameterIndex parameter ->
                                                     destructuringToSwiftStatements
+                                                        typeAliasesInModule
                                                         { pattern = parameter
                                                         , expression =
                                                             SwiftExpressionReference
@@ -6582,7 +6750,9 @@ valueOrFunctionDeclaration moduleContext syntaxDeclarationValueOrFunction =
                     { parameters =
                         Just
                             [ { name = generatedParameterNameForIndex 0
-                              , type_ = parameter0.type_ |> type_
+                              , type_ =
+                                    parameter0.type_
+                                        |> type_ typeAliasesInModule
                               }
                             ]
                     , statements = resultAndStatementsToAdd.statementsToAdd
@@ -6591,11 +6761,16 @@ valueOrFunctionDeclaration moduleContext syntaxDeclarationValueOrFunction =
                             |> List.foldr
                                 (\parameter outputTypeSoFar ->
                                     SwiftTypeFunction
-                                        { input = [ parameter.type_ |> type_ ]
+                                        { input =
+                                            [ parameter.type_
+                                                |> type_ typeAliasesInModule
+                                            ]
                                         , output = outputTypeSoFar
                                         }
                                 )
-                                (syntaxDeclarationValueOrFunction.result.type_ |> type_)
+                                (syntaxDeclarationValueOrFunction.result.type_
+                                    |> type_ typeAliasesInModule
+                                )
                     , result = resultAndStatementsToAdd.result
                     }
                 )
@@ -6774,7 +6949,14 @@ expression context expressionTypedNode =
                             SwiftExpressionLambda
                                 { parameters =
                                     [ { name = generatedAccessedRecordVariableName
-                                      , type_ = typeFunction.input |> type_
+                                      , type_ =
+                                            typeFunction.input
+                                                |> type_
+                                                    (\moduleNameToAccess ->
+                                                        context.moduleInfo
+                                                            |> FastDict.get moduleNameToAccess
+                                                            |> Maybe.map .typeAliases
+                                                    )
                                       }
                                     ]
                                 , statements = []
@@ -7075,7 +7257,21 @@ expression context expressionTypedNode =
                     Ok
                         { statements = []
                         , result =
-                            case expressionTypedNode.type_ |> inferredTypeExpandFunction |> .inputs |> List.map type_ of
+                            case
+                                expressionTypedNode.type_
+                                    |> inferredTypeExpandFunction
+                                    |> .inputs
+                                    |> List.map
+                                        (\input ->
+                                            input
+                                                |> type_
+                                                    (\moduleNameToAccess ->
+                                                        context.moduleInfo
+                                                            |> FastDict.get moduleNameToAccess
+                                                            |> Maybe.map .typeAliases
+                                                    )
+                                        )
+                            of
                                 [] ->
                                     SwiftExpressionVariant
                                         { originTypeName = Nothing
@@ -7167,7 +7363,14 @@ expression context expressionTypedNode =
                                                 SwiftExpressionLambda
                                                     { parameters =
                                                         [ { name = parameter.name
-                                                          , type_ = parameter.type_ |> type_
+                                                          , type_ =
+                                                                parameter.type_
+                                                                    |> type_
+                                                                        (\moduleNameToAccess ->
+                                                                            context.moduleInfo
+                                                                                |> FastDict.get moduleNameToAccess
+                                                                                |> Maybe.map .typeAliases
+                                                                        )
                                                           }
                                                         ]
                                                     , statements = []
@@ -7359,6 +7562,11 @@ expression context expressionTypedNode =
                                         , resultType =
                                             expressionTypedNode.type_
                                                 |> type_
+                                                    (\moduleNameToAccess ->
+                                                        context.moduleInfo
+                                                            |> FastDict.get moduleNameToAccess
+                                                            |> Maybe.map .typeAliases
+                                                    )
                                         , result =
                                             SwiftExpressionIfElse
                                                 { condition = condition.result
@@ -7657,6 +7865,12 @@ expression context expressionTypedNode =
                 parameterNameForIndex parameterIndex =
                     ("generated_" ++ (parameterIndex |> String.fromInt) ++ "_")
                         ++ (context.path |> String.join "_")
+
+                typeAliasesInModule : String -> Maybe (FastDict.Dict String { parameters : List String, recordFieldOrder : Maybe (List String), type_ : ElmSyntaxTypeInfer.Type })
+                typeAliasesInModule moduleNameToAccess =
+                    context.moduleInfo
+                        |> FastDict.get moduleNameToAccess
+                        |> Maybe.map .typeAliases
             in
             Result.map
                 (\result ->
@@ -7679,7 +7893,9 @@ expression context expressionTypedNode =
                                             SwiftExpressionLambda
                                                 { parameters =
                                                     [ { name = parameterNameForIndex parameter.index
-                                                      , type_ = parameter.type_ |> type_
+                                                      , type_ =
+                                                            parameter.type_
+                                                                |> type_ typeAliasesInModule
                                                       }
                                                     ]
                                                 , statements = soFar.statements
@@ -7694,6 +7910,7 @@ expression context expressionTypedNode =
                                             |> List.indexedMap
                                                 (\parameterIndex parameter ->
                                                     destructuringToSwiftStatements
+                                                        typeAliasesInModule
                                                         { pattern = parameter
                                                         , expression =
                                                             SwiftExpressionReference
@@ -7712,7 +7929,9 @@ expression context expressionTypedNode =
                         SwiftExpressionLambda
                             { parameters =
                                 [ { name = parameterNameForIndex 0
-                                  , type_ = lambda.parameter0.type_ |> type_
+                                  , type_ =
+                                        lambda.parameter0.type_
+                                            |> type_ typeAliasesInModule
                                   }
                                 ]
                             , statements =
@@ -7738,6 +7957,13 @@ expression context expressionTypedNode =
                 )
 
         ElmSyntaxTypeInfer.ExpressionCaseOf caseOf ->
+            let
+                typeAliasesInModule : String -> Maybe (FastDict.Dict String { parameters : List String, recordFieldOrder : Maybe (List String), type_ : ElmSyntaxTypeInfer.Type })
+                typeAliasesInModule moduleNameToAccess =
+                    context.moduleInfo
+                        |> FastDict.get moduleNameToAccess
+                        |> Maybe.map .typeAliases
+            in
             Result.map3
                 (\matched case0 case1Up ->
                     let
@@ -7758,7 +7984,9 @@ expression context expressionTypedNode =
                             ++ (if allCasesHaveNoStatements then
                                     [ SwiftStatementLetDeclaration
                                         { name = switchLocalResultVariableToInitialize
-                                        , resultType = expressionTypedNode.type_ |> type_
+                                        , resultType =
+                                            expressionTypedNode.type_
+                                                |> type_ typeAliasesInModule
                                         , result =
                                             SwiftExpressionSwitch
                                                 { matched = matched.result
@@ -7781,7 +8009,9 @@ expression context expressionTypedNode =
                                 else
                                     [ SwiftStatementLetDeclarationUninitialized
                                         { name = switchLocalResultVariableToInitialize
-                                        , type_ = expressionTypedNode.type_ |> type_
+                                        , type_ =
+                                            expressionTypedNode.type_
+                                                |> type_ typeAliasesInModule
                                         }
                                     , SwiftStatementSwitch
                                         { matched = matched.result
@@ -8365,7 +8595,7 @@ case_ :
             }
 case_ context syntaxCase =
     let
-        casePatternAsSwift : { pattern : SwiftPattern, type_ : SwiftType, introducedVariables : FastSet.Set String, variableAsPatternAliases : FastDict.Dict String SwiftPattern }
+        casePatternAsSwift : { pattern : SwiftPattern, introducedVariables : FastSet.Set String, variableAsPatternAliases : FastDict.Dict String SwiftPattern }
         casePatternAsSwift =
             syntaxCase.pattern |> casePattern
     in
@@ -8424,6 +8654,11 @@ letDeclaration context syntaxLetDeclaration =
                 (\destructuredExpression ->
                     destructuredExpression.statements
                         ++ destructuringToSwiftStatements
+                            (\moduleNameToAccess ->
+                                context.moduleInfo
+                                    |> FastDict.get moduleNameToAccess
+                                    |> Maybe.map .typeAliases
+                            )
                             { pattern = letDestructuring.pattern
                             , expression = destructuredExpression.result
                             }
@@ -8482,6 +8717,13 @@ letValueOrFunctionDeclaration :
         }
     -> Result String SwiftStatement
 letValueOrFunctionDeclaration context syntaxLetDeclarationValueOrFunction =
+    let
+        typeAliasesInModule : String -> Maybe (FastDict.Dict String { parameters : List String, recordFieldOrder : Maybe (List String), type_ : ElmSyntaxTypeInfer.Type })
+        typeAliasesInModule moduleNameToAccess =
+            context.moduleInfo
+                |> FastDict.get moduleNameToAccess
+                |> Maybe.map .typeAliases
+    in
     case syntaxLetDeclarationValueOrFunction.parameters of
         [] ->
             Result.map
@@ -8507,7 +8749,8 @@ letValueOrFunctionDeclaration context syntaxLetDeclarationValueOrFunction =
                                         , arguments = []
                                         }
                         , resultType =
-                            syntaxLetDeclarationValueOrFunction.type_ |> type_
+                            syntaxLetDeclarationValueOrFunction.type_
+                                |> type_ typeAliasesInModule
                         }
                 )
                 (syntaxLetDeclarationValueOrFunction.result
@@ -8536,7 +8779,9 @@ letValueOrFunctionDeclaration context syntaxLetDeclarationValueOrFunction =
                                             SwiftExpressionLambda
                                                 { parameters =
                                                     [ { name = generatedParameterNameForIndex parameter.index
-                                                      , type_ = parameter.type_ |> type_
+                                                      , type_ =
+                                                            parameter.type_
+                                                                |> type_ typeAliasesInModule
                                                       }
                                                     ]
                                                 , statements = soFar.statementsToAdd
@@ -8551,6 +8796,7 @@ letValueOrFunctionDeclaration context syntaxLetDeclarationValueOrFunction =
                                             |> List.indexedMap
                                                 (\parameterIndex parameter ->
                                                     destructuringToSwiftStatements
+                                                        typeAliasesInModule
                                                         { pattern = parameter
                                                         , expression =
                                                             SwiftExpressionReference
@@ -8568,7 +8814,9 @@ letValueOrFunctionDeclaration context syntaxLetDeclarationValueOrFunction =
                         { name = syntaxLetDeclarationValueOrFunction.name
                         , parameters =
                             [ { name = generatedParameterNameForIndex 0
-                              , type_ = parameter0.type_ |> type_
+                              , type_ =
+                                    parameter0.type_
+                                        |> type_ typeAliasesInModule
                               }
                             ]
                         , statements = resultAndStatementsToAdd.statementsToAdd
@@ -8577,12 +8825,14 @@ letValueOrFunctionDeclaration context syntaxLetDeclarationValueOrFunction =
                                 |> List.foldr
                                     (\parameter outputTypeSoFar ->
                                         SwiftTypeFunction
-                                            { input = [ parameter.type_ |> type_ ]
+                                            { input =
+                                                [ parameter.type_ |> type_ typeAliasesInModule
+                                                ]
                                             , output = outputTypeSoFar
                                             }
                                     )
                                     (syntaxLetDeclarationValueOrFunction.result.type_
-                                        |> type_
+                                        |> type_ typeAliasesInModule
                                     )
                         , result = resultAndStatementsToAdd.result
                         }
@@ -12100,6 +12350,7 @@ swiftTypeUnit =
         { moduleOrigin = Nothing
         , name = "unit"
         , arguments = []
+        , isFunction = False
         }
 
 
@@ -28410,7 +28661,7 @@ public indirect enum JsonDecode_Error: Sendable {
     case JsonDecode_OneOf(List_List<JsonDecode_Error>)
     case JsonDecode_Failure(String, JsonDecode_Value)
 }
-public struct JsonDecode_Decoder<value>: Sendable {
+public struct JsonDecode_Decoder<value: Sendable>: Sendable {
     let decode: @Sendable (JsonDecode_Value) -> Result_Result<JsonDecode_Error, value>
 }
 
