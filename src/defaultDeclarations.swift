@@ -2632,7 +2632,7 @@ public enum Elm {
         case JsonDecode_OneOf(List_List<JsonDecode_Error>)
         case JsonDecode_Failure(String, JsonDecode_Value)
     }
-    public struct JsonDecode_Decoder<value>: Sendable {
+    public struct JsonDecode_Decoder<value: Sendable>: Sendable {
         let decode: @Sendable (JsonDecode_Value) -> Result_Result<JsonDecode_Error, value>
     }
 
