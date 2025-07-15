@@ -8243,7 +8243,7 @@ inferredTypeIsConcreteSwiftType inferredType =
         ElmSyntaxTypeInfer.TypeVariable variable ->
             -- number... gets turned into Double
             -- (or in the future specialized away to Int64/Double)
-            Basics.not (String.startsWith "number" variable.name)
+            String.startsWith "number" variable.name
 
         ElmSyntaxTypeInfer.TypeNotVariable inferredTypNotVariable ->
             inferredTypeNotVariableIsConcreteSwiftType inferredTypNotVariable
