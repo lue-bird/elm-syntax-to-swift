@@ -9,10 +9,12 @@ let package = Package(
         .package(url: "https://github.com/ctreffs/SwiftSDL2.git", from: "1.4.0")
     ],
     targets: [
-        .target(
+        .executableTarget(
             name: "example-sdl2",
             dependencies: [
                 .product(name: "SDL", package: "SwiftSDL2")
-            ])
+            ],
+            resources: [ .copy("Run.elm") ]
+        )
     ]
 )
