@@ -1,7 +1,3 @@
-> ## overall TODO
-> - reduce amount of `generated_` variable names
-
-
 Print [`elm-syntax`](https://dark.elm.dmy.fr/packages/stil4m/elm-syntax/latest/) declarations as [swift](https://swift.org/) code.
 To try it out, you can
 run [this script](https://github.com/lue-bird/elm-syntax-to-swift/tree/main/node-elm-to-swift).

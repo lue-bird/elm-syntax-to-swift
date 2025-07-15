@@ -7925,6 +7925,7 @@ expression context expressionTypedNode =
                                 |> List.indexedMap
                                     (\parameter1UpIndex parameter ->
                                         { index = parameter1UpIndex + 1
+                                        , pattern = parameter.value
                                         , type_ = parameter.type_
                                         }
                                     )
@@ -7933,7 +7934,13 @@ expression context expressionTypedNode =
                                         { result =
                                             SwiftExpressionLambda
                                                 { parameters =
-                                                    [ { name = parameterNameForIndex parameter.index
+                                                    [ { name =
+                                                            case parameter.pattern of
+                                                                ElmSyntaxTypeInfer.PatternVariable patternVariable ->
+                                                                    variableNameDisambiguateFromSwiftKeywords patternVariable
+
+                                                                _ ->
+                                                                    parameterNameForIndex parameter.index
                                                       , type_ =
                                                             parameter.type_
                                                                 |> type_ typeAliasesInModule
@@ -7950,15 +7957,20 @@ expression context expressionTypedNode =
                                         ((lambda.parameter0 :: lambda.parameter1Up)
                                             |> List.indexedMap
                                                 (\parameterIndex parameter ->
-                                                    destructuringToSwiftStatements
-                                                        typeAliasesInModule
-                                                        { pattern = parameter
-                                                        , expression =
-                                                            SwiftExpressionReference
-                                                                { moduleOrigin = Nothing
-                                                                , name = parameterNameForIndex parameterIndex
+                                                    case parameter.value of
+                                                        ElmSyntaxTypeInfer.PatternVariable _ ->
+                                                            []
+
+                                                        _ ->
+                                                            destructuringToSwiftStatements
+                                                                typeAliasesInModule
+                                                                { pattern = parameter
+                                                                , expression =
+                                                                    SwiftExpressionReference
+                                                                        { moduleOrigin = Nothing
+                                                                        , name = parameterNameForIndex parameterIndex
+                                                                        }
                                                                 }
-                                                        }
                                                 )
                                             |> List.concat
                                         )
@@ -7969,7 +7981,13 @@ expression context expressionTypedNode =
                     , result =
                         SwiftExpressionLambda
                             { parameters =
-                                [ { name = parameterNameForIndex 0
+                                [ { name =
+                                        case lambda.parameter0.value of
+                                            ElmSyntaxTypeInfer.PatternVariable patternVariable ->
+                                                variableNameDisambiguateFromSwiftKeywords patternVariable
+
+                                            _ ->
+                                                parameterNameForIndex 0
                                   , type_ =
                                         lambda.parameter0.type_
                                             |> type_ typeAliasesInModule
