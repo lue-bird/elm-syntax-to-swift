@@ -2352,6 +2352,8 @@ swiftPatternCanBeUsedInSwiftDestructuring swiftPattern =
                 || (parts.part2Up |> List.all swiftPatternCanBeUsedInSwiftDestructuring)
 
 
+{-| TODO rename to case pattern?
+-}
 pattern :
     ElmSyntaxTypeInfer.TypedNode
         ElmSyntaxTypeInfer.Pattern
@@ -3121,34 +3123,6 @@ swiftPatternIgnoreIntroducedVariablesSetEmptyVariableAsPatternAliasesDictEmpty =
     { pattern = SwiftPatternIgnore
     , introducedVariables = FastSet.empty
     , variableAsPatternAliases = FastDict.empty
-    }
-
-
-{-| Where used, add variable to pattern aliases as let variables
-with `swiftStatementsPrependLetDeclarationsForVariableAsPatternAliases`
--}
-casePattern :
-    ElmSyntaxTypeInfer.TypedNode
-        ElmSyntaxTypeInfer.Pattern
-    ->
-        { pattern : SwiftPattern
-        , introducedVariables : FastSet.Set String
-        , variableAsPatternAliases : FastDict.Dict String SwiftPattern
-        }
-casePattern patternTypedNode =
-    let
-        swiftPattern :
-            { pattern : SwiftPattern
-            , introducedVariables : FastSet.Set String
-            , variableAsPatternAliases : FastDict.Dict String SwiftPattern
-            }
-        swiftPattern =
-            patternTypedNode |> pattern
-    in
-    { pattern = swiftPattern.pattern
-    , --, type_ = patternTypedNode.type_ |> type_ typeAliasesInModule
-      introducedVariables = swiftPattern.introducedVariables
-    , variableAsPatternAliases = swiftPattern.variableAsPatternAliases
     }
 
 
@@ -8656,15 +8630,23 @@ case_ context syntaxCase =
     let
         casePatternAsSwift : { pattern : SwiftPattern, introducedVariables : FastSet.Set String, variableAsPatternAliases : FastDict.Dict String SwiftPattern }
         casePatternAsSwift =
-            syntaxCase.pattern |> casePattern
+            syntaxCase.pattern |> pattern
     in
     Result.map
         (\result ->
             { pattern = casePatternAsSwift.pattern
             , statements =
-                result.statements
-                    |> swiftStatementsPrependLetDeclarationsForVariableAsPatternAliases
-                        casePatternAsSwift.variableAsPatternAliases
+                casePatternAsSwift.variableAsPatternAliases
+                    |> FastDict.foldl
+                        (\variable aliasedPattern resultSoFar ->
+                            SwiftStatementLetDestructuring
+                                { pattern = SwiftPatternVariable variable
+                                , expression =
+                                    aliasedPattern |> swiftPatternAsExpression
+                                }
+                                :: resultSoFar
+                        )
+                        result.statements
             , result = result.result
             }
         )
@@ -12252,24 +12234,6 @@ printLinebreakIndentedLinebreakIndented : Print
 printLinebreakIndentedLinebreakIndented =
     Print.linebreakIndented
         |> Print.followedBy Print.linebreakIndented
-
-
-swiftStatementsPrependLetDeclarationsForVariableAsPatternAliases :
-    FastDict.Dict String SwiftPattern
-    -> List SwiftStatement
-    -> List SwiftStatement
-swiftStatementsPrependLetDeclarationsForVariableAsPatternAliases variableAsPatternAliases statements =
-    variableAsPatternAliases
-        |> FastDict.foldl
-            (\variable aliasedPattern resultSoFar ->
-                SwiftStatementLetDestructuring
-                    { pattern = SwiftPatternVariable variable
-                    , expression =
-                        aliasedPattern |> swiftPatternAsExpression
-                    }
-                    :: resultSoFar
-            )
-            statements
 
 
 swiftExpressionReferenceTrue : SwiftExpression
