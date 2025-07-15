@@ -2348,8 +2348,8 @@ swiftPatternCanBeUsedInSwiftDestructuring swiftPattern =
 
         SwiftPatternTuple parts ->
             (parts.part0 |> swiftPatternCanBeUsedInSwiftDestructuring)
-                || (parts.part1 |> swiftPatternCanBeUsedInSwiftDestructuring)
-                || (parts.part2Up |> List.all swiftPatternCanBeUsedInSwiftDestructuring)
+                && (parts.part1 |> swiftPatternCanBeUsedInSwiftDestructuring)
+                && (parts.part2Up |> List.all swiftPatternCanBeUsedInSwiftDestructuring)
 
 
 {-| TODO rename to case pattern?
@@ -12381,12 +12381,7 @@ printExactlySpaceCurlyOpening =
 
 swiftTypeUnit : SwiftType
 swiftTypeUnit =
-    SwiftTypeConstruct
-        { moduleOrigin = Nothing
-        , name = "unit"
-        , arguments = []
-        , isFunction = False
-        }
+    SwiftTypeRecord FastDict.empty
 
 
 {-| Print value/function declarations into
