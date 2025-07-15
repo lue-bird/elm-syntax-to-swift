@@ -17,6 +17,9 @@ const elmString =
             `import CoreFoundation
 import Foundation
 
+extension Elm.List_List: Equatable where a: Equatable {}
+extension Elm.List_List: Hashable where a: Hashable {}
+
 // using enum to create a namespace can't be instantiated
 public enum Elm {
 `,
