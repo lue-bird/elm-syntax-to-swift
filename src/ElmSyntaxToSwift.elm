@@ -7561,8 +7561,17 @@ expression context expressionTypedNode =
                                                                 }
                                                 in
                                                 if
-                                                    annotationWithExpandedAliases
-                                                        |> inferredTypeIsConcreteSwiftType
+                                                    case annotationWithExpandedAliases of
+                                                        ElmSyntaxTypeInfer.TypeNotVariable (ElmSyntaxTypeInfer.TypeFunction _) ->
+                                                            -- TODO there is the case that the referenced declaration
+                                                            -- is a curried value declaration.
+                                                            -- preferred resolution: check when generating public static let,
+                                                            -- generate func with generated parameter instead if it's type is a function
+                                                            True
+
+                                                        _ ->
+                                                            annotationWithExpandedAliases
+                                                                |> inferredTypeIsConcreteSwiftType
                                                 then
                                                     SwiftExpressionReference swiftReference
 
