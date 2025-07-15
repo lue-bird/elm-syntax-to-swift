@@ -5145,23 +5145,24 @@ printSwiftExpressionRecord swiftRecordFields =
                                 fieldValuePrint =
                                     printSwiftExpressionNotParenthesized fieldValue
                             in
-                            Print.withIndentIncreasedBy 1
-                                (Print.exactly (fieldName ++ ":")
-                                    |> Print.followedBy
-                                        (Print.withIndentAtNextMultipleOf4
-                                            (Print.spaceOrLinebreakIndented
-                                                (fieldValuePrint |> Print.lineSpread)
-                                                |> Print.followedBy fieldValuePrint
-                                            )
+                            Print.exactly (fieldName ++ ":")
+                                |> Print.followedBy
+                                    (Print.withIndentAtNextMultipleOf4
+                                        (Print.spaceOrLinebreakIndented
+                                            (fieldValuePrint |> Print.lineSpread)
+                                            |> Print.followedBy fieldValuePrint
                                         )
-                                )
+                                    )
                         )
                         (printExactlyComma
                             |> Print.followedBy Print.linebreakIndented
                         )
         in
         printExactlyParenOpening
-            |> Print.followedBy fieldsPrint
+            |> Print.followedBy
+                (Print.withIndentIncreasedBy 1
+                    fieldsPrint
+                )
             |> Print.followedBy
                 (Print.spaceOrLinebreakIndented
                     (fieldsPrint |> Print.lineSpread)
@@ -6707,6 +6708,7 @@ valueOrFunctionDeclaration moduleContext syntaxDeclarationValueOrFunction =
                                 |> List.indexedMap
                                     (\laterParameterIndex parameter ->
                                         { index = laterParameterIndex + 1
+                                        , pattern = parameter.value
                                         , type_ = parameter.type_
                                         }
                                     )
@@ -6715,7 +6717,13 @@ valueOrFunctionDeclaration moduleContext syntaxDeclarationValueOrFunction =
                                         { result =
                                             SwiftExpressionLambda
                                                 { parameters =
-                                                    [ { name = generatedParameterNameForIndex parameter.index
+                                                    [ { name =
+                                                            case parameter.pattern of
+                                                                ElmSyntaxTypeInfer.PatternVariable patternVariable ->
+                                                                    variableNameDisambiguateFromSwiftKeywords patternVariable
+
+                                                                _ ->
+                                                                    generatedParameterNameForIndex parameter.index
                                                       , type_ =
                                                             parameter.type_
                                                                 |> type_ typeAliasesInModule
@@ -6732,15 +6740,20 @@ valueOrFunctionDeclaration moduleContext syntaxDeclarationValueOrFunction =
                                         ((parameter0 :: parameter1Up)
                                             |> List.indexedMap
                                                 (\parameterIndex parameter ->
-                                                    destructuringToSwiftStatements
-                                                        typeAliasesInModule
-                                                        { pattern = parameter
-                                                        , expression =
-                                                            SwiftExpressionReference
-                                                                { moduleOrigin = Nothing
-                                                                , name = generatedParameterNameForIndex parameterIndex
+                                                    case parameter.value of
+                                                        ElmSyntaxTypeInfer.PatternVariable _ ->
+                                                            []
+
+                                                        _ ->
+                                                            destructuringToSwiftStatements
+                                                                typeAliasesInModule
+                                                                { pattern = parameter
+                                                                , expression =
+                                                                    SwiftExpressionReference
+                                                                        { moduleOrigin = Nothing
+                                                                        , name = generatedParameterNameForIndex parameterIndex
+                                                                        }
                                                                 }
-                                                        }
                                                 )
                                             |> List.concat
                                         )
@@ -6749,7 +6762,13 @@ valueOrFunctionDeclaration moduleContext syntaxDeclarationValueOrFunction =
                     in
                     { parameters =
                         Just
-                            [ { name = generatedParameterNameForIndex 0
+                            [ { name =
+                                    case parameter0.value of
+                                        ElmSyntaxTypeInfer.PatternVariable patternVariable ->
+                                            variableNameDisambiguateFromSwiftKeywords patternVariable
+
+                                        _ ->
+                                            generatedParameterNameForIndex 0
                               , type_ =
                                     parameter0.type_
                                         |> type_ typeAliasesInModule
@@ -7546,27 +7565,28 @@ expression context expressionTypedNode =
         ElmSyntaxTypeInfer.ExpressionIfThenElse ifThenElse ->
             Result.map3
                 (\condition onTrue onFalse ->
+                    let
+                        ifLocalResultVariableToInitialize : String
+                        ifLocalResultVariableToInitialize =
+                            generatedLocalReturnResult context.path
+
+                        typeAliasesInModule : String -> Maybe (FastDict.Dict String { parameters : List String, recordFieldOrder : Maybe (List String), type_ : ElmSyntaxTypeInfer.Type })
+                        typeAliasesInModule moduleNameToAccess =
+                            context.moduleInfo
+                                |> FastDict.get moduleNameToAccess
+                                |> Maybe.map .typeAliases
+                    in
                     if
                         (onTrue.statements |> List.isEmpty)
                             && (onFalse.statements |> List.isEmpty)
                     then
-                        let
-                            introducedIfResultVariable : String
-                            introducedIfResultVariable =
-                                generatedLocalReturnResult context.path
-                        in
                         { statements =
                             condition.statements
                                 ++ [ SwiftStatementLetDeclaration
-                                        { name = introducedIfResultVariable
+                                        { name = ifLocalResultVariableToInitialize
                                         , resultType =
                                             expressionTypedNode.type_
-                                                |> type_
-                                                    (\moduleNameToAccess ->
-                                                        context.moduleInfo
-                                                            |> FastDict.get moduleNameToAccess
-                                                            |> Maybe.map .typeAliases
-                                                    )
+                                                |> type_ typeAliasesInModule
                                         , result =
                                             SwiftExpressionIfElse
                                                 { condition = condition.result
@@ -7578,20 +7598,41 @@ expression context expressionTypedNode =
                         , result =
                             SwiftExpressionReference
                                 { moduleOrigin = Nothing
-                                , name = introducedIfResultVariable
+                                , name = ifLocalResultVariableToInitialize
                                 }
                         }
 
                     else
                         { statements =
                             condition.statements
-                                ++ onTrue.statements
-                                ++ onFalse.statements
+                                ++ [ SwiftStatementLetDeclarationUninitialized
+                                        { name = ifLocalResultVariableToInitialize
+                                        , type_ =
+                                            expressionTypedNode.type_
+                                                |> type_ typeAliasesInModule
+                                        }
+                                   , SwiftStatementIfElse
+                                        { condition = condition.result
+                                        , onTrue =
+                                            onTrue.statements
+                                                ++ [ SwiftStatementBindingAssignment
+                                                        { name = ifLocalResultVariableToInitialize
+                                                        , assignedValue = onTrue.result
+                                                        }
+                                                   ]
+                                        , onFalse =
+                                            onFalse.statements
+                                                ++ [ SwiftStatementBindingAssignment
+                                                        { name = ifLocalResultVariableToInitialize
+                                                        , assignedValue = onFalse.result
+                                                        }
+                                                   ]
+                                        }
+                                   ]
                         , result =
-                            SwiftExpressionIfElse
-                                { condition = condition.result
-                                , onTrue = onTrue.result
-                                , onFalse = onFalse.result
+                            SwiftExpressionReference
+                                { moduleOrigin = Nothing
+                                , name = ifLocalResultVariableToInitialize
                                 }
                         }
                 )
@@ -9177,11 +9218,11 @@ printSwiftFuncDeclaration swiftValueOrFunctionDeclaration =
                 (printParenthesized
                     (parameterPrints
                         |> Print.listMapAndIntersperseAndFlatten
-                            (\parameterPrint ->
-                                Print.spaceOrLinebreakIndented headerLineSpread
-                                    |> Print.followedBy parameterPrint
+                            (\parameterPrint -> parameterPrint)
+                            (Print.exactly ","
+                                |> Print.followedBy
+                                    (Print.spaceOrLinebreakIndented headerLineSpread)
                             )
-                            Print.empty
                     )
                     |> Print.followedBy
                         (Print.spaceOrLinebreakIndented headerLineSpread)
@@ -12110,18 +12151,12 @@ printSwiftStatement swiftStatement =
                     )
 
         SwiftStatementBindingAssignment assignment ->
-            let
-                assignedValuePrint : Print
-                assignedValuePrint =
-                    printSwiftExpressionNotParenthesized assignment.assignedValue
-            in
             Print.exactly (assignment.name ++ " =")
                 |> Print.followedBy
                     (Print.withIndentAtNextMultipleOf4
-                        (Print.spaceOrLinebreakIndented
-                            (assignedValuePrint |> Print.lineSpread)
+                        (Print.linebreakIndented
                             |> Print.followedBy
-                                assignedValuePrint
+                                (printSwiftExpressionNotParenthesized assignment.assignedValue)
                         )
                     )
 
