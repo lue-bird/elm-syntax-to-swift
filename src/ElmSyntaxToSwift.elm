@@ -4138,8 +4138,8 @@ referenceToCoreSwift reference =
                 "int" ->
                     Just { moduleOrigin = Nothing, name = "JsonEncode_int" }
 
-                "double" ->
-                    Just { moduleOrigin = Nothing, name = "JsonEncode_double" }
+                "float" ->
+                    Just { moduleOrigin = Nothing, name = "JsonEncode_float" }
 
                 "list" ->
                     Just { moduleOrigin = Nothing, name = "JsonEncode_list" }
@@ -4182,8 +4182,8 @@ referenceToCoreSwift reference =
                 "int" ->
                     Just { moduleOrigin = Nothing, name = "JsonDecode_int" }
 
-                "double" ->
-                    Just { moduleOrigin = Nothing, name = "JsonDecode_double" }
+                "float" ->
+                    Just { moduleOrigin = Nothing, name = "JsonDecode_float" }
 
                 "nullable" ->
                     Just { moduleOrigin = Nothing, name = "JsonDecode_nullable" }
@@ -4318,8 +4318,8 @@ referenceToCoreSwift reference =
                 "int" ->
                     Just { moduleOrigin = Nothing, name = "Random_int" }
 
-                "double" ->
-                    Just { moduleOrigin = Nothing, name = "Random_double" }
+                "float" ->
+                    Just { moduleOrigin = Nothing, name = "Random_float" }
 
                 "uniform" ->
                     Just { moduleOrigin = Nothing, name = "Random_uniform" }
@@ -4461,11 +4461,11 @@ referenceToCoreSwift reference =
                 "unsignedInt32" ->
                     Just { moduleOrigin = Nothing, name = "BytesDecode_unsignedInt32" }
 
-                "double32" ->
-                    Just { moduleOrigin = Nothing, name = "BytesDecode_double32" }
+                "float32" ->
+                    Just { moduleOrigin = Nothing, name = "BytesDecode_float32" }
 
-                "double64" ->
-                    Just { moduleOrigin = Nothing, name = "BytesDecode_double64" }
+                "float64" ->
+                    Just { moduleOrigin = Nothing, name = "BytesDecode_float64" }
 
                 "string" ->
                     Just { moduleOrigin = Nothing, name = "BytesDecode_string" }
@@ -4527,11 +4527,11 @@ referenceToCoreSwift reference =
                 "unsignedInt32" ->
                     Just { moduleOrigin = Nothing, name = "BytesEncode_unsignedInt32" }
 
-                "double32" ->
-                    Just { moduleOrigin = Nothing, name = "BytesEncode_double32" }
+                "float32" ->
+                    Just { moduleOrigin = Nothing, name = "BytesEncode_float32" }
 
-                "double64" ->
-                    Just { moduleOrigin = Nothing, name = "BytesEncode_double64" }
+                "float64" ->
+                    Just { moduleOrigin = Nothing, name = "BytesEncode_float64" }
 
                 "bytes" ->
                     Just { moduleOrigin = Nothing, name = "BytesEncode_bytes" }
@@ -12941,7 +12941,7 @@ elmRandomTypes =
                                 }
                             )
                       )
-                    , ( "double"
+                    , ( "float"
                       , ElmSyntaxTypeInfer.TypeNotVariable
                             (ElmSyntaxTypeInfer.TypeFunction
                                 { input =
@@ -14388,7 +14388,7 @@ elmBytesTypes =
                                 }
                             )
                       )
-                    , ( "double32"
+                    , ( "float32"
                       , ElmSyntaxTypeInfer.TypeNotVariable
                             (ElmSyntaxTypeInfer.TypeFunction
                                 { input =
@@ -14419,7 +14419,7 @@ elmBytesTypes =
                                 }
                             )
                       )
-                    , ( "double64"
+                    , ( "float64"
                       , ElmSyntaxTypeInfer.TypeNotVariable
                             (ElmSyntaxTypeInfer.TypeFunction
                                 { input =
@@ -15458,7 +15458,7 @@ elmBytesTypes =
                                 }
                             )
                       )
-                    , ( "double32"
+                    , ( "float32"
                       , ElmSyntaxTypeInfer.TypeNotVariable
                             (ElmSyntaxTypeInfer.TypeFunction
                                 { input =
@@ -15495,7 +15495,7 @@ elmBytesTypes =
                                 }
                             )
                       )
-                    , ( "double64"
+                    , ( "float64"
                       , ElmSyntaxTypeInfer.TypeNotVariable
                             (ElmSyntaxTypeInfer.TypeFunction
                                 { input =
@@ -16272,7 +16272,7 @@ elmJsonTypes =
                                 }
                             )
                       )
-                    , ( "double"
+                    , ( "float"
                       , ElmSyntaxTypeInfer.TypeNotVariable
                             (ElmSyntaxTypeInfer.TypeConstruct
                                 { moduleOrigin = "Json.Decode"
@@ -18538,7 +18538,7 @@ elmJsonTypes =
                                 }
                             )
                       )
-                    , ( "double"
+                    , ( "float"
                       , ElmSyntaxTypeInfer.TypeNotVariable
                             (ElmSyntaxTypeInfer.TypeFunction
                                 { input =
