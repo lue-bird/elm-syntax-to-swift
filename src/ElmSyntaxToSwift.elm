@@ -8811,6 +8811,7 @@ letValueOrFunctionDeclaration context syntaxLetDeclarationValueOrFunction =
                                 |> List.indexedMap
                                     (\laterParameterIndex parameter ->
                                         { index = laterParameterIndex + 1
+                                        , pattern = parameter.value
                                         , type_ = parameter.type_
                                         }
                                     )
@@ -8819,7 +8820,13 @@ letValueOrFunctionDeclaration context syntaxLetDeclarationValueOrFunction =
                                         { result =
                                             SwiftExpressionLambda
                                                 { parameters =
-                                                    [ { name = generatedParameterNameForIndex parameter.index
+                                                    [ { name =
+                                                            case parameter.pattern of
+                                                                ElmSyntaxTypeInfer.PatternVariable patternVariable ->
+                                                                    variableNameDisambiguateFromSwiftKeywords patternVariable
+
+                                                                _ ->
+                                                                    generatedParameterNameForIndex parameter.index
                                                       , type_ =
                                                             parameter.type_
                                                                 |> type_ typeAliasesInModule
@@ -8836,15 +8843,20 @@ letValueOrFunctionDeclaration context syntaxLetDeclarationValueOrFunction =
                                         ((parameter0 :: parameter1Up)
                                             |> List.indexedMap
                                                 (\parameterIndex parameter ->
-                                                    destructuringToSwiftStatements
-                                                        typeAliasesInModule
-                                                        { pattern = parameter
-                                                        , expression =
-                                                            SwiftExpressionReference
-                                                                { moduleOrigin = Nothing
-                                                                , name = generatedParameterNameForIndex parameterIndex
+                                                    case parameter.value of
+                                                        ElmSyntaxTypeInfer.PatternVariable _ ->
+                                                            []
+
+                                                        _ ->
+                                                            destructuringToSwiftStatements
+                                                                typeAliasesInModule
+                                                                { pattern = parameter
+                                                                , expression =
+                                                                    SwiftExpressionReference
+                                                                        { moduleOrigin = Nothing
+                                                                        , name = generatedParameterNameForIndex parameterIndex
+                                                                        }
                                                                 }
-                                                        }
                                                 )
                                             |> List.concat
                                         )
@@ -8854,7 +8866,13 @@ letValueOrFunctionDeclaration context syntaxLetDeclarationValueOrFunction =
                     SwiftStatementFuncDeclaration
                         { name = syntaxLetDeclarationValueOrFunction.name
                         , parameters =
-                            [ { name = generatedParameterNameForIndex 0
+                            [ { name =
+                                    case parameter0.value of
+                                        ElmSyntaxTypeInfer.PatternVariable patternVariable ->
+                                            variableNameDisambiguateFromSwiftKeywords patternVariable
+
+                                        _ ->
+                                            generatedParameterNameForIndex 0
                               , type_ =
                                     parameter0.type_
                                         |> type_ typeAliasesInModule
