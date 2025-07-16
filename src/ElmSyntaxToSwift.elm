@@ -798,59 +798,14 @@ typeNotVariable typeAliasesInModule inferredTypeNotVariable =
                                 |> referenceToSwiftName
                         , isFunction =
                             case
-                                typeAliasesInModule typeConstruct.moduleOrigin
-                                    |> Maybe.andThen
-                                        (\byName ->
-                                            byName |> FastDict.get typeConstruct.name
-                                        )
+                                inferredTypeConstructToFunction typeAliasesInModule
+                                    typeConstruct
                             of
                                 Nothing ->
                                     False
 
-                                Just referencedTypeAlias ->
-                                    case referencedTypeAlias.type_ of
-                                        ElmSyntaxTypeInfer.TypeVariable _ ->
-                                            -- identity type alias
-                                            case
-                                                inferredTypeNotVariable
-                                                    |> inferredTypeNotVariableExpandInnerAliases typeAliasesInModule
-                                            of
-                                                ElmSyntaxTypeInfer.TypeNotVariable (ElmSyntaxTypeInfer.TypeFunction _) ->
-                                                    True
-
-                                                _ ->
-                                                    False
-
-                                        ElmSyntaxTypeInfer.TypeNotVariable aliasTypeNotVariable ->
-                                            case aliasTypeNotVariable of
-                                                ElmSyntaxTypeInfer.TypeUnit ->
-                                                    False
-
-                                                ElmSyntaxTypeInfer.TypeTuple _ ->
-                                                    False
-
-                                                ElmSyntaxTypeInfer.TypeTriple _ ->
-                                                    False
-
-                                                ElmSyntaxTypeInfer.TypeRecord _ ->
-                                                    False
-
-                                                ElmSyntaxTypeInfer.TypeRecordExtension _ ->
-                                                    False
-
-                                                ElmSyntaxTypeInfer.TypeFunction _ ->
-                                                    True
-
-                                                ElmSyntaxTypeInfer.TypeConstruct _ ->
-                                                    case
-                                                        inferredTypeNotVariable
-                                                            |> inferredTypeNotVariableExpandInnerAliases typeAliasesInModule
-                                                    of
-                                                        ElmSyntaxTypeInfer.TypeNotVariable (ElmSyntaxTypeInfer.TypeFunction _) ->
-                                                            True
-
-                                                        _ ->
-                                                            False
+                                Just _ ->
+                                    True
                         }
 
         ElmSyntaxTypeInfer.TypeTuple typeTuple ->
@@ -1035,6 +990,7 @@ printSwiftTypeFunction :
     -> Print
 printSwiftTypeFunction positionOrNothing typeFunction =
     let
+        inputIsEscaping : Bool
         inputIsEscaping =
             case positionOrNothing of
                 Nothing ->
@@ -1152,6 +1108,115 @@ swiftTypeExpandFunctionIntoReverse soFarReverse swiftType =
             { inputs = soFarReverse |> List.reverse
             , output = SwiftTypeVariable variable
             }
+
+
+inferredTypeToFunction :
+    (String
+     ->
+        Maybe
+            (FastDict.Dict
+                String
+                { parameters : List String
+                , recordFieldOrder : Maybe (List String)
+                , type_ : ElmSyntaxTypeInfer.Type
+                }
+            )
+    )
+    -> ElmSyntaxTypeInfer.Type
+    -> Maybe { input : ElmSyntaxTypeInfer.Type, output : ElmSyntaxTypeInfer.Type }
+inferredTypeToFunction typeAliasesInModule inferredType =
+    case inferredType of
+        ElmSyntaxTypeInfer.TypeVariable _ ->
+            Nothing
+
+        ElmSyntaxTypeInfer.TypeNotVariable aliasTypeNotVariable ->
+            inferredTypeNotVariableToFunction typeAliasesInModule
+                aliasTypeNotVariable
+
+
+inferredTypeNotVariableToFunction :
+    (String
+     ->
+        Maybe
+            (FastDict.Dict
+                String
+                { parameters : List String
+                , recordFieldOrder : Maybe (List String)
+                , type_ : ElmSyntaxTypeInfer.Type
+                }
+            )
+    )
+    -> ElmSyntaxTypeInfer.TypeNotVariable
+    -> Maybe { input : ElmSyntaxTypeInfer.Type, output : ElmSyntaxTypeInfer.Type }
+inferredTypeNotVariableToFunction typeAliasesInModule inferredTypeNotFunction =
+    case inferredTypeNotFunction of
+        ElmSyntaxTypeInfer.TypeUnit ->
+            Nothing
+
+        ElmSyntaxTypeInfer.TypeTuple _ ->
+            Nothing
+
+        ElmSyntaxTypeInfer.TypeTriple _ ->
+            Nothing
+
+        ElmSyntaxTypeInfer.TypeRecord _ ->
+            Nothing
+
+        ElmSyntaxTypeInfer.TypeRecordExtension _ ->
+            Nothing
+
+        ElmSyntaxTypeInfer.TypeFunction inferredTypeFunction ->
+            Just inferredTypeFunction
+
+        ElmSyntaxTypeInfer.TypeConstruct inferredTypeConstruct ->
+            inferredTypeConstructToFunction typeAliasesInModule
+                inferredTypeConstruct
+
+
+inferredTypeConstructToFunction :
+    (String
+     ->
+        Maybe
+            (FastDict.Dict
+                String
+                { parameters : List String
+                , recordFieldOrder : Maybe (List String)
+                , type_ : ElmSyntaxTypeInfer.Type
+                }
+            )
+    )
+    ->
+        { moduleOrigin : String
+        , name : String
+        , arguments : List ElmSyntaxTypeInfer.Type
+        }
+    -> Maybe { input : ElmSyntaxTypeInfer.Type, output : ElmSyntaxTypeInfer.Type }
+inferredTypeConstructToFunction typeAliasesInModule inferredTypeConstruct =
+    case
+        typeAliasesInModule inferredTypeConstruct.moduleOrigin
+            |> Maybe.andThen
+                (\byName ->
+                    byName |> FastDict.get inferredTypeConstruct.name
+                )
+    of
+        Nothing ->
+            Nothing
+
+        Just referencedTypeAlias ->
+            case referencedTypeAlias.type_ of
+                ElmSyntaxTypeInfer.TypeVariable _ ->
+                    -- identity type alias
+                    case inferredTypeConstruct.arguments of
+                        [] ->
+                            Nothing
+
+                        typeAliasArgument :: _ ->
+                            inferredTypeToFunction typeAliasesInModule
+                                typeAliasArgument
+
+                ElmSyntaxTypeInfer.TypeNotVariable aliasTypeNotVariable ->
+                    inferredTypeNotVariableToFunction typeAliasesInModule
+                        aliasTypeNotVariable
 
 
 inferredTypeExpandToFunction :
@@ -3443,7 +3508,7 @@ referenceToCoreSwift reference =
         "Basics" ->
             case reference.name of
                 "identity" ->
-                    Just { moduleOrigin = Nothing, name = "id" }
+                    Just { moduleOrigin = Nothing, name = "Basics_identity" }
 
                 "always" ->
                     Just { moduleOrigin = Nothing, name = "Basics_always" }
@@ -6680,22 +6745,58 @@ valueOrFunctionDeclaration moduleContext syntaxDeclarationValueOrFunction =
         [] ->
             Result.map
                 (\result ->
-                    let
-                        resultType : SwiftType
-                        resultType =
-                            syntaxDeclarationValueOrFunction.type_
-                                |> type_ typeAliasesInModule
-                    in
-                    { parameters =
-                        if resultType |> swiftTypeIsConcrete then
-                            Nothing
+                    case
+                        syntaxDeclarationValueOrFunction.type_
+                            |> inferredTypeToFunction
+                                typeAliasesInModule
+                    of
+                        Nothing ->
+                            let
+                                resultType : SwiftType
+                                resultType =
+                                    syntaxDeclarationValueOrFunction.type_
+                                        |> type_ typeAliasesInModule
+                            in
+                            { parameters =
+                                if resultType |> swiftTypeIsConcrete then
+                                    Nothing
 
-                        else
-                            Just []
-                    , statements = result.statements
-                    , resultType = resultType
-                    , result = result.result
-                    }
+                                else
+                                    Just []
+                            , statements = result.statements
+                            , resultType = resultType
+                            , result = result.result
+                            }
+
+                        Just resultTypeFunction ->
+                            let
+                                inputParameterName : String
+                                inputParameterName =
+                                    generatedParameterNameForIndex 0
+                            in
+                            { parameters =
+                                Just
+                                    [ { name = inputParameterName
+                                      , type_ =
+                                            resultTypeFunction.input
+                                                |> type_ typeAliasesInModule
+                                      }
+                                    ]
+                            , statements = result.statements
+                            , resultType =
+                                resultTypeFunction.output
+                                    |> type_ typeAliasesInModule
+                            , result =
+                                SwiftExpressionCall
+                                    { called = result.result
+                                    , arguments =
+                                        [ SwiftExpressionReference
+                                            { moduleOrigin = Nothing
+                                            , name = inputParameterName
+                                            }
+                                        ]
+                                    }
+                            }
                 )
                 (syntaxDeclarationValueOrFunction.result
                     |> expression
@@ -7563,10 +7664,6 @@ expression context expressionTypedNode =
                                                 if
                                                     case annotationWithExpandedAliases of
                                                         ElmSyntaxTypeInfer.TypeNotVariable (ElmSyntaxTypeInfer.TypeFunction _) ->
-                                                            -- TODO there is the case that the referenced declaration
-                                                            -- is a curried value declaration.
-                                                            -- preferred resolution: check when generating public static let,
-                                                            -- generate func with generated parameter instead if it's type is a function
                                                             True
 
                                                         _ ->
