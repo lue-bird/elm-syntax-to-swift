@@ -23,11 +23,12 @@ plus2 n =
         )
 -->
 Ok """import Foundation
+...
 public enum Elm {
     ..some default declarations..
 
     public static func Sample_plus2(_ n: Double) -> Double {
-        Basics_add(n, List_sum(Array_toList([ 2.0 ])))
+        Basics_add(n)(List_sum(Array_toList([ 2.0 ])))
     }
 }
 """
@@ -38,7 +39,7 @@ public enum Elm {
 -   not supported are
     -   ports that use non-json values like `port sendMessage : String -> Cmd msg`, glsl
     -   `elm/file`, `elm/http`, `elm/browser`, `elm-explorations/markdown`, `elm-explorations/webgl`, `elm-explorations/benchmark`
-    -   `Task`, `Process`, `Platform.Task`, `Platform.ProcessId`, `Platform.Router`, `Platform.sendToApp`, `Platform.sendToSelf`, `Random.generate`, `Time.now`, `Time.every`, `Time.here`, `Time.getZoneName`, `Bytes.getHostEndianness`, `Math.Matrix4.inverseOrthonormal`, `Math.Matrix4.mulAffine`
+    -   `Task`, `Process`, `Platform.Task`, `Platform.ProcessId`, `Platform.Router`, `Platform.sendToApp`, `Platform.sendToSelf`, `Random.generate`, `Time.now`, `Time.every`, `Time.here`, `Time.getZoneName`, `Bytes.getHostEndianness`, `Math.Matrix4` (due to swift's standard library not exposing many [simd types and operations available in apple's SDK](https://developer.apple.com/documentation/simd/simd_double4x4))
     -   extensible record types outside of module-level value/function declarations. For example, these declarations might not work:
         ```elm
         -- in variant value
@@ -51,7 +52,6 @@ public enum Elm {
         userId : { u | name : String, server : Domain } -> String
         ```
         In the non-allowed cases listed above, we assume that you intended to use a regular record type with only the extension fields which can lead to swift compile errors if you actually pass in additional fields.
--   elm-exploration/linear-algebra's `Vec2`, `Vec3`, `Vec4`, `Mat4` components have 64-bit precision but their swift counterparts only have 32
 -   dependencies cannot internally use the same module names as the transpiled project
 -   the resulting code might not be readable or even conventionally formatted and comments are not preserved
 -  on every web search you need to ignore -app -swiftui -ios -apple -xcode -taylor
@@ -83,8 +83,7 @@ You will find these types:
   - a transpiled elm app does not run itself.
     An elm main `Platform.worker` program type will literally just consist of fields `Init`, `Update` and `Subscriptions` where
     subscriptions/commands are returned as a list of `Elm.PlatformSub_SubSingle`/`Elm.PlatformCmd_CmdSingle` with possible elm subscriptions/commands in a choice type.
-    It's then your responsibility as "the platform" to perform effects, create events and manage the state. For an example see [example-worker/](https://github.com/lue-bird/elm-syntax-to-swift/tree/main/example-worker)
-  - TODO elm-exploration/linear-algebra's `Math.Matrix2.Vec2`, `Math.Matrix3.Vec3`, `Math.Matrix4.Vec4`, `Math.Matrix4.Mat4` will be of type [`System.Numerics.Vector2`](https://learn.microsoft.com/en-us/dotnet/api/system.numerics.vector2?view=net-9.0), [`System.Numerics.Vector3`](https://learn.microsoft.com/en-us/dotnet/api/system.numerics.vector3?view=net-9.0), [`System.Numerics.Vector4`](https://learn.microsoft.com/en-us/dotnet/api/system.numerics.vector4?view=net-9.0), [`System.Numerics.Matrix4x4`](https://learn.microsoft.com/en-us/dotnet/api/system.numerics.matrix4x4?view=net-9.0)
+    It's then your responsibility as "the platform" to perform effects, create events and manage the state. For an example see [example-worker/](https://github.com/lue-bird/elm-syntax-to-swift/tree/main/example-worker) TODO
 
 Compile the resulting swift to an executable:
 ```bash

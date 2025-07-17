@@ -96,6 +96,7 @@ public enum Elm {
     public static func Basics_eq<a: Equatable>(_ a: a) -> (a) -> Bool {
         { b in a == b }
     }
+    // TODO is this overload necessary?
     public static func Basics_eq<a>(_ a: a) -> (a) -> Bool {
         { b in
             if let a = a as? AnyHashable,
@@ -111,6 +112,7 @@ public enum Elm {
     public static func Basics_neq<a: Equatable>(_ a: a) -> (a) -> Bool {
         { b in a != b }
     }
+    // TODO is this overload necessary?
     public static func Basics_neq<a>(_ a: a) -> (a) -> Bool {
         { b in
             if let a = a as? AnyHashable,
@@ -3398,5 +3400,300 @@ public enum Elm {
                 + "\n\n"
                 + msg
         }
+    }
+
+    public typealias MathVector2_Vec2 = SIMD2<Double>
+    public typealias MathVector3_Vec3 = SIMD3<Double>
+    public typealias MathVector4_Vec4 = SIMD4<Double>
+
+    public static func MathVector2_vec2(_ x: Double) -> (Double) -> MathVector2_Vec2 {
+        { y in SIMD2(x, y) }
+    }
+    public static func MathVector2_fromRecord(_ vec2: (x: Double, y: Double)) -> MathVector2_Vec2 {
+        SIMD2(x: vec2.x, y: vec2.y)
+    }
+    public static func MathVector2_toRecord(_ vec2: MathVector2_Vec2) -> (x: Double, y: Double) {
+        (x: vec2.x, y: vec2.y)
+    }
+    public static func MathVector2_getX(_ vec2: MathVector2_Vec2) -> Double {
+        vec2.x
+    }
+    public static func MathVector2_getY(_ vec2: MathVector2_Vec2) -> Double {
+        vec2.y
+    }
+    public static func MathVector2_setX(_ newX: Double) -> (MathVector2_Vec2) -> MathVector2_Vec2 {
+        { vec2 in
+            var vec2Mutable = vec2
+            vec2Mutable.x = newX
+            return vec2Mutable
+        }
+    }
+    public static func MathVector2_setY(_ newY: Double) -> (MathVector2_Vec2) -> MathVector2_Vec2 {
+        { vec2 in
+            var vec2Mutable = vec2
+            vec2Mutable.y = newY
+            return vec2Mutable
+        }
+    }
+    public static func MathVector2_add(a: MathVector2_Vec2) -> (MathVector2_Vec2) ->
+        MathVector2_Vec2
+    {
+        { b in a + b }
+    }
+    public static func MathVector2_sub(_ a: MathVector2_Vec2) -> (MathVector2_Vec2) ->
+        MathVector2_Vec2
+    {
+        { b in a - b }
+    }
+    public static func MathVector2_negate(_ vec2: MathVector2_Vec2) -> MathVector2_Vec2 {
+        -vec2
+    }
+    public static func MathVector2_scale(_ factor: Double) -> (MathVector2_Vec2) -> MathVector2_Vec2
+    {
+        { vec2 in vec2 * factor }
+    }
+    public static func MathVector2_dot(_ a: MathVector2_Vec2) -> (MathVector2_Vec2) ->
+        Double
+    {
+        { b in a.x * b.x + a.y * b.y }
+    }
+    public static func MathVector2_normalize(_ vec2: MathVector2_Vec2) -> MathVector2_Vec2 {
+        vec2 / MathVector2_length(vec2)
+        // alternative: vec2 * vec2 / MathVector2_lengthSquared(vec2)
+    }
+    public static func MathVector2_direction(_ a: MathVector2_Vec2) -> (MathVector2_Vec2) ->
+        MathVector2_Vec2
+    {
+        { b in MathVector2_normalize(a - b) }
+    }
+    public static func MathVector2_length(_ vec2: MathVector2_Vec2) -> Double {
+        sqrt(vec2.x * vec2.x + vec2.y + vec2.y)
+    }
+    public static func MathVector2_lengthSquared(_ vec2: MathVector2_Vec2) -> Double {
+        vec2.x * vec2.x + vec2.y + vec2.y
+    }
+    public static func MathVector2_distance(_ a: MathVector2_Vec2) -> (MathVector2_Vec2) ->
+        Double
+    {
+        { b in MathVector2_length(a - b) }
+    }
+    public static func MathVector2_distanceSquared(_ a: MathVector2_Vec2) -> (MathVector2_Vec2) ->
+        Double
+    {
+        { b in MathVector2_lengthSquared(a - b) }
+    }
+
+    public static func MathVector3_i(_ x: Double) -> (Double) -> (Double) -> MathVector3_Vec3 {
+        { y in { z in SIMD3(1, 0, 0) } }
+    }
+    public static func MathVector3_j(_ x: Double) -> (Double) -> (Double) -> MathVector3_Vec3 {
+        { y in { z in SIMD3(0, 1, 0) } }
+    }
+    public static func MathVector3_k(_ x: Double) -> (Double) -> (Double) -> MathVector3_Vec3 {
+        { y in { z in SIMD3(0, 0, 1) } }
+    }
+    public static func MathVector3_vec3(_ x: Double) -> (Double) -> (Double) -> MathVector3_Vec3 {
+        { y in { z in SIMD3(x, y, z) } }
+    }
+    public static func MathVector3_fromRecord(_ vec3: (x: Double, y: Double, z: Double))
+        -> MathVector3_Vec3
+    {
+        SIMD3(x: vec3.x, y: vec3.y, z: vec3.z)
+    }
+    public static func MathVector3_toRecord(_ vec3: MathVector3_Vec3) -> (
+        x: Double, y: Double, z: Double
+    ) {
+        (x: vec3.x, y: vec3.y, z: vec3.z)
+    }
+    public static func MathVector3_getX(_ vec3: MathVector3_Vec3) -> Double {
+        vec3.x
+    }
+    public static func MathVector3_getY(_ vec3: MathVector3_Vec3) -> Double {
+        vec3.y
+    }
+    public static func MathVector3_getZ(_ vec3: MathVector3_Vec3) -> Double {
+        vec3.z
+    }
+    public static func MathVector3_setX(_ newX: Double) -> (MathVector3_Vec3) -> MathVector3_Vec3 {
+        { vec3 in
+            var vec3Mutable = vec3
+            vec3Mutable.x = newX
+            return vec3Mutable
+        }
+    }
+    public static func MathVector3_setY(_ newY: Double) -> (MathVector3_Vec3) -> MathVector3_Vec3 {
+        { vec3 in
+            var vec3Mutable = vec3
+            vec3Mutable.y = newY
+            return vec3Mutable
+        }
+    }
+    public static func MathVector3_setZ(_ newZ: Double) -> (MathVector3_Vec3) -> MathVector3_Vec3 {
+        { vec3 in
+            var vec3Mutable = vec3
+            vec3Mutable.z = newZ
+            return vec3Mutable
+        }
+    }
+    public static func MathVector3_add(a: MathVector3_Vec3) -> (MathVector3_Vec3) ->
+        MathVector3_Vec3
+    {
+        { b in a + b }
+    }
+    public static func MathVector3_sub(_ a: MathVector3_Vec3) -> (MathVector3_Vec3) ->
+        MathVector3_Vec3
+    {
+        { b in a - b }
+    }
+    public static func MathVector3_negate(_ vec3: MathVector3_Vec3) -> MathVector3_Vec3 {
+        -vec3
+    }
+    public static func MathVector3_scale(_ factor: Double) -> (MathVector3_Vec3) -> MathVector3_Vec3
+    {
+        { vec3 in vec3 * factor }
+    }
+    public static func MathVector3_dot(_ a: MathVector3_Vec3) -> (MathVector3_Vec3) ->
+        Double
+    {
+        { b in a.x * b.x + a.y * b.y + a.z * b.z }
+    }
+    public static func MathVector3_cross(_ a: MathVector3_Vec3) -> (MathVector3_Vec3) ->
+        MathVector3_Vec3
+    {
+        { b in
+            SIMD3(
+                a.y * b.z - a.z * b.y,
+                a.z * b.x - a.x * b.z,
+                a.x * b.y - a.y * b.x
+            )
+        }
+    }
+    public static func MathVector3_normalize(_ vec3: MathVector3_Vec3) -> MathVector3_Vec3 {
+        vec3 / MathVector3_length(vec3)
+        // alternative: vec3 * vec3 / MathVector3_lengthSquared(vec3)
+    }
+    public static func MathVector3_direction(_ a: MathVector3_Vec3) -> (MathVector3_Vec3) ->
+        MathVector3_Vec3
+    {
+        { b in MathVector3_normalize(a - b) }
+    }
+    public static func MathVector3_length(_ vec3: MathVector3_Vec3) -> Double {
+        sqrt(vec3.x * vec3.x + vec3.y + vec3.y + vec3.z * vec3.z)
+    }
+    public static func MathVector3_lengthSquared(_ vec3: MathVector3_Vec3) -> Double {
+        vec3.x * vec3.x + vec3.y + vec3.y + vec3.z * vec3.z
+    }
+    public static func MathVector3_distance(_ a: MathVector3_Vec3) -> (MathVector3_Vec3) ->
+        Double
+    {
+        { b in MathVector3_length(a - b) }
+    }
+    public static func MathVector3_distanceSquared(_ a: MathVector3_Vec3) -> (MathVector3_Vec3) ->
+        Double
+    {
+        { b in MathVector3_lengthSquared(a - b) }
+    }
+
+    public static func MathVector4_vec4(_ x: Double) -> (Double) -> (Double) -> (Double) ->
+        MathVector4_Vec4
+    {
+        { y in { z in { w in SIMD4(x, y, z, w) } } }
+    }
+    public static func MathVector4_fromRecord(_ vec4: (x: Double, y: Double, z: Double, w: Double))
+        -> MathVector4_Vec4
+    {
+        SIMD4(x: vec4.x, y: vec4.y, z: vec4.z, w: vec4.w)
+    }
+    public static func MathVector4_toRecord(_ vec4: MathVector4_Vec4) -> (
+        x: Double, y: Double, z: Double, w: Double
+    ) {
+        (x: vec4.x, y: vec4.y, z: vec4.z, w: vec4.w)
+    }
+    public static func MathVector4_getX(_ vec4: MathVector4_Vec4) -> Double {
+        vec4.x
+    }
+    public static func MathVector4_getY(_ vec4: MathVector4_Vec4) -> Double {
+        vec4.y
+    }
+    public static func MathVector4_getZ(_ vec4: MathVector4_Vec4) -> Double {
+        vec4.z
+    }
+    public static func MathVector4_getW(_ vec4: MathVector4_Vec4) -> Double {
+        vec4.w
+    }
+    public static func MathVector4_setX(_ newX: Double) -> (MathVector4_Vec4) -> MathVector4_Vec4 {
+        { vec4 in
+            var vec4Mutable = vec4
+            vec4Mutable.x = newX
+            return vec4Mutable
+        }
+    }
+    public static func MathVector4_setY(_ newY: Double) -> (MathVector4_Vec4) -> MathVector4_Vec4 {
+        { vec4 in
+            var vec4Mutable = vec4
+            vec4Mutable.y = newY
+            return vec4Mutable
+        }
+    }
+    public static func MathVector4_setZ(_ newZ: Double) -> (MathVector4_Vec4) -> MathVector4_Vec4 {
+        { vec4 in
+            var vec4Mutable = vec4
+            vec4Mutable.z = newZ
+            return vec4Mutable
+        }
+    }
+    public static func MathVector4_setW(_ newW: Double) -> (MathVector4_Vec4) -> MathVector4_Vec4 {
+        { vec4 in
+            var vec4Mutable = vec4
+            vec4Mutable.w = newW
+            return vec4Mutable
+        }
+    }
+    public static func MathVector4_add(a: MathVector4_Vec4) -> (MathVector4_Vec4) ->
+        MathVector4_Vec4
+    {
+        { b in a + b }
+    }
+    public static func MathVector4_sub(_ a: MathVector4_Vec4) -> (MathVector4_Vec4) ->
+        MathVector4_Vec4
+    {
+        { b in a - b }
+    }
+    public static func MathVector4_negate(_ vec4: MathVector4_Vec4) -> MathVector4_Vec4 {
+        -vec4
+    }
+    public static func MathVector4_scale(_ factor: Double) -> (MathVector4_Vec4) -> MathVector4_Vec4
+    {
+        { vec4 in vec4 * factor }
+    }
+    public static func MathVector4_dot(_ a: MathVector4_Vec4) -> (MathVector4_Vec4) ->
+        Double
+    {
+        { b in a.x * b.x + a.y * b.y + a.z * b.z + a.w * b.w }
+    }
+    public static func MathVector4_normalize(_ vec4: MathVector4_Vec4) -> MathVector4_Vec4 {
+        vec4 / MathVector4_length(vec4)
+        // alternative: vec4 * vec4 / MathVector4_lengthSquared(vec4)
+    }
+    public static func MathVector4_direction(_ a: MathVector4_Vec4) -> (MathVector4_Vec4) ->
+        MathVector4_Vec4
+    {
+        { b in MathVector4_normalize(a - b) }
+    }
+    public static func MathVector4_length(_ vec4: MathVector4_Vec4) -> Double {
+        sqrt(vec4.x * vec4.x + vec4.y + vec4.y + vec4.z * vec4.z + vec4.w * vec4.w)
+    }
+    public static func MathVector4_lengthSquared(_ vec4: MathVector4_Vec4) -> Double {
+        vec4.x * vec4.x + vec4.y + vec4.y + vec4.z * vec4.z + vec4.w * vec4.w
+    }
+    public static func MathVector4_distance(_ a: MathVector4_Vec4) -> (MathVector4_Vec4) ->
+        Double
+    {
+        { b in MathVector4_length(a - b) }
+    }
+    public static func MathVector4_distanceSquared(_ a: MathVector4_Vec4) -> (MathVector4_Vec4) ->
+        Double
+    {
+        { b in MathVector4_lengthSquared(a - b) }
     }
 }
