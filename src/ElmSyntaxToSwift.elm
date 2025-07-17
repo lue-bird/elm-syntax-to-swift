@@ -79,7 +79,7 @@ type SwiftPattern
 -}
 type SwiftExpression
     = SwiftExpressionDouble Float
-    | -- TODO currently represented as Double | SwiftExpressionInt64 Int
+    | -- NUMBER currently represented as Double | SwiftExpressionInt64 Int
       SwiftExpressionUnicodeScalar Char
     | SwiftExpressionStringLiteral String
     | SwiftExpressionReference
@@ -3245,7 +3245,7 @@ typeConstructReferenceToCoreSwift reference =
                     Just { moduleOrigin = Nothing, name = "Bool" }
 
                 "Int" ->
-                    -- TODO currently Int is treated as Float
+                    -- NUMBER currently Int is treated as Float
                     justSwiftReferenceDouble
 
                 "Float" ->
@@ -5102,7 +5102,7 @@ printSwiftPatternNotParenthesized swiftPattern =
                 Print.exactly "true"
 
         SwiftPatternInteger int64 ->
-            -- TODO currently represented as Double
+            -- NUMBER currently represented as Double
             Print.exactly (int64 |> Basics.toFloat |> String.fromFloat)
 
         SwiftPatternUnicodeScalar char ->
@@ -8277,9 +8277,6 @@ expression context expressionTypedNode =
             in
             Result.map3
                 (\declaration0 declaration1Up result ->
-                    -- TODO cleaner would be bubbling the declarations
-                    -- up as statements but we cant guarantee no name clashes
-                    -- so we need to prefix all declarations and their uses with context.path
                     { statements = []
                     , result =
                         SwiftExpressionCall
@@ -13106,7 +13103,7 @@ swiftPatternAsExpression swiftPattern =
                 swiftExpressionReferenceFalse
 
         SwiftPatternInteger int ->
-            -- TODO currently represented as Double
+            -- NUMBER currently represented as Double
             SwiftExpressionDouble (int |> Basics.toFloat)
 
         SwiftPatternUnicodeScalar char ->
