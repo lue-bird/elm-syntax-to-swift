@@ -553,8 +553,7 @@ printSwiftEnumDeclaration :
     { indirect : Bool
     , name : String
     , parameters : List String
-    , -- TODO rename to cases
-      variants : FastDict.Dict String (List SwiftType)
+    , cases : FastDict.Dict String (List SwiftType)
     }
     -> Print
 printSwiftEnumDeclaration swiftEnumType =
@@ -584,7 +583,7 @@ printSwiftEnumDeclaration swiftEnumType =
             (Print.withIndentAtNextMultipleOf4
                 (Print.linebreakIndented
                     |> Print.followedBy
-                        (swiftEnumType.variants
+                        (swiftEnumType.cases
                             |> FastDict.toList
                             |> Print.listMapAndIntersperseAndFlatten
                                 (\( name, values ) ->
@@ -5326,7 +5325,7 @@ modules :
                 FastDict.Dict
                     String
                     { parameters : List String
-                    , variants : FastDict.Dict String (List SwiftType)
+                    , cases : FastDict.Dict String (List SwiftType)
                     }
             }
         }
@@ -6452,7 +6451,7 @@ modules syntaxDeclarationsIncludingOverwrittenOnes =
                         |> FastDict.map
                             (\_ typeAliasInfo ->
                                 { parameters = typeAliasInfo.parameters
-                                , variants = typeAliasInfo.variants
+                                , cases = typeAliasInfo.variants
                                 }
                             )
                 , typeAliases =
@@ -10397,7 +10396,7 @@ type SwiftEnumTypeOrTypeAliasDeclaration
     = SwiftEnumTypeDeclaration
         { name : String
         , parameters : List String
-        , variants : FastDict.Dict String (List SwiftType)
+        , cases : FastDict.Dict String (List SwiftType)
         }
     | SwiftTypeAliasDeclaration
         { name : String
@@ -10417,7 +10416,7 @@ swiftTypeDeclarationsGroupByDependencies :
         List
             { name : String
             , parameters : List String
-            , variants : FastDict.Dict String (List SwiftType)
+            , cases : FastDict.Dict String (List SwiftType)
             }
     }
     ->
@@ -10445,7 +10444,7 @@ swiftTypeDeclarationsGroupByDependencies swiftTypeDeclarations =
                         (\enumDeclaration ->
                             ( SwiftEnumTypeDeclaration enumDeclaration
                             , enumDeclaration.name
-                            , enumDeclaration.variants
+                            , enumDeclaration.cases
                                 |> FastDict.foldl
                                     (\_ variantValues soFar ->
                                         FastSet.union soFar
@@ -13255,7 +13254,7 @@ swiftDeclarationsToModuleString :
         FastDict.Dict
             String
             { parameters : List String
-            , variants : FastDict.Dict String (List SwiftType)
+            , cases : FastDict.Dict String (List SwiftType)
             }
     }
     -> String
@@ -13285,7 +13284,7 @@ swiftDeclarationsToModuleString swiftDeclarations =
                             (\name info ->
                                 { name = name
                                 , parameters = info.parameters
-                                , variants = info.variants
+                                , cases = info.cases
                                 }
                             )
                 }
@@ -13314,7 +13313,7 @@ public enum Elm {
                                             { indirect = False
                                             , name = swiftEnumTypeDeclaration.name
                                             , parameters = swiftEnumTypeDeclaration.parameters
-                                            , variants = swiftEnumTypeDeclaration.variants
+                                            , cases = swiftEnumTypeDeclaration.cases
                                             }
 
                                     SwiftTypeAliasDeclaration aliasDeclaration ->
@@ -13332,7 +13331,7 @@ public enum Elm {
                                                     { indirect = True
                                                     , name = swiftEnumTypeDeclaration.name
                                                     , parameters = swiftEnumTypeDeclaration.parameters
-                                                    , variants = swiftEnumTypeDeclaration.variants
+                                                    , cases = swiftEnumTypeDeclaration.cases
                                                     }
 
                                             SwiftTypeAliasDeclaration aliasDeclaration ->
@@ -13350,7 +13349,7 @@ public enum Elm {
                                                                                 { indirect = True
                                                                                 , name = swiftEnumTypeDeclaration.name
                                                                                 , parameters = swiftEnumTypeDeclaration.parameters
-                                                                                , variants = swiftEnumTypeDeclaration.variants
+                                                                                , cases = swiftEnumTypeDeclaration.cases
                                                                                 }
 
                                                                         SwiftTypeAliasDeclaration aliasDeclaration ->
