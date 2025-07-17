@@ -2453,9 +2453,7 @@ swiftPatternCanBeUsedInSwiftDestructuring swiftPattern =
                 && (parts.part2Up |> List.all swiftPatternCanBeUsedInSwiftDestructuring)
 
 
-{-| TODO rename to case pattern?
--}
-pattern :
+casePattern :
     ElmSyntaxTypeInfer.TypedNode
         ElmSyntaxTypeInfer.Pattern
     ->
@@ -2463,11 +2461,11 @@ pattern :
         , introducedVariables : FastSet.Set String
         , variableAsPatternAliases : FastDict.Dict String SwiftPattern
         }
-pattern patternInferred =
-    patternInPath [] patternInferred
+casePattern patternInferred =
+    casePatternInPath [] patternInferred
 
 
-patternInPath :
+casePatternInPath :
     List String
     ->
         ElmSyntaxTypeInfer.TypedNode
@@ -2477,7 +2475,7 @@ patternInPath :
         , introducedVariables : FastSet.Set String
         , variableAsPatternAliases : FastDict.Dict String SwiftPattern
         }
-patternInPath path patternInferred =
+casePatternInPath path patternInferred =
     -- IGNORE TCO
     case patternInferred.value of
         ElmSyntaxTypeInfer.PatternIgnored ->
@@ -2517,17 +2515,17 @@ patternInPath path patternInferred =
             }
 
         ElmSyntaxTypeInfer.PatternParenthesized inParens ->
-            patternInPath path inParens
+            casePatternInPath path inParens
 
         ElmSyntaxTypeInfer.PatternTuple parts ->
             let
                 part0 : { pattern : SwiftPattern, introducedVariables : FastSet.Set String, variableAsPatternAliases : FastDict.Dict String SwiftPattern }
                 part0 =
-                    parts.part0 |> patternInPath ("0" :: path)
+                    parts.part0 |> casePatternInPath ("0" :: path)
 
                 part1 : { pattern : SwiftPattern, introducedVariables : FastSet.Set String, variableAsPatternAliases : FastDict.Dict String SwiftPattern }
                 part1 =
-                    parts.part1 |> patternInPath ("1" :: path)
+                    parts.part1 |> casePatternInPath ("1" :: path)
             in
             { pattern =
                 SwiftPatternTuple
@@ -2548,15 +2546,15 @@ patternInPath path patternInferred =
             let
                 part0 : { pattern : SwiftPattern, introducedVariables : FastSet.Set String, variableAsPatternAliases : FastDict.Dict String SwiftPattern }
                 part0 =
-                    parts.part0 |> patternInPath ("0" :: path)
+                    parts.part0 |> casePatternInPath ("0" :: path)
 
                 part1 : { pattern : SwiftPattern, introducedVariables : FastSet.Set String, variableAsPatternAliases : FastDict.Dict String SwiftPattern }
                 part1 =
-                    parts.part1 |> patternInPath ("1" :: path)
+                    parts.part1 |> casePatternInPath ("1" :: path)
 
                 part2 : { pattern : SwiftPattern, introducedVariables : FastSet.Set String, variableAsPatternAliases : FastDict.Dict String SwiftPattern }
                 part2 =
-                    parts.part2 |> patternInPath ("2" :: path)
+                    parts.part2 |> casePatternInPath ("2" :: path)
             in
             { pattern =
                 SwiftPatternTuple
@@ -2676,11 +2674,11 @@ patternInPath path patternInferred =
             let
                 head : { pattern : SwiftPattern, introducedVariables : FastSet.Set String, variableAsPatternAliases : FastDict.Dict String SwiftPattern }
                 head =
-                    listCons.head |> patternInPath ("head" :: path)
+                    listCons.head |> casePatternInPath ("head" :: path)
 
                 tail : { pattern : SwiftPattern, introducedVariables : FastSet.Set String, variableAsPatternAliases : FastDict.Dict String SwiftPattern }
                 tail =
-                    listCons.tail |> patternInPath ("tail" :: path)
+                    listCons.tail |> casePatternInPath ("tail" :: path)
             in
             { pattern =
                 SwiftPatternVariant
@@ -2707,7 +2705,7 @@ patternInPath path patternInferred =
                     elementPatterns
                         |> List.indexedMap
                             (\elementIndex element ->
-                                element |> patternInPath ((elementIndex |> String.fromInt) :: path)
+                                element |> casePatternInPath ((elementIndex |> String.fromInt) :: path)
                             )
             in
             { pattern =
@@ -2792,7 +2790,7 @@ patternInPath path patternInferred =
                             variant.values
                                 |> List.indexedMap
                                     (\valueIndex value ->
-                                        value |> patternInPath ((valueIndex |> String.fromInt) :: path)
+                                        value |> casePatternInPath ((valueIndex |> String.fromInt) :: path)
                                     )
                     in
                     { pattern =
@@ -2888,17 +2886,17 @@ patternFillingOutIgnoredPartsWithNewVariables path patternInferred =
             }
 
         ElmSyntaxTypeInfer.PatternParenthesized inParens ->
-            patternInPath path inParens
+            casePatternInPath path inParens
 
         ElmSyntaxTypeInfer.PatternTuple parts ->
             let
                 part0 : { pattern : SwiftPattern, introducedVariables : FastSet.Set String, variableAsPatternAliases : FastDict.Dict String SwiftPattern }
                 part0 =
-                    parts.part0 |> patternInPath ("0" :: path)
+                    parts.part0 |> casePatternInPath ("0" :: path)
 
                 part1 : { pattern : SwiftPattern, introducedVariables : FastSet.Set String, variableAsPatternAliases : FastDict.Dict String SwiftPattern }
                 part1 =
-                    parts.part1 |> patternInPath ("1" :: path)
+                    parts.part1 |> casePatternInPath ("1" :: path)
             in
             { pattern =
                 SwiftPatternTuple
@@ -2919,15 +2917,15 @@ patternFillingOutIgnoredPartsWithNewVariables path patternInferred =
             let
                 part0 : { pattern : SwiftPattern, introducedVariables : FastSet.Set String, variableAsPatternAliases : FastDict.Dict String SwiftPattern }
                 part0 =
-                    parts.part0 |> patternInPath ("0" :: path)
+                    parts.part0 |> casePatternInPath ("0" :: path)
 
                 part1 : { pattern : SwiftPattern, introducedVariables : FastSet.Set String, variableAsPatternAliases : FastDict.Dict String SwiftPattern }
                 part1 =
-                    parts.part1 |> patternInPath ("1" :: path)
+                    parts.part1 |> casePatternInPath ("1" :: path)
 
                 part2 : { pattern : SwiftPattern, introducedVariables : FastSet.Set String, variableAsPatternAliases : FastDict.Dict String SwiftPattern }
                 part2 =
-                    parts.part2 |> patternInPath ("2" :: path)
+                    parts.part2 |> casePatternInPath ("2" :: path)
             in
             { pattern =
                 SwiftPatternTuple
@@ -3051,11 +3049,11 @@ patternFillingOutIgnoredPartsWithNewVariables path patternInferred =
             let
                 head : { pattern : SwiftPattern, introducedVariables : FastSet.Set String, variableAsPatternAliases : FastDict.Dict String SwiftPattern }
                 head =
-                    listCons.head |> patternInPath ("head" :: path)
+                    listCons.head |> casePatternInPath ("head" :: path)
 
                 tail : { pattern : SwiftPattern, introducedVariables : FastSet.Set String, variableAsPatternAliases : FastDict.Dict String SwiftPattern }
                 tail =
-                    listCons.tail |> patternInPath ("tail" :: path)
+                    listCons.tail |> casePatternInPath ("tail" :: path)
             in
             { pattern =
                 SwiftPatternVariant
@@ -3082,7 +3080,7 @@ patternFillingOutIgnoredPartsWithNewVariables path patternInferred =
                     elementPatterns
                         |> List.indexedMap
                             (\elementIndex element ->
-                                element |> patternInPath ((elementIndex |> String.fromInt) :: path)
+                                element |> casePatternInPath ((elementIndex |> String.fromInt) :: path)
                             )
             in
             { pattern =
@@ -3146,7 +3144,7 @@ patternFillingOutIgnoredPartsWithNewVariables path patternInferred =
                             variant.values
                                 |> List.indexedMap
                                     (\valueIndex value ->
-                                        value |> patternInPath ((valueIndex |> String.fromInt) :: path)
+                                        value |> casePatternInPath ((valueIndex |> String.fromInt) :: path)
                                     )
 
                         reference : { moduleOrigin : Maybe String, name : String }
@@ -9468,7 +9466,7 @@ case_ context syntaxCase =
     let
         casePatternAsSwift : { pattern : SwiftPattern, introducedVariables : FastSet.Set String, variableAsPatternAliases : FastDict.Dict String SwiftPattern }
         casePatternAsSwift =
-            syntaxCase.pattern |> pattern
+            syntaxCase.pattern |> casePattern
     in
     Result.map
         (\result ->
