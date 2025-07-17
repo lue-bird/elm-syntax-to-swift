@@ -44,7 +44,9 @@ type SwiftType
         , part1 : SwiftType
         , part2Up : List SwiftType
         }
-    | SwiftTypeRecord (FastDict.Dict String SwiftType)
+    | SwiftTypeRecord
+        -- invariant: cannot have exactly one entry
+        (FastDict.Dict String SwiftType)
     | SwiftTypeVariable String
     | SwiftTypeFunction
         { input : List SwiftType
@@ -61,8 +63,9 @@ type SwiftPattern
     | SwiftPatternUnicodeScalar Char
     | SwiftPatternStringLiteral String
     | SwiftPatternVariable String
-    | -- TODO go through all uses and generate all unspecified fields with _ for ignored
-      SwiftPatternRecord (FastDict.Dict String SwiftPattern)
+    | SwiftPatternRecord
+        -- invariant: cannot have exactly one entry
+        (FastDict.Dict String SwiftPattern)
     | SwiftPatternVariant
         { originTypeName : Maybe String
         , name : String
@@ -835,7 +838,15 @@ typeNotVariable typeAliasesInModule inferredTypeNotVariable =
                             )
                             FastDict.empty
             in
-            SwiftTypeRecord swiftFields
+            SwiftTypeRecord
+                (if (swiftFields |> FastDict.size) == 1 then
+                    swiftFields
+                        |> FastDict.insert unusedDummyFieldNameBecauseSwiftDoesNotSupportSingleFieldRecord
+                            swiftTypeUnit
+
+                 else
+                    swiftFields
+                )
 
         ElmSyntaxTypeInfer.TypeFunction typeFunction ->
             SwiftTypeFunction
@@ -861,7 +872,15 @@ typeNotVariable typeAliasesInModule inferredTypeNotVariable =
                             )
                             FastDict.empty
             in
-            SwiftTypeRecord swiftFields
+            SwiftTypeRecord
+                (if (swiftFields |> FastDict.size) == 1 then
+                    swiftFields
+                        |> FastDict.insert unusedDummyFieldNameBecauseSwiftDoesNotSupportSingleFieldRecord
+                            swiftTypeUnit
+
+                 else
+                    swiftFields
+                )
 
 
 {-| Type position:
@@ -913,14 +932,7 @@ printSwiftTypeRecord position fields =
         Print.exactly "("
             |> Print.followedBy
                 (Print.withIndentIncreasedBy 1
-                    ((if (fields |> FastDict.size) >= 2 then
-                        fields
-
-                      else
-                        fields
-                            |> FastDict.insert unusedDummyFieldNameBecauseSwiftDoesNotSupportSingleFieldRecord
-                                swiftTypeUnit
-                     )
+                    (fields
                         |> FastDict.toList
                         |> Print.listMapAndIntersperseAndFlatten
                             (\( fieldName, fieldValue ) ->
@@ -2016,7 +2028,16 @@ inferredPatternUntilAsPatterns patternTypedNode =
                         )
                         fieldsDictEmptyIntroducedVariablesDictEmpty
             in
-            { pattern = SwiftPatternRecord combinedFieldNames.fields
+            { pattern =
+                SwiftPatternRecord
+                    (if (combinedFieldNames.fields |> FastDict.size) == 1 then
+                        combinedFieldNames.fields
+                            |> FastDict.insert unusedDummyFieldNameBecauseSwiftDoesNotSupportSingleFieldRecord
+                                SwiftPatternIgnore
+
+                     else
+                        combinedFieldNames.fields
+                    )
             , patternAliases = []
             }
 
@@ -2665,7 +2686,16 @@ casePatternInPath path patternInferred =
                         )
                         fieldsDictEmptyIntroducedVariablesDictEmpty
             in
-            { pattern = SwiftPatternRecord combinedFieldNames.fields
+            { pattern =
+                SwiftPatternRecord
+                    (if (combinedFieldNames.fields |> FastDict.size) == 1 then
+                        combinedFieldNames.fields
+                            |> FastDict.insert unusedDummyFieldNameBecauseSwiftDoesNotSupportSingleFieldRecord
+                                SwiftPatternIgnore
+
+                     else
+                        combinedFieldNames.fields
+                    )
             , introducedVariables = combinedFieldNames.introducedVariables
             , variableAsPatternAliases = FastDict.empty
             }
@@ -3040,7 +3070,16 @@ patternFillingOutIgnoredPartsWithNewVariables path patternInferred =
                         )
                         fieldsDictEmptyIntroducedVariablesDictEmpty
             in
-            { pattern = SwiftPatternRecord combinedFieldNames.fields
+            { pattern =
+                SwiftPatternRecord
+                    (if (combinedFieldNames.fields |> FastDict.size) == 1 then
+                        combinedFieldNames.fields
+                            |> FastDict.insert unusedDummyFieldNameBecauseSwiftDoesNotSupportSingleFieldRecord
+                                SwiftPatternIgnore
+
+                     else
+                        combinedFieldNames.fields
+                    )
             , introducedVariables = combinedFieldNames.introducedVariables
             , variableAsPatternAliases = FastDict.empty
             }
@@ -5066,14 +5105,7 @@ printSwiftPatternRecord : FastDict.Dict String SwiftPattern -> Print
 printSwiftPatternRecord recordFields =
     printExactlyParenOpening
         |> Print.followedBy
-            ((if (recordFields |> FastDict.size) >= 2 then
-                recordFields
-
-              else
-                recordFields
-                    |> FastDict.insert unusedDummyFieldNameBecauseSwiftDoesNotSupportSingleFieldRecord
-                        SwiftPatternIgnore
-             )
+            (recordFields
                 |> FastDict.toList
                 |> Print.listMapAndIntersperseAndFlatten
                     (\( fieldName, fieldValuePattern ) ->
@@ -5101,7 +5133,6 @@ printExactlyComma =
 
 unusedDummyFieldNameBecauseSwiftDoesNotSupportSingleFieldRecord : String
 unusedDummyFieldNameBecauseSwiftDoesNotSupportSingleFieldRecord =
-    -- TODO add when generating Swift syntax, not when printing
     "unusedDummyFieldBecauseSwiftDoesNotSupportSingleFieldRecord"
 
 
@@ -5114,15 +5145,8 @@ printSwiftExpressionRecord swiftRecordFields =
         let
             fieldsPrint : Print
             fieldsPrint =
-                (if (swiftRecordFields |> FastDict.size) >= 2 then
-                    swiftRecordFields |> FastDict.toList
-
-                 else
-                    swiftRecordFields
-                        |> FastDict.insert unusedDummyFieldNameBecauseSwiftDoesNotSupportSingleFieldRecord
-                            swiftExpressionUnit
-                        |> FastDict.toList
-                )
+                swiftRecordFields
+                    |> FastDict.toList
                     |> Print.listMapAndIntersperseAndFlatten
                         (\( fieldName, fieldValue ) ->
                             let
@@ -7384,6 +7408,21 @@ expression context expressionTypedNode =
                                     inferredTypeExpandToFunction
                                         expressionTypedNode.type_
                                         |> .inputs
+
+                                resultRecordFields : FastDict.Dict String SwiftExpression
+                                resultRecordFields =
+                                    (fieldName0 :: fieldName1Up)
+                                        |> List.foldl
+                                            (\fieldName soFar ->
+                                                soFar
+                                                    |> FastDict.insert fieldName
+                                                        (SwiftExpressionReference
+                                                            { moduleOrigin = Nothing
+                                                            , name = generatedFieldValueParameterName fieldName
+                                                            }
+                                                        )
+                                            )
+                                            FastDict.empty
                             in
                             Ok
                                 { statements = []
@@ -7416,18 +7455,13 @@ expression context expressionTypedNode =
                                                     }
                                             )
                                             (SwiftExpressionRecord
-                                                ((fieldName0 :: fieldName1Up)
-                                                    |> List.foldl
-                                                        (\fieldName soFar ->
-                                                            soFar
-                                                                |> FastDict.insert fieldName
-                                                                    (SwiftExpressionReference
-                                                                        { moduleOrigin = Nothing
-                                                                        , name = generatedFieldValueParameterName fieldName
-                                                                        }
-                                                                    )
-                                                        )
-                                                        FastDict.empty
+                                                (if (resultRecordFields |> FastDict.size) == 1 then
+                                                    resultRecordFields
+                                                        |> FastDict.insert unusedDummyFieldNameBecauseSwiftDoesNotSupportSingleFieldRecord
+                                                            swiftExpressionUnit
+
+                                                 else
+                                                    resultRecordFields
                                                 )
                                             )
                                 }
@@ -7820,6 +7854,16 @@ expression context expressionTypedNode =
         ElmSyntaxTypeInfer.ExpressionRecord fieldNodes ->
             Result.map
                 (\fields ->
+                    let
+                        fieldResults : FastDict.Dict String SwiftExpression
+                        fieldResults =
+                            fields
+                                |> List.foldl
+                                    (\( fieldName, fieldValue ) soFar ->
+                                        soFar |> FastDict.insert fieldName fieldValue.result
+                                    )
+                                    FastDict.empty
+                    in
                     { statements =
                         fields
                             |> List.concatMap
@@ -7828,9 +7872,14 @@ expression context expressionTypedNode =
                                 )
                     , result =
                         SwiftExpressionRecord
-                            (fields
-                                |> List.map (\( fieldName, fieldValue ) -> ( fieldName, fieldValue.result ))
-                                |> FastDict.fromList
+                            (if (fieldResults |> FastDict.size) == 1 then
+                                fieldResults
+                                    |> FastDict.insert
+                                        unusedDummyFieldNameBecauseSwiftDoesNotSupportSingleFieldRecord
+                                        swiftExpressionUnit
+
+                             else
+                                fieldResults
                             )
                     }
                 )
@@ -8686,6 +8735,7 @@ swiftExpressionCallCondense call =
 
 swiftExpressionContainsDelayedExecution : SwiftExpression -> Bool
 swiftExpressionContainsDelayedExecution swiftExpression =
+    -- IGNORE TCO
     case swiftExpression of
         SwiftExpressionDouble _ ->
             False
@@ -8800,6 +8850,7 @@ swiftExpressionInnermostLambdaResult swiftExpression =
 
 swiftStatementContainsDelayedExecution : SwiftStatement -> Bool
 swiftStatementContainsDelayedExecution swiftStatement =
+    -- IGNORE TCO
     case swiftStatement of
         SwiftStatementLetDeclarationUninitialized _ ->
             False
