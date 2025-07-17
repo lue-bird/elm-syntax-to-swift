@@ -6747,8 +6747,7 @@ valueOrFunctionDeclaration moduleContext syntaxDeclarationValueOrFunction =
                 (\result ->
                     case
                         syntaxDeclarationValueOrFunction.type_
-                            |> inferredTypeToFunction
-                                typeAliasesInModule
+                            |> inferredTypeToFunction typeAliasesInModule
                     of
                         Nothing ->
                             let
@@ -6787,14 +6786,13 @@ valueOrFunctionDeclaration moduleContext syntaxDeclarationValueOrFunction =
                                 resultTypeFunction.output
                                     |> type_ typeAliasesInModule
                             , result =
-                                SwiftExpressionCall
+                                swiftExpressionCallCondense
                                     { called = result.result
-                                    , arguments =
-                                        [ SwiftExpressionReference
+                                    , argument =
+                                        SwiftExpressionReference
                                             { moduleOrigin = Nothing
                                             , name = inputParameterName
                                             }
-                                        ]
                                     }
                             }
                 )
@@ -7134,12 +7132,12 @@ expression context expressionTypedNode =
                         argument1Up
                             |> List.foldl
                                 (\argument condensedSoFar ->
-                                    condenseExpressionCall
+                                    swiftExpressionCallCondense
                                         { called = condensedSoFar
                                         , argument = argument.result
                                         }
                                 )
-                                (condenseExpressionCall
+                                (swiftExpressionCallCondense
                                     { called = called.result
                                     , argument = argument0.result
                                     }
@@ -7187,7 +7185,7 @@ expression context expressionTypedNode =
                                 called.statements
                                     ++ argument.statements
                             , result =
-                                condenseExpressionCall
+                                swiftExpressionCallCondense
                                     { called = called.result
                                     , argument = argument.result
                                     }
@@ -7217,7 +7215,7 @@ expression context expressionTypedNode =
                                 called.statements
                                     ++ argument.statements
                             , result =
-                                condenseExpressionCall
+                                swiftExpressionCallCondense
                                     { called = called.result
                                     , argument = argument.result
                                     }
@@ -8598,12 +8596,12 @@ listMapToFastSetsAndUnify elementToSet list =
             FastSet.empty
 
 
-condenseExpressionCall :
+swiftExpressionCallCondense :
     { called : SwiftExpression
     , argument : SwiftExpression
     }
     -> SwiftExpression
-condenseExpressionCall call =
+swiftExpressionCallCondense call =
     case call.called of
         SwiftExpressionCall calledCall ->
             SwiftExpressionCall
@@ -8612,16 +8610,63 @@ condenseExpressionCall call =
                 }
 
         SwiftExpressionLambda calledLambda ->
-            case ( calledLambda.parameters |> List.map .name, calledLambda.result ) of
-                ( [ "generated_record" ], SwiftExpressionRecordAccess recordAccess ) ->
-                    -- TODO handle before converting called to swift
-                    SwiftExpressionRecordAccess
-                        { record = call.argument
-                        , field = recordAccess.field
-                        }
+            case calledLambda.parameters of
+                [ parameter ] ->
+                    if
+                        (call.argument |> swiftExpressionIsConstant)
+                            || (-- if we wanted to reduce whenever possible
+                                -- we would need to check
+                                -- that the parameter is used exactly once
+                                -- _and_ only in a non-delayed execution.
+                                -- We do a simpler thing because we don't strive
+                                -- for optimal, just eliminating e.g.
+                                -- { r in r.x }(...) or
+                                -- { a in Variant a }(...)
+                                ((call.called
+                                    |> swiftExpressionCountUsesOfReference
+                                        { moduleOrigin = Nothing, name = parameter.name }
+                                 )
+                                    == 1
+                                )
+                                    && Basics.not
+                                        (let
+                                            -- this is a bit awkward. potentially
+                                            -- try nested condensing call
+                                            calledLambdaResultInnermostLambdaResult : { statements : List SwiftStatement, result : SwiftExpression }
+                                            calledLambdaResultInnermostLambdaResult =
+                                                call.called
+                                                    |> swiftExpressionInnermostLambdaResult
+                                         in
+                                         swiftExpressionContainsDelayedExecution
+                                            calledLambdaResultInnermostLambdaResult.result
+                                            || List.any swiftStatementContainsDelayedExecution
+                                                calledLambdaResultInnermostLambdaResult.statements
+                                        )
+                               )
+                    then
+                        calledLambda.result
+                            |> swiftExpressionSubstituteReferences
+                                (\existingReference ->
+                                    if
+                                        case existingReference.moduleOrigin of
+                                            Nothing ->
+                                                existingReference.name == parameter.name
 
-                -- TODO possibly generalize when parameter is used once → fill in
-                -- useful for directly applied variant constructors
+                                            _ ->
+                                                False
+                                    then
+                                        call.argument
+
+                                    else
+                                        SwiftExpressionReference existingReference
+                                )
+
+                    else
+                        SwiftExpressionCall
+                            { called = SwiftExpressionLambda calledLambda
+                            , arguments = [ call.argument ]
+                            }
+
                 _ ->
                     SwiftExpressionCall
                         { called = SwiftExpressionLambda calledLambda
@@ -8731,6 +8776,657 @@ condenseExpressionCall call =
                 { called = call.called
                 , arguments = [ call.argument ]
                 }
+
+
+swiftExpressionContainsDelayedExecution : SwiftExpression -> Bool
+swiftExpressionContainsDelayedExecution swiftExpression =
+    case swiftExpression of
+        SwiftExpressionDouble _ ->
+            False
+
+        SwiftExpressionUnicodeScalar _ ->
+            False
+
+        SwiftExpressionStringLiteral _ ->
+            False
+
+        SwiftExpressionReference _ ->
+            False
+
+        SwiftExpressionVariant _ ->
+            False
+
+        SwiftExpressionNegateOperation inNegation ->
+            swiftExpressionContainsDelayedExecution inNegation
+
+        SwiftExpressionRecordAccess recordAccess ->
+            swiftExpressionContainsDelayedExecution recordAccess.record
+
+        SwiftExpressionTuple parts ->
+            (parts.part0 |> swiftExpressionContainsDelayedExecution)
+                || (parts.part1 |> swiftExpressionContainsDelayedExecution)
+                || (parts.part2Up |> List.any swiftExpressionContainsDelayedExecution)
+
+        SwiftExpressionArrayLiteral elements ->
+            elements |> List.any swiftExpressionContainsDelayedExecution
+
+        SwiftExpressionRecord fields ->
+            fields
+                |> fastDictAny
+                    (\_ fieldValue -> fieldValue |> swiftExpressionContainsDelayedExecution)
+
+        SwiftExpressionCall call ->
+            (call.called |> swiftExpressionContainsDelayedExecution)
+                || (call.arguments |> List.any swiftExpressionContainsDelayedExecution)
+
+        SwiftExpressionLambda _ ->
+            True
+
+        SwiftExpressionIfElse ifElse ->
+            (ifElse.condition |> swiftExpressionContainsDelayedExecution)
+                || (ifElse.onTrue |> swiftExpressionContainsDelayedExecution)
+                || (ifElse.onFalse |> swiftExpressionContainsDelayedExecution)
+
+        SwiftExpressionSwitch switch ->
+            (switch.matched |> swiftExpressionContainsDelayedExecution)
+                || (switch.case0.result |> swiftExpressionContainsDelayedExecution)
+                || (switch.case1Up
+                        |> List.any
+                            (\laterCase -> laterCase.result |> swiftExpressionContainsDelayedExecution)
+                   )
+
+
+swiftExpressionInnermostLambdaResult :
+    SwiftExpression
+    -> { statements : List SwiftStatement, result : SwiftExpression }
+swiftExpressionInnermostLambdaResult swiftExpression =
+    -- IGNORE TCO
+    case swiftExpression of
+        SwiftExpressionLambda lambda ->
+            let
+                resultInnermostLambdaResult : { statements : List SwiftStatement, result : SwiftExpression }
+                resultInnermostLambdaResult =
+                    swiftExpressionInnermostLambdaResult lambda.result
+            in
+            { statements = lambda.statements ++ resultInnermostLambdaResult.statements
+            , result = resultInnermostLambdaResult.result
+            }
+
+        SwiftExpressionDouble _ ->
+            { statements = [], result = swiftExpression }
+
+        SwiftExpressionUnicodeScalar _ ->
+            { statements = [], result = swiftExpression }
+
+        SwiftExpressionStringLiteral _ ->
+            { statements = [], result = swiftExpression }
+
+        SwiftExpressionReference _ ->
+            { statements = [], result = swiftExpression }
+
+        SwiftExpressionVariant _ ->
+            { statements = [], result = swiftExpression }
+
+        SwiftExpressionNegateOperation _ ->
+            { statements = [], result = swiftExpression }
+
+        SwiftExpressionRecordAccess _ ->
+            { statements = [], result = swiftExpression }
+
+        SwiftExpressionTuple _ ->
+            { statements = [], result = swiftExpression }
+
+        SwiftExpressionArrayLiteral _ ->
+            { statements = [], result = swiftExpression }
+
+        SwiftExpressionRecord _ ->
+            { statements = [], result = swiftExpression }
+
+        SwiftExpressionCall _ ->
+            { statements = [], result = swiftExpression }
+
+        SwiftExpressionIfElse _ ->
+            { statements = [], result = swiftExpression }
+
+        SwiftExpressionSwitch _ ->
+            { statements = [], result = swiftExpression }
+
+
+swiftStatementContainsDelayedExecution : SwiftStatement -> Bool
+swiftStatementContainsDelayedExecution swiftStatement =
+    case swiftStatement of
+        SwiftStatementLetDeclarationUninitialized _ ->
+            False
+
+        SwiftStatementFuncDeclaration _ ->
+            True
+
+        SwiftStatementLetDestructuring destructuring ->
+            swiftExpressionContainsDelayedExecution destructuring.expression
+
+        SwiftStatementVarDeclaration var ->
+            swiftExpressionContainsDelayedExecution var.value
+
+        SwiftStatementBindingAssignment assignment ->
+            swiftExpressionContainsDelayedExecution assignment.assignedValue
+
+        SwiftStatementRecordFieldAssignment assignment ->
+            swiftExpressionContainsDelayedExecution assignment.assignedValue
+
+        SwiftStatementLetDeclaration swiftStatementLetDeclaration ->
+            swiftExpressionContainsDelayedExecution swiftStatementLetDeclaration.result
+
+        SwiftStatementIfElse ifElse ->
+            (ifElse.condition |> swiftExpressionContainsDelayedExecution)
+                || (ifElse.onTrue |> List.any swiftStatementContainsDelayedExecution)
+                || (ifElse.onFalse |> List.any swiftStatementContainsDelayedExecution)
+
+        SwiftStatementSwitch switch ->
+            (switch.matched |> swiftExpressionContainsDelayedExecution)
+                || (switch.case0.statements |> List.any swiftStatementContainsDelayedExecution)
+                || (switch.case1Up
+                        |> List.any
+                            (\laterCase ->
+                                laterCase.statements |> List.any swiftStatementContainsDelayedExecution
+                            )
+                   )
+
+
+swiftExpressionIsConstant : SwiftExpression -> Bool
+swiftExpressionIsConstant swiftExpression =
+    case swiftExpression of
+        SwiftExpressionDouble _ ->
+            True
+
+        SwiftExpressionUnicodeScalar _ ->
+            True
+
+        SwiftExpressionStringLiteral _ ->
+            True
+
+        SwiftExpressionReference _ ->
+            True
+
+        SwiftExpressionVariant _ ->
+            True
+
+        SwiftExpressionNegateOperation _ ->
+            False
+
+        SwiftExpressionRecordAccess _ ->
+            False
+
+        SwiftExpressionTuple _ ->
+            False
+
+        SwiftExpressionArrayLiteral elements ->
+            elements |> List.isEmpty
+
+        SwiftExpressionRecord fields ->
+            fields |> FastDict.isEmpty
+
+        SwiftExpressionCall _ ->
+            False
+
+        SwiftExpressionLambda _ ->
+            False
+
+        SwiftExpressionIfElse _ ->
+            False
+
+        SwiftExpressionSwitch _ ->
+            False
+
+
+swiftExpressionCountUsesOfReference :
+    { moduleOrigin : Maybe String, name : String }
+    -> SwiftExpression
+    -> Int
+swiftExpressionCountUsesOfReference referenceToCountUsesOf swiftExpression =
+    -- IGNORE TCO
+    case swiftExpression of
+        SwiftExpressionReference reference ->
+            if
+                (reference.moduleOrigin == referenceToCountUsesOf.moduleOrigin)
+                    && (reference.name == referenceToCountUsesOf.name)
+            then
+                1
+
+            else
+                0
+
+        SwiftExpressionVariant _ ->
+            0
+
+        SwiftExpressionDouble _ ->
+            0
+
+        SwiftExpressionStringLiteral _ ->
+            0
+
+        SwiftExpressionUnicodeScalar _ ->
+            0
+
+        SwiftExpressionNegateOperation inNegation ->
+            swiftExpressionCountUsesOfReference referenceToCountUsesOf inNegation
+
+        SwiftExpressionRecordAccess recordAccess ->
+            swiftExpressionCountUsesOfReference referenceToCountUsesOf recordAccess.record
+
+        SwiftExpressionLambda lambda ->
+            swiftExpressionCountUsesOfReference referenceToCountUsesOf lambda.result
+                + (lambda.statements
+                    |> listMapAndSum
+                        (\statement ->
+                            statement |> swiftStatementCountUsesOfReference referenceToCountUsesOf
+                        )
+                  )
+
+        SwiftExpressionCall call ->
+            (call.called
+                |> swiftExpressionCountUsesOfReference referenceToCountUsesOf
+            )
+                + (call.arguments
+                    |> listMapAndSum
+                        (\argument ->
+                            argument |> swiftExpressionCountUsesOfReference referenceToCountUsesOf
+                        )
+                  )
+
+        SwiftExpressionArrayLiteral elements ->
+            elements
+                |> listMapAndSum
+                    (\element ->
+                        element |> swiftExpressionCountUsesOfReference referenceToCountUsesOf
+                    )
+
+        SwiftExpressionRecord fields ->
+            fields
+                |> FastDict.foldl
+                    (\_ fieldValue soFar ->
+                        soFar
+                            + (fieldValue |> swiftExpressionCountUsesOfReference referenceToCountUsesOf)
+                    )
+                    0
+
+        SwiftExpressionIfElse ifThenElse ->
+            (ifThenElse.condition
+                |> swiftExpressionCountUsesOfReference referenceToCountUsesOf
+            )
+                + (ifThenElse.onTrue
+                    |> swiftExpressionCountUsesOfReference referenceToCountUsesOf
+                  )
+                + (ifThenElse.onFalse
+                    |> swiftExpressionCountUsesOfReference referenceToCountUsesOf
+                  )
+
+        SwiftExpressionSwitch switch ->
+            (switch.matched
+                |> swiftExpressionCountUsesOfReference referenceToCountUsesOf
+            )
+                + ((switch.case0 :: switch.case1Up)
+                    |> listMapAndSum
+                        (\swiftCase ->
+                            swiftCase.result |> swiftExpressionCountUsesOfReference referenceToCountUsesOf
+                        )
+                  )
+
+        SwiftExpressionTuple parts ->
+            (parts.part0
+                |> swiftExpressionCountUsesOfReference referenceToCountUsesOf
+            )
+                + (parts.part1
+                    |> swiftExpressionCountUsesOfReference referenceToCountUsesOf
+                  )
+                + (parts.part2Up
+                    |> listMapAndSum
+                        (\part ->
+                            part |> swiftExpressionCountUsesOfReference referenceToCountUsesOf
+                        )
+                  )
+
+
+swiftStatementCountUsesOfReference :
+    { moduleOrigin : Maybe String, name : String }
+    -> SwiftStatement
+    -> Int
+swiftStatementCountUsesOfReference referenceToCountUsesOf swiftStatement =
+    -- IGNORE TCO
+    case swiftStatement of
+        SwiftStatementLetDeclarationUninitialized _ ->
+            0
+
+        SwiftStatementLetDestructuring destructuring ->
+            swiftExpressionCountUsesOfReference referenceToCountUsesOf
+                destructuring.expression
+
+        SwiftStatementLetDeclaration swiftStatementLetDeclaration ->
+            swiftExpressionCountUsesOfReference referenceToCountUsesOf
+                swiftStatementLetDeclaration.result
+
+        SwiftStatementFuncDeclaration funcDeclaration ->
+            (funcDeclaration.result
+                |> swiftExpressionCountUsesOfReference referenceToCountUsesOf
+            )
+                + (funcDeclaration.statements
+                    |> listMapAndSum
+                        (\statement ->
+                            statement |> swiftStatementCountUsesOfReference referenceToCountUsesOf
+                        )
+                  )
+
+        SwiftStatementVarDeclaration var ->
+            swiftExpressionCountUsesOfReference referenceToCountUsesOf
+                var.value
+
+        SwiftStatementBindingAssignment assignment ->
+            swiftExpressionCountUsesOfReference referenceToCountUsesOf
+                assignment.assignedValue
+
+        SwiftStatementRecordFieldAssignment assignment ->
+            swiftExpressionCountUsesOfReference referenceToCountUsesOf
+                assignment.assignedValue
+
+        SwiftStatementIfElse ifElse ->
+            (ifElse.condition
+                |> swiftExpressionCountUsesOfReference referenceToCountUsesOf
+            )
+                + (ifElse.onTrue
+                    |> listMapAndSum
+                        (\statement ->
+                            statement |> swiftStatementCountUsesOfReference referenceToCountUsesOf
+                        )
+                  )
+                + (ifElse.onFalse
+                    |> listMapAndSum
+                        (\statement ->
+                            statement |> swiftStatementCountUsesOfReference referenceToCountUsesOf
+                        )
+                  )
+
+        SwiftStatementSwitch switch ->
+            (switch.matched
+                |> swiftExpressionCountUsesOfReference referenceToCountUsesOf
+            )
+                + (switch.case0.statements
+                    |> listMapAndSum
+                        (\statement ->
+                            statement |> swiftStatementCountUsesOfReference referenceToCountUsesOf
+                        )
+                  )
+                + (switch.case1Up
+                    |> listMapAndSum
+                        (\laterCase ->
+                            laterCase.statements
+                                |> listMapAndSum
+                                    (\statement ->
+                                        statement |> swiftStatementCountUsesOfReference referenceToCountUsesOf
+                                    )
+                        )
+                  )
+
+
+listMapAndSum : (a -> Int) -> List a -> Int
+listMapAndSum elementToInt list =
+    listMapAndSumPlus 0 elementToInt list
+
+
+listMapAndSumPlus : Int -> (a -> Int) -> List a -> Int
+listMapAndSumPlus soFar elementToInt list =
+    case list of
+        [] ->
+            soFar
+
+        head :: tail ->
+            listMapAndSumPlus (soFar + (head |> elementToInt))
+                elementToInt
+                tail
+
+
+swiftExpressionSubstituteReferences :
+    ({ moduleOrigin : Maybe String, name : String } -> SwiftExpression)
+    -> SwiftExpression
+    -> SwiftExpression
+swiftExpressionSubstituteReferences referenceToExpression swiftExpression =
+    -- IGNORE TCO
+    case swiftExpression of
+        SwiftExpressionDouble _ ->
+            swiftExpression
+
+        SwiftExpressionUnicodeScalar _ ->
+            swiftExpression
+
+        SwiftExpressionStringLiteral _ ->
+            swiftExpression
+
+        SwiftExpressionVariant _ ->
+            swiftExpression
+
+        SwiftExpressionReference reference ->
+            reference |> referenceToExpression
+
+        SwiftExpressionNegateOperation inNegation ->
+            SwiftExpressionNegateOperation
+                (swiftExpressionSubstituteReferences referenceToExpression inNegation)
+
+        SwiftExpressionRecordAccess recordAccess ->
+            SwiftExpressionRecordAccess
+                { record =
+                    swiftExpressionSubstituteReferences referenceToExpression
+                        recordAccess.record
+                , field = recordAccess.field
+                }
+
+        SwiftExpressionLambda lambda ->
+            SwiftExpressionLambda
+                { parameters = lambda.parameters
+                , statements =
+                    lambda.statements
+                        |> List.map
+                            (\statement ->
+                                statement |> swiftStatementSubstituteReferences referenceToExpression
+                            )
+                , result = lambda.result |> swiftExpressionSubstituteReferences referenceToExpression
+                }
+
+        SwiftExpressionIfElse ifElse ->
+            SwiftExpressionIfElse
+                { condition = ifElse.condition |> swiftExpressionSubstituteReferences referenceToExpression
+                , onTrue = ifElse.onTrue |> swiftExpressionSubstituteReferences referenceToExpression
+                , onFalse = ifElse.onFalse |> swiftExpressionSubstituteReferences referenceToExpression
+                }
+
+        SwiftExpressionTuple parts ->
+            SwiftExpressionTuple
+                { part0 = parts.part0 |> swiftExpressionSubstituteReferences referenceToExpression
+                , part1 = parts.part1 |> swiftExpressionSubstituteReferences referenceToExpression
+                , part2Up =
+                    parts.part2Up
+                        |> List.map
+                            (\part ->
+                                part |> swiftExpressionSubstituteReferences referenceToExpression
+                            )
+                }
+
+        SwiftExpressionArrayLiteral elements ->
+            SwiftExpressionArrayLiteral
+                (elements
+                    |> List.map
+                        (\element ->
+                            element |> swiftExpressionSubstituteReferences referenceToExpression
+                        )
+                )
+
+        SwiftExpressionRecord fields ->
+            SwiftExpressionRecord
+                (fields
+                    |> FastDict.map
+                        (\_ fieldValue ->
+                            fieldValue |> swiftExpressionSubstituteReferences referenceToExpression
+                        )
+                )
+
+        SwiftExpressionCall call ->
+            SwiftExpressionCall
+                { called = call.called |> swiftExpressionSubstituteReferences referenceToExpression
+                , arguments =
+                    call.arguments
+                        |> List.map
+                            (\argument ->
+                                argument |> swiftExpressionSubstituteReferences referenceToExpression
+                            )
+                }
+
+        SwiftExpressionSwitch switch ->
+            SwiftExpressionSwitch
+                { matched = switch.matched |> swiftExpressionSubstituteReferences referenceToExpression
+                , case0 = switch.case0 |> swiftExpressionSwitchCaseSubstituteReferences referenceToExpression
+                , case1Up =
+                    switch.case1Up
+                        |> List.map
+                            (\switchCase ->
+                                switchCase
+                                    |> swiftExpressionSwitchCaseSubstituteReferences referenceToExpression
+                            )
+                }
+
+
+swiftExpressionSwitchCaseSubstituteReferences :
+    ({ moduleOrigin : Maybe String, name : String } -> SwiftExpression)
+    ->
+        { pattern : SwiftPattern
+        , result : SwiftExpression
+        }
+    ->
+        { pattern : SwiftPattern
+        , result : SwiftExpression
+        }
+swiftExpressionSwitchCaseSubstituteReferences referenceToExpression swiftCase =
+    { pattern = swiftCase.pattern
+    , result = swiftCase.result |> swiftExpressionSubstituteReferences referenceToExpression
+    }
+
+
+swiftStatementSubstituteReferences :
+    ({ moduleOrigin : Maybe String, name : String } -> SwiftExpression)
+    -> SwiftStatement
+    -> SwiftStatement
+swiftStatementSubstituteReferences referenceToExpression swiftStatement =
+    -- IGNORE TCO
+    case swiftStatement of
+        SwiftStatementLetDeclarationUninitialized _ ->
+            swiftStatement
+
+        SwiftStatementLetDestructuring letDestructuring ->
+            SwiftStatementLetDestructuring
+                { pattern = letDestructuring.pattern
+                , expression =
+                    letDestructuring.expression
+                        |> swiftExpressionSubstituteReferences referenceToExpression
+                }
+
+        SwiftStatementVarDeclaration varDeclaration ->
+            SwiftStatementVarDeclaration
+                { name = varDeclaration.name
+                , value =
+                    varDeclaration.value
+                        |> swiftExpressionSubstituteReferences referenceToExpression
+                }
+
+        SwiftStatementBindingAssignment assignment ->
+            SwiftStatementBindingAssignment
+                { name = assignment.name
+                , assignedValue =
+                    assignment.assignedValue
+                        |> swiftExpressionSubstituteReferences referenceToExpression
+                }
+
+        SwiftStatementRecordFieldAssignment assignment ->
+            SwiftStatementRecordFieldAssignment
+                { recordBindingName = assignment.recordBindingName
+                , fieldName = assignment.fieldName
+                , assignedValue =
+                    assignment.assignedValue
+                        |> swiftExpressionSubstituteReferences referenceToExpression
+                }
+
+        SwiftStatementLetDeclaration swiftStatementLetDeclaration ->
+            SwiftStatementLetDeclaration
+                { name = swiftStatementLetDeclaration.name
+                , resultType = swiftStatementLetDeclaration.resultType
+                , result =
+                    swiftStatementLetDeclaration.result
+                        |> swiftExpressionSubstituteReferences referenceToExpression
+                }
+
+        SwiftStatementFuncDeclaration funcDeclaration ->
+            SwiftStatementFuncDeclaration
+                { name = funcDeclaration.name
+                , parameters = funcDeclaration.parameters
+                , statements =
+                    funcDeclaration.statements
+                        |> List.map
+                            (\statement ->
+                                statement |> swiftStatementSubstituteReferences referenceToExpression
+                            )
+                , resultType = funcDeclaration.resultType
+                , result =
+                    funcDeclaration.result
+                        |> swiftExpressionSubstituteReferences referenceToExpression
+                }
+
+        SwiftStatementIfElse swiftStatementIfElse ->
+            SwiftStatementIfElse
+                { condition =
+                    swiftStatementIfElse.condition
+                        |> swiftExpressionSubstituteReferences referenceToExpression
+                , onTrue =
+                    swiftStatementIfElse.onTrue
+                        |> List.map
+                            (\statement ->
+                                statement |> swiftStatementSubstituteReferences referenceToExpression
+                            )
+                , onFalse =
+                    swiftStatementIfElse.onFalse
+                        |> List.map
+                            (\statement ->
+                                statement |> swiftStatementSubstituteReferences referenceToExpression
+                            )
+                }
+
+        SwiftStatementSwitch switch ->
+            SwiftStatementSwitch
+                { matched = switch.matched |> swiftExpressionSubstituteReferences referenceToExpression
+                , case0 = switch.case0 |> swiftStatementSwitchCaseSubstituteReferences referenceToExpression
+                , case1Up =
+                    switch.case1Up
+                        |> List.map
+                            (\switchCase ->
+                                switchCase
+                                    |> swiftStatementSwitchCaseSubstituteReferences referenceToExpression
+                            )
+                }
+
+
+swiftStatementSwitchCaseSubstituteReferences :
+    ({ moduleOrigin : Maybe String, name : String } -> SwiftExpression)
+    ->
+        { pattern : SwiftPattern
+        , statements : List SwiftStatement
+        }
+    ->
+        { pattern : SwiftPattern
+        , statements : List SwiftStatement
+        }
+swiftStatementSwitchCaseSubstituteReferences referenceToExpression swiftCase =
+    { pattern = swiftCase.pattern
+    , statements =
+        swiftCase.statements
+            |> List.map
+                (\statement ->
+                    statement |> swiftStatementSubstituteReferences referenceToExpression
+                )
+    }
 
 
 case_ :
