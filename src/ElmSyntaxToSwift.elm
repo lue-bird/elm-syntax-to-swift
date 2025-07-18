@@ -2485,7 +2485,12 @@ casePattern :
     ->
         { pattern : SwiftPattern
         , introducedVariables : FastSet.Set String
-        , variableAsPatternAliases : FastDict.Dict String SwiftPattern
+        , variableAsPatternAliases :
+            FastDict.Dict
+                String
+                { pattern : SwiftPattern
+                , type_ : ElmSyntaxTypeInfer.Type
+                }
         }
 casePattern patternInferred =
     casePatternInPath [] patternInferred
@@ -2499,7 +2504,12 @@ casePatternInPath :
     ->
         { pattern : SwiftPattern
         , introducedVariables : FastSet.Set String
-        , variableAsPatternAliases : FastDict.Dict String SwiftPattern
+        , variableAsPatternAliases :
+            FastDict.Dict
+                String
+                { pattern : SwiftPattern
+                , type_ : ElmSyntaxTypeInfer.Type
+                }
         }
 casePatternInPath path patternInferred =
     -- IGNORE TCO
@@ -2545,11 +2555,29 @@ casePatternInPath path patternInferred =
 
         ElmSyntaxTypeInfer.PatternTuple parts ->
             let
-                part0 : { pattern : SwiftPattern, introducedVariables : FastSet.Set String, variableAsPatternAliases : FastDict.Dict String SwiftPattern }
+                part0 :
+                    { pattern : SwiftPattern
+                    , introducedVariables : FastSet.Set String
+                    , variableAsPatternAliases :
+                        FastDict.Dict
+                            String
+                            { pattern : SwiftPattern
+                            , type_ : ElmSyntaxTypeInfer.Type
+                            }
+                    }
                 part0 =
                     parts.part0 |> casePatternInPath ("0" :: path)
 
-                part1 : { pattern : SwiftPattern, introducedVariables : FastSet.Set String, variableAsPatternAliases : FastDict.Dict String SwiftPattern }
+                part1 :
+                    { pattern : SwiftPattern
+                    , introducedVariables : FastSet.Set String
+                    , variableAsPatternAliases :
+                        FastDict.Dict
+                            String
+                            { pattern : SwiftPattern
+                            , type_ : ElmSyntaxTypeInfer.Type
+                            }
+                    }
                 part1 =
                     parts.part1 |> casePatternInPath ("1" :: path)
             in
@@ -2570,15 +2598,42 @@ casePatternInPath path patternInferred =
 
         ElmSyntaxTypeInfer.PatternTriple parts ->
             let
-                part0 : { pattern : SwiftPattern, introducedVariables : FastSet.Set String, variableAsPatternAliases : FastDict.Dict String SwiftPattern }
+                part0 :
+                    { pattern : SwiftPattern
+                    , introducedVariables : FastSet.Set String
+                    , variableAsPatternAliases :
+                        FastDict.Dict
+                            String
+                            { pattern : SwiftPattern
+                            , type_ : ElmSyntaxTypeInfer.Type
+                            }
+                    }
                 part0 =
                     parts.part0 |> casePatternInPath ("0" :: path)
 
-                part1 : { pattern : SwiftPattern, introducedVariables : FastSet.Set String, variableAsPatternAliases : FastDict.Dict String SwiftPattern }
+                part1 :
+                    { pattern : SwiftPattern
+                    , introducedVariables : FastSet.Set String
+                    , variableAsPatternAliases :
+                        FastDict.Dict
+                            String
+                            { pattern : SwiftPattern
+                            , type_ : ElmSyntaxTypeInfer.Type
+                            }
+                    }
                 part1 =
                     parts.part1 |> casePatternInPath ("1" :: path)
 
-                part2 : { pattern : SwiftPattern, introducedVariables : FastSet.Set String, variableAsPatternAliases : FastDict.Dict String SwiftPattern }
+                part2 :
+                    { pattern : SwiftPattern
+                    , introducedVariables : FastSet.Set String
+                    , variableAsPatternAliases :
+                        FastDict.Dict
+                            String
+                            { pattern : SwiftPattern
+                            , type_ : ElmSyntaxTypeInfer.Type
+                            }
+                    }
                 part2 =
                     parts.part2 |> casePatternInPath ("2" :: path)
             in
@@ -2707,11 +2762,29 @@ casePatternInPath path patternInferred =
 
         ElmSyntaxTypeInfer.PatternListCons listCons ->
             let
-                head : { pattern : SwiftPattern, introducedVariables : FastSet.Set String, variableAsPatternAliases : FastDict.Dict String SwiftPattern }
+                head :
+                    { pattern : SwiftPattern
+                    , introducedVariables : FastSet.Set String
+                    , variableAsPatternAliases :
+                        FastDict.Dict
+                            String
+                            { pattern : SwiftPattern
+                            , type_ : ElmSyntaxTypeInfer.Type
+                            }
+                    }
                 head =
                     listCons.head |> casePatternInPath ("head" :: path)
 
-                tail : { pattern : SwiftPattern, introducedVariables : FastSet.Set String, variableAsPatternAliases : FastDict.Dict String SwiftPattern }
+                tail :
+                    { pattern : SwiftPattern
+                    , introducedVariables : FastSet.Set String
+                    , variableAsPatternAliases :
+                        FastDict.Dict
+                            String
+                            { pattern : SwiftPattern
+                            , type_ : ElmSyntaxTypeInfer.Type
+                            }
+                    }
                 tail =
                     listCons.tail |> casePatternInPath ("tail" :: path)
             in
@@ -2728,7 +2801,17 @@ casePatternInPath path patternInferred =
 
         ElmSyntaxTypeInfer.PatternListExact elementPatterns ->
             let
-                elements : List { pattern : SwiftPattern, introducedVariables : FastSet.Set String, variableAsPatternAliases : FastDict.Dict String SwiftPattern }
+                elements :
+                    List
+                        { pattern : SwiftPattern
+                        , introducedVariables : FastSet.Set String
+                        , variableAsPatternAliases :
+                            FastDict.Dict
+                                String
+                                { pattern : SwiftPattern
+                                , type_ : ElmSyntaxTypeInfer.Type
+                                }
+                        }
                 elements =
                     elementPatterns
                         |> List.indexedMap
@@ -2801,7 +2884,17 @@ casePatternInPath path patternInferred =
                                             }
                                     }
 
-                        values : List { pattern : SwiftPattern, introducedVariables : FastSet.Set String, variableAsPatternAliases : FastDict.Dict String SwiftPattern }
+                        values :
+                            List
+                                { pattern : SwiftPattern
+                                , introducedVariables : FastSet.Set String
+                                , variableAsPatternAliases :
+                                    FastDict.Dict
+                                        String
+                                        { pattern : SwiftPattern
+                                        , type_ : ElmSyntaxTypeInfer.Type
+                                        }
+                                }
                         values =
                             variant.values
                                 |> List.indexedMap
@@ -2828,7 +2921,16 @@ casePatternInPath path patternInferred =
 
         ElmSyntaxTypeInfer.PatternAs patternAs ->
             let
-                aliasedPattern : { pattern : SwiftPattern, introducedVariables : FastSet.Set String, variableAsPatternAliases : FastDict.Dict String SwiftPattern }
+                aliasedPattern :
+                    { pattern : SwiftPattern
+                    , introducedVariables : FastSet.Set String
+                    , variableAsPatternAliases :
+                        FastDict.Dict
+                            String
+                            { pattern : SwiftPattern
+                            , type_ : ElmSyntaxTypeInfer.Type
+                            }
+                    }
                 aliasedPattern =
                     patternAs.pattern |> patternFillingOutIgnoredPartsWithNewVariables path
 
@@ -2843,7 +2945,9 @@ casePatternInPath path patternInferred =
             , variableAsPatternAliases =
                 aliasedPattern.variableAsPatternAliases
                     |> FastDict.insert variableDisambiguated
-                        aliasedPattern.pattern
+                        { pattern = aliasedPattern.pattern
+                        , type_ = patternAs.pattern.type_
+                        }
             }
 
 
@@ -2860,7 +2964,12 @@ patternFillingOutIgnoredPartsWithNewVariables :
     ->
         { pattern : SwiftPattern
         , introducedVariables : FastSet.Set String
-        , variableAsPatternAliases : FastDict.Dict String SwiftPattern
+        , variableAsPatternAliases :
+            FastDict.Dict
+                String
+                { pattern : SwiftPattern
+                , type_ : ElmSyntaxTypeInfer.Type
+                }
         }
 patternFillingOutIgnoredPartsWithNewVariables path patternInferred =
     -- IGNORE TCO
@@ -2905,17 +3014,35 @@ patternFillingOutIgnoredPartsWithNewVariables path patternInferred =
             }
 
         ElmSyntaxTypeInfer.PatternParenthesized inParens ->
-            casePatternInPath path inParens
+            patternFillingOutIgnoredPartsWithNewVariables path inParens
 
         ElmSyntaxTypeInfer.PatternTuple parts ->
             let
-                part0 : { pattern : SwiftPattern, introducedVariables : FastSet.Set String, variableAsPatternAliases : FastDict.Dict String SwiftPattern }
+                part0 :
+                    { pattern : SwiftPattern
+                    , introducedVariables : FastSet.Set String
+                    , variableAsPatternAliases :
+                        FastDict.Dict
+                            String
+                            { pattern : SwiftPattern
+                            , type_ : ElmSyntaxTypeInfer.Type
+                            }
+                    }
                 part0 =
-                    parts.part0 |> casePatternInPath ("0" :: path)
+                    parts.part0 |> patternFillingOutIgnoredPartsWithNewVariables ("0" :: path)
 
-                part1 : { pattern : SwiftPattern, introducedVariables : FastSet.Set String, variableAsPatternAliases : FastDict.Dict String SwiftPattern }
+                part1 :
+                    { pattern : SwiftPattern
+                    , introducedVariables : FastSet.Set String
+                    , variableAsPatternAliases :
+                        FastDict.Dict
+                            String
+                            { pattern : SwiftPattern
+                            , type_ : ElmSyntaxTypeInfer.Type
+                            }
+                    }
                 part1 =
-                    parts.part1 |> casePatternInPath ("1" :: path)
+                    parts.part1 |> patternFillingOutIgnoredPartsWithNewVariables ("1" :: path)
             in
             { pattern =
                 SwiftPatternTuple
@@ -2934,17 +3061,44 @@ patternFillingOutIgnoredPartsWithNewVariables path patternInferred =
 
         ElmSyntaxTypeInfer.PatternTriple parts ->
             let
-                part0 : { pattern : SwiftPattern, introducedVariables : FastSet.Set String, variableAsPatternAliases : FastDict.Dict String SwiftPattern }
+                part0 :
+                    { pattern : SwiftPattern
+                    , introducedVariables : FastSet.Set String
+                    , variableAsPatternAliases :
+                        FastDict.Dict
+                            String
+                            { pattern : SwiftPattern
+                            , type_ : ElmSyntaxTypeInfer.Type
+                            }
+                    }
                 part0 =
-                    parts.part0 |> casePatternInPath ("0" :: path)
+                    parts.part0 |> patternFillingOutIgnoredPartsWithNewVariables ("0" :: path)
 
-                part1 : { pattern : SwiftPattern, introducedVariables : FastSet.Set String, variableAsPatternAliases : FastDict.Dict String SwiftPattern }
+                part1 :
+                    { pattern : SwiftPattern
+                    , introducedVariables : FastSet.Set String
+                    , variableAsPatternAliases :
+                        FastDict.Dict
+                            String
+                            { pattern : SwiftPattern
+                            , type_ : ElmSyntaxTypeInfer.Type
+                            }
+                    }
                 part1 =
-                    parts.part1 |> casePatternInPath ("1" :: path)
+                    parts.part1 |> patternFillingOutIgnoredPartsWithNewVariables ("1" :: path)
 
-                part2 : { pattern : SwiftPattern, introducedVariables : FastSet.Set String, variableAsPatternAliases : FastDict.Dict String SwiftPattern }
+                part2 :
+                    { pattern : SwiftPattern
+                    , introducedVariables : FastSet.Set String
+                    , variableAsPatternAliases :
+                        FastDict.Dict
+                            String
+                            { pattern : SwiftPattern
+                            , type_ : ElmSyntaxTypeInfer.Type
+                            }
+                    }
                 part2 =
-                    parts.part2 |> casePatternInPath ("2" :: path)
+                    parts.part2 |> patternFillingOutIgnoredPartsWithNewVariables ("2" :: path)
             in
             { pattern =
                 SwiftPatternTuple
@@ -3075,13 +3229,31 @@ patternFillingOutIgnoredPartsWithNewVariables path patternInferred =
 
         ElmSyntaxTypeInfer.PatternListCons listCons ->
             let
-                head : { pattern : SwiftPattern, introducedVariables : FastSet.Set String, variableAsPatternAliases : FastDict.Dict String SwiftPattern }
+                head :
+                    { pattern : SwiftPattern
+                    , introducedVariables : FastSet.Set String
+                    , variableAsPatternAliases :
+                        FastDict.Dict
+                            String
+                            { pattern : SwiftPattern
+                            , type_ : ElmSyntaxTypeInfer.Type
+                            }
+                    }
                 head =
-                    listCons.head |> casePatternInPath ("head" :: path)
+                    listCons.head |> patternFillingOutIgnoredPartsWithNewVariables ("head" :: path)
 
-                tail : { pattern : SwiftPattern, introducedVariables : FastSet.Set String, variableAsPatternAliases : FastDict.Dict String SwiftPattern }
+                tail :
+                    { pattern : SwiftPattern
+                    , introducedVariables : FastSet.Set String
+                    , variableAsPatternAliases :
+                        FastDict.Dict
+                            String
+                            { pattern : SwiftPattern
+                            , type_ : ElmSyntaxTypeInfer.Type
+                            }
+                    }
                 tail =
-                    listCons.tail |> casePatternInPath ("tail" :: path)
+                    listCons.tail |> patternFillingOutIgnoredPartsWithNewVariables ("tail" :: path)
             in
             { pattern =
                 swiftPatternListCons head.pattern tail.pattern
@@ -3096,12 +3268,22 @@ patternFillingOutIgnoredPartsWithNewVariables path patternInferred =
 
         ElmSyntaxTypeInfer.PatternListExact elementPatterns ->
             let
-                elements : List { pattern : SwiftPattern, introducedVariables : FastSet.Set String, variableAsPatternAliases : FastDict.Dict String SwiftPattern }
+                elements :
+                    List
+                        { pattern : SwiftPattern
+                        , introducedVariables : FastSet.Set String
+                        , variableAsPatternAliases :
+                            FastDict.Dict
+                                String
+                                { pattern : SwiftPattern
+                                , type_ : ElmSyntaxTypeInfer.Type
+                                }
+                        }
                 elements =
                     elementPatterns
                         |> List.indexedMap
                             (\elementIndex element ->
-                                element |> casePatternInPath ((elementIndex |> String.fromInt) :: path)
+                                element |> patternFillingOutIgnoredPartsWithNewVariables ((elementIndex |> String.fromInt) :: path)
                             )
             in
             { pattern =
@@ -3148,12 +3330,22 @@ patternFillingOutIgnoredPartsWithNewVariables path patternInferred =
 
                 Nothing ->
                     let
-                        values : List { pattern : SwiftPattern, introducedVariables : FastSet.Set String, variableAsPatternAliases : FastDict.Dict String SwiftPattern }
+                        values :
+                            List
+                                { pattern : SwiftPattern
+                                , introducedVariables : FastSet.Set String
+                                , variableAsPatternAliases :
+                                    FastDict.Dict
+                                        String
+                                        { pattern : SwiftPattern
+                                        , type_ : ElmSyntaxTypeInfer.Type
+                                        }
+                                }
                         values =
                             variant.values
                                 |> List.indexedMap
                                     (\valueIndex value ->
-                                        value |> casePatternInPath ((valueIndex |> String.fromInt) :: path)
+                                        value |> patternFillingOutIgnoredPartsWithNewVariables ((valueIndex |> String.fromInt) :: path)
                                     )
 
                         reference : { moduleOrigin : Maybe String, name : String }
@@ -3196,7 +3388,16 @@ patternFillingOutIgnoredPartsWithNewVariables path patternInferred =
 
         ElmSyntaxTypeInfer.PatternAs patternAs ->
             let
-                aliasedPattern : { pattern : SwiftPattern, introducedVariables : FastSet.Set String, variableAsPatternAliases : FastDict.Dict String SwiftPattern }
+                aliasedPattern :
+                    { pattern : SwiftPattern
+                    , introducedVariables : FastSet.Set String
+                    , variableAsPatternAliases :
+                        FastDict.Dict
+                            String
+                            { pattern : SwiftPattern
+                            , type_ : ElmSyntaxTypeInfer.Type
+                            }
+                    }
                 aliasedPattern =
                     patternAs.pattern |> patternFillingOutIgnoredPartsWithNewVariables path
 
@@ -3211,7 +3412,9 @@ patternFillingOutIgnoredPartsWithNewVariables path patternInferred =
             , variableAsPatternAliases =
                 aliasedPattern.variableAsPatternAliases
                     |> FastDict.insert variableDisambiguated
-                        aliasedPattern.pattern
+                        { pattern = aliasedPattern.pattern
+                        , type_ = patternAs.pattern.type_
+                        }
             }
 
 
@@ -3228,7 +3431,12 @@ fieldsDictEmptyIntroducedVariablesDictEmpty =
 swiftPatternIgnoreIntroducedVariablesSetEmptyVariableAsPatternAliasesDictEmpty :
     { pattern : SwiftPattern
     , introducedVariables : FastSet.Set String
-    , variableAsPatternAliases : FastDict.Dict String SwiftPattern
+    , variableAsPatternAliases :
+        FastDict.Dict
+            String
+            { pattern : SwiftPattern
+            , type_ : ElmSyntaxTypeInfer.Type
+            }
     }
 swiftPatternIgnoreIntroducedVariablesSetEmptyVariableAsPatternAliasesDictEmpty =
     { pattern = SwiftPatternIgnore
@@ -9429,7 +9637,16 @@ case_ :
             }
 case_ context syntaxCase =
     let
-        casePatternAsSwift : { pattern : SwiftPattern, introducedVariables : FastSet.Set String, variableAsPatternAliases : FastDict.Dict String SwiftPattern }
+        casePatternAsSwift :
+            { pattern : SwiftPattern
+            , introducedVariables : FastSet.Set String
+            , variableAsPatternAliases :
+                FastDict.Dict
+                    String
+                    { pattern : SwiftPattern
+                    , type_ : ElmSyntaxTypeInfer.Type
+                    }
+            }
         casePatternAsSwift =
             syntaxCase.pattern |> casePattern
     in
@@ -9440,10 +9657,18 @@ case_ context syntaxCase =
                 casePatternAsSwift.variableAsPatternAliases
                     |> FastDict.foldl
                         (\variable aliasedPattern resultSoFar ->
-                            SwiftStatementLetDestructuring
-                                { pattern = SwiftPatternVariable variable
-                                , expression =
-                                    aliasedPattern |> swiftPatternAsExpression
+                            SwiftStatementLetDeclaration
+                                { name = variable
+                                , resultType =
+                                    aliasedPattern.type_
+                                        |> type_
+                                            (\moduleNameToAccess ->
+                                                context.moduleInfo
+                                                    |> FastDict.get moduleNameToAccess
+                                                    |> Maybe.map .typeAliases
+                                            )
+                                , result =
+                                    aliasedPattern.pattern |> swiftPatternAsExpression
                                 }
                                 :: resultSoFar
                         )
