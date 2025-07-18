@@ -2053,7 +2053,7 @@ inferredPatternUntilAsPatterns patternTypedNode =
             in
             { pattern =
                 SwiftPatternVariant
-                    { originTypeName = Nothing
+                    { originTypeName = Just "List_List"
                     , name = "List_Cons"
                     , values =
                         [ head.pattern
@@ -2080,7 +2080,7 @@ inferredPatternUntilAsPatterns patternTypedNode =
                     |> List.foldr
                         (\element soFar ->
                             SwiftPatternVariant
-                                { originTypeName = Nothing
+                                { originTypeName = Just "List_List"
                                 , name = "List_Cons"
                                 , values =
                                     [ element.pattern
@@ -2089,7 +2089,7 @@ inferredPatternUntilAsPatterns patternTypedNode =
                                 }
                         )
                         (SwiftPatternVariant
-                            { originTypeName = Nothing
+                            { originTypeName = Just "List_List"
                             , name = "List_Empty"
                             , values = []
                             }
@@ -2155,7 +2155,12 @@ inferredPatternUntilAsPatterns patternTypedNode =
                     in
                     { pattern =
                         SwiftPatternVariant
-                            { originTypeName = reference.moduleOrigin
+                            { originTypeName =
+                                Just
+                                    ((variant.moduleOrigin |> String.replace "." "")
+                                        ++ "_"
+                                        ++ variant.choiceTypeName
+                                    )
                             , name = reference.name
                             , values = values |> List.map .pattern
                             }
@@ -2712,7 +2717,7 @@ casePatternInPath path patternInferred =
             in
             { pattern =
                 SwiftPatternVariant
-                    { originTypeName = Nothing
+                    { originTypeName = Just "List_List"
                     , name = "List_Cons"
                     , values =
                         [ head.pattern
@@ -2743,7 +2748,7 @@ casePatternInPath path patternInferred =
                     |> List.foldr
                         (\element soFar ->
                             SwiftPatternVariant
-                                { originTypeName = Nothing
+                                { originTypeName = Just "List_List"
                                 , name = "List_Cons"
                                 , values =
                                     [ element.pattern
@@ -2752,7 +2757,7 @@ casePatternInPath path patternInferred =
                                 }
                         )
                         (SwiftPatternVariant
-                            { originTypeName = Nothing
+                            { originTypeName = Just "List_List"
                             , name = "List_Empty"
                             , values = []
                             }
@@ -2825,7 +2830,12 @@ casePatternInPath path patternInferred =
                     in
                     { pattern =
                         SwiftPatternVariant
-                            { originTypeName = reference.moduleOrigin
+                            { originTypeName =
+                                Just
+                                    ((variant.moduleOrigin |> String.replace "." "")
+                                        ++ "_"
+                                        ++ variant.choiceTypeName
+                                    )
                             , name = reference.name
                             , values = values |> List.map .pattern
                             }
@@ -3096,7 +3106,7 @@ patternFillingOutIgnoredPartsWithNewVariables path patternInferred =
             in
             { pattern =
                 SwiftPatternVariant
-                    { originTypeName = Nothing
+                    { originTypeName = Just "List_List"
                     , name = "List_Cons"
                     , values =
                         [ head.pattern
@@ -3127,7 +3137,7 @@ patternFillingOutIgnoredPartsWithNewVariables path patternInferred =
                     |> List.foldr
                         (\element soFar ->
                             SwiftPatternVariant
-                                { originTypeName = Nothing
+                                { originTypeName = Just "List_List"
                                 , name = "List_Cons"
                                 , values =
                                     [ element.pattern
@@ -3136,7 +3146,7 @@ patternFillingOutIgnoredPartsWithNewVariables path patternInferred =
                                 }
                         )
                         (SwiftPatternVariant
-                            { originTypeName = Nothing
+                            { originTypeName = Just "List_List"
                             , name = "List_Empty"
                             , values = []
                             }
@@ -3209,7 +3219,12 @@ patternFillingOutIgnoredPartsWithNewVariables path patternInferred =
                     in
                     { pattern =
                         SwiftPatternVariant
-                            { originTypeName = reference.moduleOrigin
+                            { originTypeName =
+                                Just
+                                    ((variant.moduleOrigin |> String.replace "." "")
+                                        ++ "_"
+                                        ++ variant.choiceTypeName
+                                    )
                             , name = reference.name
                             , values = values |> List.map .pattern
                             }
@@ -4648,6 +4663,32 @@ referenceToCoreSwift reference =
 
                 "sequence" ->
                     Just { moduleOrigin = Nothing, name = "BytesEncode_sequence" }
+
+                _ ->
+                    Nothing
+
+        "Elm.Kernel.Parser" ->
+            case reference.name of
+                "isSubString" ->
+                    Just { moduleOrigin = Nothing, name = "ElmKernelParser_isSubString" }
+
+                "isSubChar" ->
+                    Just { moduleOrigin = Nothing, name = "ElmKernelParser_isSubChar" }
+
+                "isAsciiCode" ->
+                    Just { moduleOrigin = Nothing, name = "ElmKernelParser_isAsciiCode" }
+
+                "chompBase10" ->
+                    Just { moduleOrigin = Nothing, name = "ElmKernelParser_chompBase10" }
+
+                "consumeBase" ->
+                    Just { moduleOrigin = Nothing, name = "ElmKernelParser_consumeBase" }
+
+                "consumeBase16" ->
+                    Just { moduleOrigin = Nothing, name = "ElmKernelParser_consumeBase16" }
+
+                "findSubString" ->
+                    Just { moduleOrigin = Nothing, name = "ElmKernelParser_findSubString" }
 
                 _ ->
                     Nothing
@@ -7315,6 +7356,12 @@ expression context expressionTypedNode =
                                         { moduleOrigin = reference.moduleOrigin
                                         , name = reference.name
                                         }
+
+                        swiftOriginTypeName : String
+                        swiftOriginTypeName =
+                            (reference.moduleOrigin |> String.replace "." "")
+                                ++ "_"
+                                ++ reference.choiceTypeName
                     in
                     Ok
                         { statements = []
@@ -7336,7 +7383,7 @@ expression context expressionTypedNode =
                             of
                                 [] ->
                                     SwiftExpressionVariant
-                                        { originTypeName = Nothing
+                                        { originTypeName = Just swiftOriginTypeName
                                         , name = swiftVariantName
                                         }
 
@@ -7369,7 +7416,7 @@ expression context expressionTypedNode =
                                             (SwiftExpressionCall
                                                 { called =
                                                     SwiftExpressionVariant
-                                                        { originTypeName = Nothing
+                                                        { originTypeName = Just swiftOriginTypeName
                                                         , name = swiftVariantName
                                                         }
                                                 , arguments =
@@ -13094,9 +13141,7 @@ swiftPatternAsExpression swiftPattern =
             case variant.values of
                 [] ->
                     SwiftExpressionVariant
-                        { originTypeName =
-                            -- Just variant.originTypeName
-                            Nothing
+                        { originTypeName = variant.originTypeName
                         , name = variant.name
                         }
 
@@ -27347,27 +27392,30 @@ public static func String_join(_ inBetween: String) -> (List_List<String>) -> St
 }
 
 public static func String_reverse(_ string: String) -> String {
-    String(decoding: Array(string.utf16).reversed(), as: UTF16.self)
+    String(decoding: string.utf16.reversed(), as: Unicode.UTF16.self)
 }
 
 public static func String_dropLeft(_ countToSkip: Double) -> (String) -> String {
     { string in
-        String(decoding: Array(string.utf16.dropFirst(Int(countToSkip))), as: UTF16.self)
+        String(decoding: string.utf16.dropFirst(Int(countToSkip)), as: Unicode.UTF16.self)
     }
 }
 
 public static func String_dropRight(_ countToSkip: Double) -> (String) -> String {
-    { string in String(decoding: Array(string.utf16.dropLast(Int(countToSkip))), as: UTF16.self)
+    { string in
+        String(decoding: string.utf16.dropLast(Int(countToSkip)), as: Unicode.UTF16.self)
     }
 }
 
 public static func String_left(_ countToTake: Double) -> (String) -> String {
-    { string in String(decoding: Array(string.utf16.prefix(Int(countToTake))), as: UTF16.self)
+    { string in
+        String(decoding: string.utf16.prefix(Int(countToTake)), as: Unicode.UTF16.self)
     }
 }
 
 public static func String_right(_ countToTake: Double) -> (String) -> String {
-    { string in String(decoding: Array(string.utf16.suffix(Int(countToTake))), as: UTF16.self)
+    { string in
+        String(decoding: string.utf16.suffix(Int(countToTake)), as: Unicode.UTF16.self)
     }
 }
 
@@ -27384,20 +27432,29 @@ public static func String_padRight(_ desiredLength: Double) -> (String) -> (Stri
 public static func String_padLeft(_ desiredLength: Double) -> (String) -> (String) -> String {
     { string in
         { padChar in
-            String(repeating: padChar, count: max(0, Int(desiredLength) - string.utf16.count))
+            String(
+                repeating: padChar,
+                count: max(0, Int(desiredLength) - string.utf16.count)
+            )
                 + string
         }
     }
 }
 
 public static func String_repeat(_ count: Double) -> (String) -> String {
-    { segment in String(repeating: segment, count: Int(count)) }
+    { segment in
+        String(repeating: segment, count: Int(count))
+    }
 }
 
 public static func String_replace(_ toReplace: String) -> (String) -> (String)
     -> String
 {
-    { replacement in { string in string.replacing(toReplace, with: replacement) } }
+    { replacement in
+        { string in
+            string.replacing(toReplace, with: replacement)
+        }
+    }
 }
 
 public static func String_toLower(_ string: String) -> String {
@@ -27417,7 +27474,7 @@ public static func String_trimLeft(_ string: String) -> String {
 }
 
 public static func String_trimRight(_ string: String) -> String {
-    let startToRestoreAfterTrimming =
+    let startToRestoreAfterTrimming: String.SubSequence =
         string.prefix(while: { character in
             character.isWhitespace || character.isNewline
         })
@@ -27430,9 +27487,7 @@ public static func String_trim(_ string: String) -> String {
 }
 
 public static func String_map(_ characterChange: @escaping (UnicodeScalar) -> UnicodeScalar)
-    -> (
-        String
-    ) -> String
+    -> (String) -> String
 {
     { string in
         String(String.UnicodeScalarView(string.unicodeScalars.map(characterChange)))
@@ -27440,11 +27495,10 @@ public static func String_map(_ characterChange: @escaping (UnicodeScalar) -> Un
 }
 
 public static func String_filter(_ keepCharacter: @escaping (UnicodeScalar) -> Bool) -> (String)
-    ->
-    String
+    -> String
 {
     { string in
-        String(String.UnicodeScalarView(string.unicodeScalars.filter(keepCharacter)))
+        String(string.unicodeScalars.filter(keepCharacter))
     }
 }
 
@@ -27456,12 +27510,13 @@ public static func String_split(_ separator: String) -> (String) -> List_List<St
     { string in
         Array_toList(
             string.split(separator: separator)
-                .map({ sub in String(sub) }))
+                .map({ sub in String(sub) })
+        )
     }
 }
 
-public static func String_all(_ isExpected: @escaping (UnicodeScalar) -> Bool) -> (String) ->
-    Bool
+public static func String_all(_ isExpected: @escaping (UnicodeScalar) -> Bool)
+    -> (String) -> Bool
 {
     { string in string.unicodeScalars.allSatisfy(isExpected) }
 }
@@ -27470,8 +27525,8 @@ public static func String_any(_ isOdd: @escaping (UnicodeScalar) -> Bool) -> (St
     { string in string.unicodeScalars.contains(where: isOdd) }
 }
 
-public static func String_slice(_ startInclusivePossiblyNegativeAsDouble: Double) -> (Double) ->
-    (String) -> String
+public static func String_slice(_ startInclusivePossiblyNegativeAsDouble: Double)
+    -> (Double) -> (String) -> String
 {
     { endExclusivePossiblyNegative in
         { string in
@@ -27489,15 +27544,14 @@ public static func String_slice(_ startInclusivePossiblyNegativeAsDouble: Double
                 ""
             } else {
                 String(
-                    decoding: string.utf16[
+                    string.utf16[
                         string.utf16.index(
                             string.utf16.startIndex, offsetBy: realStartIndexInclusive
                         )..<string.utf16.index(
                             string.utf16.startIndex, offsetBy: realEndIndexExclusive
                         )
-                    ],
-                    as: UTF16.self
-                )
+                    ]
+                ) ?? ""
             }
         }
     }
@@ -27512,9 +27566,9 @@ static func possiblyNegativeIndexForCount(index: Int, count: Int) -> Int {
     }
 }
 
-public static func String_foldl<Folded>(
-    _ reduce: @escaping (UnicodeScalar) -> (Folded) -> Folded
-) -> (Folded) -> (String) -> Folded {
+public static func String_foldl<state>(
+    _ reduce: @escaping (UnicodeScalar) -> (state) -> state
+) -> (state) -> (String) -> state {
     { initialFolded in
         { string in
             string.unicodeScalars.reduce(
@@ -27527,9 +27581,9 @@ public static func String_foldl<Folded>(
     }
 }
 
-public static func String_foldr<Folded>(
-    _ reduce: @escaping (UnicodeScalar) -> (Folded) -> Folded
-) -> (Folded) -> (String) -> Folded {
+public static func String_foldr<state>(
+    _ reduce: @escaping (UnicodeScalar) -> (state) -> state
+) -> (state) -> (String) -> state {
     { initialFolded in
         { string in
             string.unicodeScalars.reversed().reduce(
@@ -28234,11 +28288,11 @@ public static func List_length<a>(_ list: List_List<a>) -> Double {
     Double(List_foldl({ (_, soFar) in soFar + 1 }, 0, list))
 }
 
-private static func List_foldl<a, Folded>(
-    _ reduce: (a, Folded) -> Folded,
-    _ initialFolded: Folded,
+private static func List_foldl<a, state>(
+    _ reduce: (a, state) -> state,
+    _ initialFolded: state,
     _ list: List_List<a>
-) -> Folded {
+) -> state {
     var foldedSoFar = initialFolded
     var remainingList = list
     while true {
@@ -28251,9 +28305,9 @@ private static func List_foldl<a, Folded>(
         }
     }
 }
-public static func List_foldl<a, Folded>(
-    _ reduce: @escaping (a) -> (Folded) -> Folded
-) -> (Folded) -> (List_List<a>) -> Folded {
+public static func List_foldl<a, state>(
+    _ reduce: @escaping (a) -> (state) -> state
+) -> (state) -> (List_List<a>) -> state {
     { initialFolded in
         { list in
             var foldedSoFar = initialFolded
@@ -28271,16 +28325,16 @@ public static func List_foldl<a, Folded>(
     }
 }
 
-private static func List_foldr<a, Folded>(
-    _ reduce: (a, Folded) -> Folded,
-    _ initialFolded: Folded,
+private static func List_foldr<a, state>(
+    _ reduce: (a, state) -> state,
+    _ initialFolded: state,
     _ list: List_List<a>
-) -> Folded {
+) -> state {
     List_foldl(reduce, initialFolded, List_reverse(list))
 }
-public static func List_foldr<a, Folded>(
-    _ reduce: @escaping (a) -> (Folded) -> Folded,
-) -> (Folded) -> (List_List<a>) -> Folded {
+public static func List_foldr<a, state>(
+    _ reduce: @escaping (a) -> (state) -> state,
+) -> (state) -> (List_List<a>) -> state {
     { initialFolded in { list in List_foldl(reduce)(initialFolded)(List_reverse(list)) } }
 }
 
@@ -30324,13 +30378,13 @@ public static func MathVector2_length(_ vec2: MathVector2_Vec2) -> Double {
 public static func MathVector2_lengthSquared(_ vec2: MathVector2_Vec2) -> Double {
     vec2.x * vec2.x + vec2.y + vec2.y
 }
-public static func MathVector2_distance(_ a: MathVector2_Vec2) -> (MathVector2_Vec2) ->
-    Double
+public static func MathVector2_distance(_ a: MathVector2_Vec2)
+    -> (MathVector2_Vec2) -> Double
 {
     { b in MathVector2_length(a - b) }
 }
-public static func MathVector2_distanceSquared(_ a: MathVector2_Vec2) -> (MathVector2_Vec2) ->
-    Double
+public static func MathVector2_distanceSquared(_ a: MathVector2_Vec2)
+    -> (MathVector2_Vec2) -> Double
 {
     { b in MathVector2_lengthSquared(a - b) }
 }
@@ -30368,21 +30422,21 @@ public static func MathVector3_getZ(_ vec3: MathVector3_Vec3) -> Double {
 }
 public static func MathVector3_setX(_ newX: Double) -> (MathVector3_Vec3) -> MathVector3_Vec3 {
     { vec3 in
-        var vec3Mutable = vec3
+        var vec3Mutable: MathVector3_Vec3 = vec3
         vec3Mutable.x = newX
         return vec3Mutable
     }
 }
 public static func MathVector3_setY(_ newY: Double) -> (MathVector3_Vec3) -> MathVector3_Vec3 {
     { vec3 in
-        var vec3Mutable = vec3
+        var vec3Mutable: MathVector3_Vec3 = vec3
         vec3Mutable.y = newY
         return vec3Mutable
     }
 }
 public static func MathVector3_setZ(_ newZ: Double) -> (MathVector3_Vec3) -> MathVector3_Vec3 {
     { vec3 in
-        var vec3Mutable = vec3
+        var vec3Mutable: MathVector3_Vec3 = vec3
         vec3Mutable.z = newZ
         return vec3Mutable
     }
@@ -30475,28 +30529,28 @@ public static func MathVector4_getW(_ vec4: MathVector4_Vec4) -> Double {
 }
 public static func MathVector4_setX(_ newX: Double) -> (MathVector4_Vec4) -> MathVector4_Vec4 {
     { vec4 in
-        var vec4Mutable = vec4
+        var vec4Mutable: MathVector4_Vec4 = vec4
         vec4Mutable.x = newX
         return vec4Mutable
     }
 }
 public static func MathVector4_setY(_ newY: Double) -> (MathVector4_Vec4) -> MathVector4_Vec4 {
     { vec4 in
-        var vec4Mutable = vec4
+        var vec4Mutable: MathVector4_Vec4 = vec4
         vec4Mutable.y = newY
         return vec4Mutable
     }
 }
 public static func MathVector4_setZ(_ newZ: Double) -> (MathVector4_Vec4) -> MathVector4_Vec4 {
     { vec4 in
-        var vec4Mutable = vec4
+        var vec4Mutable: MathVector4_Vec4 = vec4
         vec4Mutable.z = newZ
         return vec4Mutable
     }
 }
 public static func MathVector4_setW(_ newW: Double) -> (MathVector4_Vec4) -> MathVector4_Vec4 {
     { vec4 in
-        var vec4Mutable = vec4
+        var vec4Mutable: MathVector4_Vec4 = vec4
         vec4Mutable.w = newW
         return vec4Mutable
     }
@@ -30518,8 +30572,8 @@ public static func MathVector4_scale(_ factor: Double) -> (MathVector4_Vec4) -> 
 {
     { vec4 in vec4 * factor }
 }
-public static func MathVector4_dot(_ a: MathVector4_Vec4) -> (MathVector4_Vec4) ->
-    Double
+public static func MathVector4_dot(_ a: MathVector4_Vec4)
+    -> (MathVector4_Vec4) -> Double
 {
     { b in a.x * b.x + a.y * b.y + a.z * b.z + a.w * b.w }
 }
@@ -30527,8 +30581,8 @@ public static func MathVector4_normalize(_ vec4: MathVector4_Vec4) -> MathVector
     vec4 / MathVector4_length(vec4)
     // alternative: vec4 * vec4 / MathVector4_lengthSquared(vec4)
 }
-public static func MathVector4_direction(_ a: MathVector4_Vec4) -> (MathVector4_Vec4) ->
-    MathVector4_Vec4
+public static func MathVector4_direction(_ a: MathVector4_Vec4)
+    -> (MathVector4_Vec4) -> MathVector4_Vec4
 {
     { b in MathVector4_normalize(a - b) }
 }
@@ -30538,14 +30592,264 @@ public static func MathVector4_length(_ vec4: MathVector4_Vec4) -> Double {
 public static func MathVector4_lengthSquared(_ vec4: MathVector4_Vec4) -> Double {
     vec4.x * vec4.x + vec4.y + vec4.y + vec4.z * vec4.z + vec4.w * vec4.w
 }
-public static func MathVector4_distance(_ a: MathVector4_Vec4) -> (MathVector4_Vec4) ->
-    Double
+public static func MathVector4_distance(_ a: MathVector4_Vec4)
+    -> (MathVector4_Vec4) -> Double
 {
     { b in MathVector4_length(a - b) }
 }
-public static func MathVector4_distanceSquared(_ a: MathVector4_Vec4) -> (MathVector4_Vec4) ->
-    Double
+public static func MathVector4_distanceSquared(_ a: MathVector4_Vec4)
+    -> (MathVector4_Vec4) -> Double
 {
     { b in MathVector4_lengthSquared(a - b) }
+}
+
+private static func stringUtf16CodePointAt(_ string: String, _ offset: Int)
+    -> Unicode.UTF16.CodeUnit
+{
+    string.utf16[
+        string.utf16.index(
+            string.utf16.startIndex,
+            offsetBy: offset
+        )
+    ]
+}
+private static func surrogatePairToUnicodeScalar(
+    _ left: Unicode.UTF16.CodeUnit,
+    _ right: Unicode.UTF16.CodeUnit
+) -> UnicodeScalar? {
+    UnicodeScalar(
+        String(
+            decoding: [left, right],
+            as: Unicode.UTF16.self
+        )
+    )
+}
+
+public static func ElmKernelParser_isSubString(_ smallString: String)
+    -> (Double)
+    -> (Double)
+    -> (Double)
+    -> (String)
+    -> (Double, Double, Double)
+{
+    { offsetOriginal in
+        { rowOriginal in
+            { colOriginal in
+                { bigString in
+                    let smallLength: Int = smallString.utf16.count
+                    var row: Int = Int(rowOriginal)
+                    var col: Int = Int(colOriginal)
+                    var offset: Int = Int(offsetOriginal)
+                    var isGood: Bool = Int(offset) + smallLength <= bigString.utf16.count
+                    var i: Int = 0
+                    while isGood && i < smallLength {
+                        let code: Unicode.UTF16.CodeUnit =
+                            stringUtf16CodePointAt(bigString, offset)
+                        isGood =
+                            stringUtf16CodePointAt(smallString, i)
+                            == stringUtf16CodePointAt(bigString, offset)
+
+                        if code == 0x000A /* \\n */ {
+                            i = i + 1
+                            row = row + 1
+                            col = 1
+                        } else {
+                            col = col + 1
+                            if Unicode.UTF16.isSurrogate(code) {
+                                isGood =
+                                    isGood
+                                    && (stringUtf16CodePointAt(smallString, i + 1)
+                                        == stringUtf16CodePointAt(bigString, offset + 1))
+                                i = i + 2
+                                offset = offset + 2
+                            } else {
+                                i = i + 1
+                            }
+                        }
+                    }
+                    return if isGood {
+                        (Double(offset), Double(row), Double(col))
+                    } else {
+                        (-1, Double(row), Double(col))
+                    }
+                }
+            }
+        }
+    }
+}
+
+public static func ElmKernelParser_isSubChar(_ predicate: @escaping (UnicodeScalar) -> Bool)
+    -> (Double) -> (String) -> Double
+{
+    { offset in
+        { string in
+            let offsetInt: Int = Int(offset)
+            return if string.utf16.count <= offsetInt {
+                -1
+            } else if Unicode.UTF16.isSurrogate(stringUtf16CodePointAt(string, offsetInt)) {
+                if predicate(
+                    surrogatePairToUnicodeScalar(
+                        stringUtf16CodePointAt(string, offsetInt),
+                        stringUtf16CodePointAt(string, offsetInt + 1),
+                    ) ?? "\\0"
+                ) {
+                    offset + 2
+                } else {
+                    -1
+                }
+            } else if predicate(
+                UnicodeScalar(stringUtf16CodePointAt(string, offsetInt)) ?? "\\0"
+            ) {
+                if stringUtf16CodePointAt(string, offsetInt) == 0x000A /* \\n */ {
+                    -2
+                } else {
+                    offset + 1
+                }
+            } else {
+                -1
+            }
+        }
+    }
+}
+
+public static func ElmKernelParser_isAsciiCode(_ code: Double)
+    -> (Double) -> (String) -> Bool
+{
+    { offset in
+        { string in
+            Double(stringUtf16CodePointAt(string, Int(offset))) == code
+        }
+    }
+}
+
+public static func ElmKernelParser_chompBase10(_ offsetOriginal: Double)
+    -> (String) -> Double
+{
+    { string in
+        var offset: Int = Int(offsetOriginal)
+        var foundNonBase10: Bool = false
+        while (offset < string.utf16.count) && !(foundNonBase10) {
+            let code: Unicode.UTF16.CodeUnit = stringUtf16CodePointAt(string, offset)
+            foundNonBase10 = !(code < 0x30 || 0x39 < code)
+            offset = offset + 1
+        }
+        return Double(offset)
+    }
+}
+
+public static func ElmKernelParser_consumeBase(_ baseAsDouble: Double)
+    -> (Double) -> (String) -> (Double, Double)
+{
+    { offsetOriginal in
+        { string in
+            let base: Int = Int(baseAsDouble)
+            var offset: Int = Int(offsetOriginal)
+            var total: Int = 0
+            var foundNonBase: Bool = false
+            while (offset < string.utf16.count) && !(foundNonBase) {
+                let digit: Int = Int(stringUtf16CodePointAt(string, offset) - 0x30)
+                if digit < 0 || base <= digit {
+                    foundNonBase = true
+                } else {
+                    total = base * total + digit
+                    offset = offset + 1
+                }
+            }
+            return (Double(offset), Double(total))
+        }
+    }
+}
+
+public static func ElmKernelParser_consumeBase16(_ offsetOriginal: Double)
+    -> (String) -> (Double, Double)
+{
+    { string in
+        var offset: Int = Int(offsetOriginal)
+        var total: Int = 0
+        var foundNonBase16: Bool = false
+        while (offset < string.utf16.count) && !(foundNonBase16) {
+            let code: Unicode.UTF16.CodeUnit = stringUtf16CodePointAt(string, offset)
+            if 0x30 <= code && code <= 0x39 {
+                total = 16 * total + Int(code) - 0x30
+                offset = offset + 1
+            } else if 0x41 <= code && code <= 0x46 {
+                total = 16 * total + Int(code) - 55
+                offset = offset + 1
+            } else if 0x61 <= code && code <= 0x66 {
+                total = 16 * total + Int(code) - 87
+                offset = offset + 1
+            } else {
+                foundNonBase16 = true
+            }
+        }
+        return (Double(offset), Double(total))
+    }
+}
+
+public static func ElmKernelParser_findSubString(_ smallString: String)
+    -> (Double)
+    -> (Double)
+    -> (Double)
+    -> (String)
+    -> (Double, Double, Double)
+{
+    { offsetOriginalAsDouble in
+        { rowOriginal in
+            { colOriginal in
+                { bigString in
+                    let offsetOriginal: Int = Int(offsetOriginalAsDouble)
+                    let bigStringStartingWithOffsetOriginal: Substring =
+                        Substring(
+                            bigString.utf16[
+                                bigString.utf16.index(
+                                    bigString.utf16.startIndex,
+                                    offsetBy: offsetOriginal
+                                )...
+                            ]
+                        )
+                    let foundStartOffset: Int? =
+                        switch bigStringStartingWithOffsetOriginal
+                            .range(of: smallString)
+                        {
+                        case .none: .none
+                        case let .some(foundRangeAfterOffsetOriginal):
+                            offsetOriginal
+                                + foundRangeAfterOffsetOriginal.lowerBound
+                                .utf16Offset(in: bigStringStartingWithOffsetOriginal)
+                        }
+                    var row: Int = Int(rowOriginal)
+                    var col: Int = Int(colOriginal)
+                    var offset: Int = offsetOriginal
+                    let foundEndOffsetOrBigStringEnd: Int =
+                        switch foundStartOffset {
+                        case .none: bigString.utf16.count
+                        case let .some(foundIndexAfterOffsetOriginal):
+                            foundIndexAfterOffsetOriginal
+                                + smallString.utf16.count
+                        }
+                    while offset < foundEndOffsetOrBigStringEnd {
+                        let code: Unicode.UTF16.CodeUnit = stringUtf16CodePointAt(
+                            bigString, offset)
+                        if code == 0x000A /* \\n */ {
+                            offset = offset + 1
+                            col = 1
+                            row = row + 1
+                        } else {
+                            col = col + 1
+                            offset =
+                                if Unicode.UTF16.isSurrogate(code) {
+                                    offset + 2
+                                } else {
+                                    offset + 1
+                                }
+                        }
+                    }
+                    return (
+                        Double(foundStartOffset ?? -1), Double(row), Double(col)
+                    )
+                }
+            }
+        }
+    }
 }
 """
