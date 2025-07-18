@@ -908,23 +908,20 @@ printSwiftTypeNotParenthesized position swiftType =
             Print.exactly variable
 
         SwiftTypeConstruct typeConstruct ->
-            -- TODO check if arguments actually need to be @escaping if TypeIncoming
             printSwiftTypeConstruct position typeConstruct
 
         SwiftTypeTuple parts ->
-            -- TODO check if parts actually need to be @escaping if TypeIncoming
-            printSwiftTypeTuple position parts
+            printSwiftTypeTuple parts
 
         SwiftTypeRecord fields ->
-            -- TODO check if values actually need to be @escaping if TypeIncoming
-            printSwiftTypeRecord position fields
+            printSwiftTypeRecord fields
 
         SwiftTypeFunction typeFunction ->
             printSwiftTypeFunction position typeFunction
 
 
-printSwiftTypeRecord : Maybe TypeIncomingOrOutgoing -> FastDict.Dict String SwiftType -> Print
-printSwiftTypeRecord position fields =
+printSwiftTypeRecord : FastDict.Dict String SwiftType -> Print
+printSwiftTypeRecord fields =
     if fields |> FastDict.isEmpty then
         Print.exactly "()"
 
@@ -939,7 +936,7 @@ printSwiftTypeRecord position fields =
                                 let
                                     fieldValuePrint : Print
                                     fieldValuePrint =
-                                        fieldValue |> printSwiftTypeNotParenthesized position
+                                        fieldValue |> printSwiftTypeNotParenthesized Nothing
                                 in
                                 Print.exactly (fieldName ++ ":")
                                     |> Print.followedBy
@@ -1287,25 +1284,24 @@ inferredTypeExpandFunctionIntoReverse soFarReverse inferredType =
 
 
 printSwiftTypeTuple :
-    Maybe TypeIncomingOrOutgoing
-    -> { part0 : SwiftType, part1 : SwiftType, part2Up : List SwiftType }
+    { part0 : SwiftType, part1 : SwiftType, part2Up : List SwiftType }
     -> Print
-printSwiftTypeTuple position parts =
+printSwiftTypeTuple parts =
     let
         part0Print : Print
         part0Print =
-            parts.part0 |> printSwiftTypeNotParenthesized position
+            parts.part0 |> printSwiftTypeNotParenthesized Nothing
 
         part1Print : Print
         part1Print =
-            parts.part1 |> printSwiftTypeNotParenthesized position
+            parts.part1 |> printSwiftTypeNotParenthesized Nothing
 
         part2UpPrints : List Print
         part2UpPrints =
             parts.part2Up
                 |> List.map
                     (\part ->
-                        part |> printSwiftTypeNotParenthesized position
+                        part |> printSwiftTypeNotParenthesized Nothing
                     )
 
         lineSpread : Print.LineSpread
@@ -1391,7 +1387,7 @@ printSwiftTypeConstruct positionOrNothing typeConstruct =
                     (argument0 :: argument1Up)
                         |> List.map
                             (\argument ->
-                                argument |> printSwiftTypeNotParenthesized positionOrNothing
+                                argument |> printSwiftTypeNotParenthesized Nothing
                             )
 
                 fullLineSpread : Print.LineSpread
