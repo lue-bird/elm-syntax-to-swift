@@ -67,7 +67,7 @@ type SwiftPattern
         -- invariant: cannot have exactly one entry
         (FastDict.Dict String SwiftPattern)
     | SwiftPatternVariant
-        { originTypeName : Maybe String
+        { originTypeName : String
         , name : String
         , values : List SwiftPattern
         }
@@ -90,7 +90,7 @@ type SwiftExpression
         , name : String
         }
     | SwiftExpressionVariant
-        { originTypeName : Maybe String
+        { originTypeName : String
         , name : String
         }
     | SwiftExpressionNegateOperation SwiftExpression
@@ -2052,14 +2052,7 @@ inferredPatternUntilAsPatterns patternTypedNode =
                     listCons.tail |> inferredPatternUntilAsPatterns
             in
             { pattern =
-                SwiftPatternVariant
-                    { originTypeName = Just "List_List"
-                    , name = "List_Cons"
-                    , values =
-                        [ head.pattern
-                        , tail.pattern
-                        ]
-                    }
+                swiftPatternListCons head.pattern tail.pattern
             , patternAliases =
                 head.patternAliases
                     ++ tail.patternAliases
@@ -2079,21 +2072,9 @@ inferredPatternUntilAsPatterns patternTypedNode =
                 elements
                     |> List.foldr
                         (\element soFar ->
-                            SwiftPatternVariant
-                                { originTypeName = Just "List_List"
-                                , name = "List_Cons"
-                                , values =
-                                    [ element.pattern
-                                    , soFar
-                                    ]
-                                }
+                            swiftPatternListCons element.pattern soFar
                         )
-                        (SwiftPatternVariant
-                            { originTypeName = Just "List_List"
-                            , name = "List_Empty"
-                            , values = []
-                            }
-                        )
+                        swiftPatternListEmpty
             , patternAliases =
                 elements
                     |> List.concatMap .patternAliases
@@ -2156,11 +2137,9 @@ inferredPatternUntilAsPatterns patternTypedNode =
                     { pattern =
                         SwiftPatternVariant
                             { originTypeName =
-                                Just
-                                    ((variant.moduleOrigin |> String.replace "." "")
-                                        ++ "_"
-                                        ++ variant.choiceTypeName
-                                    )
+                                (variant.moduleOrigin |> String.replace "." "")
+                                    ++ "_"
+                                    ++ variant.choiceTypeName
                             , name = reference.name
                             , values = values |> List.map .pattern
                             }
@@ -2182,6 +2161,27 @@ inferredPatternUntilAsPatterns patternTypedNode =
                   }
                 ]
             }
+
+
+swiftPatternListEmpty : SwiftPattern
+swiftPatternListEmpty =
+    SwiftPatternVariant
+        { originTypeName = "List_List"
+        , name = "List_Empty"
+        , values = []
+        }
+
+
+swiftPatternListCons : SwiftPattern -> SwiftPattern -> SwiftPattern
+swiftPatternListCons head tail =
+    SwiftPatternVariant
+        { originTypeName = "List_List"
+        , name = "List_Cons"
+        , values =
+            [ head
+            , tail
+            ]
+        }
 
 
 inferredPatternIntroducedVariables :
@@ -2716,14 +2716,7 @@ casePatternInPath path patternInferred =
                     listCons.tail |> casePatternInPath ("tail" :: path)
             in
             { pattern =
-                SwiftPatternVariant
-                    { originTypeName = Just "List_List"
-                    , name = "List_Cons"
-                    , values =
-                        [ head.pattern
-                        , tail.pattern
-                        ]
-                    }
+                swiftPatternListCons head.pattern tail.pattern
             , introducedVariables =
                 FastSet.union
                     head.introducedVariables
@@ -2747,21 +2740,9 @@ casePatternInPath path patternInferred =
                 elements
                     |> List.foldr
                         (\element soFar ->
-                            SwiftPatternVariant
-                                { originTypeName = Just "List_List"
-                                , name = "List_Cons"
-                                , values =
-                                    [ element.pattern
-                                    , soFar
-                                    ]
-                                }
+                            swiftPatternListCons element.pattern soFar
                         )
-                        (SwiftPatternVariant
-                            { originTypeName = Just "List_List"
-                            , name = "List_Empty"
-                            , values = []
-                            }
-                        )
+                        swiftPatternListEmpty
             , introducedVariables =
                 elements
                     |> listMapToFastSetsAndUnify .introducedVariables
@@ -2831,11 +2812,9 @@ casePatternInPath path patternInferred =
                     { pattern =
                         SwiftPatternVariant
                             { originTypeName =
-                                Just
-                                    ((variant.moduleOrigin |> String.replace "." "")
-                                        ++ "_"
-                                        ++ variant.choiceTypeName
-                                    )
+                                (variant.moduleOrigin |> String.replace "." "")
+                                    ++ "_"
+                                    ++ variant.choiceTypeName
                             , name = reference.name
                             , values = values |> List.map .pattern
                             }
@@ -3105,14 +3084,7 @@ patternFillingOutIgnoredPartsWithNewVariables path patternInferred =
                     listCons.tail |> casePatternInPath ("tail" :: path)
             in
             { pattern =
-                SwiftPatternVariant
-                    { originTypeName = Just "List_List"
-                    , name = "List_Cons"
-                    , values =
-                        [ head.pattern
-                        , tail.pattern
-                        ]
-                    }
+                swiftPatternListCons head.pattern tail.pattern
             , introducedVariables =
                 FastSet.union
                     head.introducedVariables
@@ -3136,21 +3108,9 @@ patternFillingOutIgnoredPartsWithNewVariables path patternInferred =
                 elements
                     |> List.foldr
                         (\element soFar ->
-                            SwiftPatternVariant
-                                { originTypeName = Just "List_List"
-                                , name = "List_Cons"
-                                , values =
-                                    [ element.pattern
-                                    , soFar
-                                    ]
-                                }
+                            swiftPatternListCons element.pattern soFar
                         )
-                        (SwiftPatternVariant
-                            { originTypeName = Just "List_List"
-                            , name = "List_Empty"
-                            , values = []
-                            }
-                        )
+                        swiftPatternListEmpty
             , introducedVariables =
                 elements
                     |> listMapToFastSetsAndUnify .introducedVariables
@@ -3220,11 +3180,9 @@ patternFillingOutIgnoredPartsWithNewVariables path patternInferred =
                     { pattern =
                         SwiftPatternVariant
                             { originTypeName =
-                                Just
-                                    ((variant.moduleOrigin |> String.replace "." "")
-                                        ++ "_"
-                                        ++ variant.choiceTypeName
-                                    )
+                                (variant.moduleOrigin |> String.replace "." "")
+                                    ++ "_"
+                                    ++ variant.choiceTypeName
                             , name = reference.name
                             , values = values |> List.map .pattern
                             }
@@ -5111,7 +5069,7 @@ printSwiftPatternNotParenthesized swiftPattern =
 
         SwiftPatternVariant patternVariant ->
             Print.exactly
-                ((patternVariant.originTypeName |> Maybe.withDefault "")
+                (patternVariant.originTypeName
                     ++ "."
                     ++ patternVariant.name
                 )
@@ -7383,7 +7341,7 @@ expression context expressionTypedNode =
                             of
                                 [] ->
                                     SwiftExpressionVariant
-                                        { originTypeName = Just swiftOriginTypeName
+                                        { originTypeName = swiftOriginTypeName
                                         , name = swiftVariantName
                                         }
 
@@ -7416,7 +7374,7 @@ expression context expressionTypedNode =
                                             (SwiftExpressionCall
                                                 { called =
                                                     SwiftExpressionVariant
-                                                        { originTypeName = Just swiftOriginTypeName
+                                                        { originTypeName = swiftOriginTypeName
                                                         , name = swiftVariantName
                                                         }
                                                 , arguments =
@@ -12265,7 +12223,7 @@ printSwiftExpressionNotParenthesized swiftExpression =
 
         SwiftExpressionVariant reference ->
             Print.exactly
-                ((reference.originTypeName |> Maybe.withDefault "")
+                (reference.originTypeName
                     ++ "."
                     ++ reference.name
                 )
