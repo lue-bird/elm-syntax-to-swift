@@ -13717,7 +13717,7 @@ printSwiftExpressionSwitch swiftSwitch =
                     ((swiftSwitch.case0 :: swiftSwitch.case1Up)
                         |> Print.listMapAndIntersperseAndFlatten
                             printSwiftExpressionSwitchCase
-                            printLinebreakLinebreakIndented
+                            Print.linebreakIndented
                     )
             )
         |> Print.followedBy Print.linebreakIndented
