@@ -28921,6 +28921,13 @@ static func Array_mapToList<a, b>(_ elementChange: (a) -> b, _ array: [a])
     return soFar
 }
 
+static func arrayReversedToList<a>(_ array: [a]) -> List_List<a> {
+    var soFar: List_List<a> = .List_Empty
+    for element in array {
+        soFar = .List_Cons(element, soFar)
+    }
+    return soFar
+}
 @Sendable public static func Array_toList<a>(_ array: [a]) -> List_List<a> {
     var soFar: List_List<a> = .List_Empty
     for element in array.reversed() {
@@ -28956,16 +28963,12 @@ static func Array_mapFromList<a, b>(_ elementChange: (a) -> b, _ fullList: List_
 
 @Sendable public static func Array_fromList<a>(_ fullList: List_List<a>) -> [a] {
     var soFar: [a] = Array()
-    var remainingList = fullList
-    while true {
-        switch remainingList {
-        case .List_Empty:
-            return soFar
-        case let .List_Cons(remainingHead, remainingTail):
-            soFar.append(remainingHead)
-            remainingList = remainingTail
-        }
+    var remainingList: List_List<a> = fullList
+    while case let .List_Cons(remainingHead, remainingTail) = remainingList {
+        soFar.append(remainingHead)
+        remainingList = remainingTail
     }
+    return soFar
 }
 
 @Sendable public static func Array_isEmpty<a>(_ array: [a]) -> Bool {
@@ -29323,17 +29326,15 @@ private static func List_foldr<a, state>(
     _ indexedElementChange: @escaping (Double) -> (a) -> b,
 ) -> (List_List<a>) -> List_List<b> {
     { list in
-        // can be optimized
-        List_foldr(
-            { (element, soFar: (index: Double, list: List_List<b>)) in
-                (
-                    index: soFar.index + 1,
-                    list: .List_Cons(indexedElementChange(soFar.index)(element), soFar.list)
-                )
-            },
-            (index: List_length(list), list: .List_Empty),
-            list
-        ).list
+        var reversedResultList: [b] = []
+        var indexSoFar: Int = 0
+        var remainingList: List_List<a> = list
+        while case let .List_Cons(head, tail) = remainingList {
+            reversedResultList.append(indexedElementChange(Double(indexSoFar))(head))
+            remainingList = tail
+            indexSoFar = indexSoFar + 1
+        }
+        return Array_toList(reversedResultList)
     }
 }
 
@@ -30386,7 +30387,7 @@ public static let JsonEncode_null: JsonEncode_Value =
 @Sendable public static func JsonEncode_object(_ fields: List_List<(String, JsonEncode_Value)>)
     -> JsonEncode_Value
 {
-    var fieldsRemaining = fields
+    var fieldsRemaining: List_List<(String, JsonEncode_Value)> = fields
     var fieldsDictionary: [String: JsonEncode_Value] = Dictionary()
     while case let .List_Cons(head, tail) = fieldsRemaining {
         fieldsDictionary[head.0] = head.1
@@ -30749,7 +30750,7 @@ public static func JsonDecode_map8<
     -> JsonDecode_Decoder<value>
 {
     JsonDecode_Decoder(decode: { toDecode in
-        var remainingOptions = options
+        var remainingOptions: List_List<JsonDecode_Decoder<value>> = options
         var optionDecodeErrors: [JsonDecode_Error] = []
         while case let .List_Cons(nextOptionDecoder, afterNextOption) = remainingOptions {
             switch nextOptionDecoder.decode(toDecode) {
@@ -30880,9 +30881,9 @@ static func JsonDecode_fieldValue(_ fieldName: String)
 {
     { valueDecoder in
         JsonDecode_Decoder(decode: { toDecode in
-            var remainingFieldNames = fieldNames
+            var remainingFieldNames: List_List<String> = fieldNames
             var successfullyDecodedFieldNames: [String] = []
-            var remainingToDecode = toDecode
+            var remainingToDecode: JsonDecode_Value = toDecode
             while case let .List_Cons(nextFieldName, afterNextFieldName) = remainingFieldNames {
                 switch JsonDecode_fieldValue(nextFieldName).decode(remainingToDecode) {
                 case let .Result_Ok(fieldValueJson):
@@ -31122,7 +31123,7 @@ static func JsonDecode_fieldValue(_ fieldName: String)
 }
 
 static func indent(_ str: String) -> String {
-    ((str.split(separator: "\\n").joined(separator: "\\n    ")))
+    str.split(separator: "\\n").joined(separator: "\\n    ")
 }
 @Sendable public static func JsonDecode_errorToString(_ error: JsonDecode_Error) -> String {
     JsonDecode_errorToStringHelp(error, .List_Empty)
@@ -31134,20 +31135,20 @@ static func JsonDecode_errorToStringHelp(
 {
     switch error {
     case let .JsonDecode_Field(f, err):
-        let isSimple =
+        let isSimple: Bool =
             switch String_uncons(f) {
             case .Maybe_Nothing: false
             case let .Maybe_Just((head, rest)):
                 Char_isAlpha(head) && String_all(Char_isAlphaNum)(rest)
             }
 
-        let fieldName =
+        let fieldName: String =
             if isSimple { "." + f } else { "['" + f + "']" }
 
         return JsonDecode_errorToStringHelp(err, .List_Cons(fieldName, context))
 
     case let .JsonDecode_Index(index, err):
-        let indexName = "[" + String(Int(index)) + "]"
+        let indexName: String = "[" + String(Int(index)) + "]"
 
         return JsonDecode_errorToStringHelp(err, .List_Cons(indexName, context))
 
@@ -31165,20 +31166,18 @@ static func JsonDecode_errorToStringHelp(
             return JsonDecode_errorToStringHelp(err, context)
 
         case _:
-            let starter =
+            let starter: String =
                 switch context {
                 case .List_Empty: "Json.Decode.oneOf"
                 case .List_Cons(_, _):
                     "The Json.Decode.oneOf at json"
                         + String_concat(List_reverse(context))
                 }
-
-            let introduction =
+            let introduction: String =
                 starter
                 + " failed in the following "
                 + String(Int(List_length(errors)))
                 + " ways:"
-
             return String_join("\\n\\n")(
                 .List_Cons(
                     introduction,
@@ -31204,7 +31203,6 @@ static func JsonDecode_errorToStringHelp(
                     + String_concat(List_reverse(context))
                     + ":\\n\\n    "
             }
-
         return introduction
             + indent((JsonEncode_encode(4)(json)))
             + "\\n\\n"
