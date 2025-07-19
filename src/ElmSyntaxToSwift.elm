@@ -8545,8 +8545,8 @@ expression context expressionTypedNode =
                             )
                             context.declaredValuesToConstructLazily
             in
-            Result.map3
-                (\declaration0 declaration1Up result ->
+            Result.map2
+                (\declarations result ->
                     -- TODO preferably lift statements up
                     { statements = []
                     , result =
@@ -8555,7 +8555,7 @@ expression context expressionTypedNode =
                                 SwiftExpressionLambda
                                     { parameters = []
                                     , statements =
-                                        (declaration0 ++ (declaration1Up |> List.concat))
+                                        (declarations |> List.concat)
                                             ++ result.statements
                                     , result =
                                         result.result
@@ -8564,22 +8564,11 @@ expression context expressionTypedNode =
                             }
                     }
                 )
-                (letIn.declaration0
-                    |> letDeclaration
-                        { moduleInfo = context.moduleInfo
-                        , variablesFromWithinDeclarationInScope =
-                            context.variablesFromWithinDeclarationInScope
-                                |> FastSet.union
-                                    variablesForWholeLetIn
-                        , declaredValuesToConstructLazily =
-                            declaredValuesToConstructLazilyIncludingCurrentFromLets
-                        , path = "declaration0" :: context.path
-                        }
-                )
-                (letIn.declaration1Up
+                ((letIn.declaration0 :: letIn.declaration1Up)
+                    |> inferredLetDeclarationNodesSortFromMostToLeastDependedOn
                     |> List.indexedMap
-                        (\laterIndex laterDeclaration ->
-                            ( laterIndex + 1, laterDeclaration )
+                        (\letDeclarationIndex laterDeclaration ->
+                            ( letDeclarationIndex, laterDeclaration )
                         )
                     |> listMapAndCombineOk
                         (\( letDeclarationIndex, letDeclarationNode ) ->
@@ -8610,6 +8599,406 @@ expression context expressionTypedNode =
                         , path = "letResult" :: context.path
                         }
                 )
+
+
+inferredLetDeclarationNodesSortFromMostToLeastDependedOn :
+    List
+        { declaration : ElmSyntaxTypeInfer.LetDeclaration
+        , range : Elm.Syntax.Range.Range
+        }
+    ->
+        List
+            { declaration : ElmSyntaxTypeInfer.LetDeclaration
+            , range : Elm.Syntax.Range.Range
+            }
+inferredLetDeclarationNodesSortFromMostToLeastDependedOn inferredLetDeclarationNodes =
+    let
+        letValueOrFunctionDeclarations =
+            inferredLetDeclarationNodes
+                |> List.filterMap
+                    (\inferredLetDeclarationNode ->
+                        case inferredLetDeclarationNode.declaration of
+                            ElmSyntaxTypeInfer.LetDestructuring _ ->
+                                Nothing
+
+                            ElmSyntaxTypeInfer.LetValueOrFunctionDeclaration inferredLetValueOrFunctionDeclaration ->
+                                Just
+                                    { range = inferredLetDeclarationNode.range
+                                    , declaration = inferredLetValueOrFunctionDeclaration
+                                    }
+                    )
+
+        letDestructurings =
+            inferredLetDeclarationNodes
+                |> List.filterMap
+                    (\inferredLetDeclarationNode ->
+                        case inferredLetDeclarationNode.declaration of
+                            ElmSyntaxTypeInfer.LetValueOrFunctionDeclaration _ ->
+                                Nothing
+
+                            ElmSyntaxTypeInfer.LetDestructuring inferredLetDestructuring ->
+                                Just
+                                    { range = inferredLetDeclarationNode.range
+                                    , declaration = inferredLetDestructuring
+                                    }
+                    )
+    in
+    letValueOrFunctionDeclarations
+        |> List.map
+            (\inferredLetValueOrFunctionDeclarationNode ->
+                ( { range = inferredLetValueOrFunctionDeclarationNode.range
+                  , declaration =
+                        ElmSyntaxTypeInfer.LetValueOrFunctionDeclaration
+                            inferredLetValueOrFunctionDeclarationNode.declaration
+                  }
+                , inferredLetValueOrFunctionDeclarationNode.declaration.name
+                , inferredLetValueOrFunctionDeclarationNode.declaration.result.value
+                    |> inferredExpressionUsedLocalReferences
+                    |> FastSet.toList
+                )
+            )
+        |> Graph.stronglyConnComponents
+        |> List.concatMap
+            (\bucket ->
+                case bucket of
+                    Graph.AcyclicSCC node ->
+                        [ node ]
+
+                    Graph.CyclicSCC nodes ->
+                        nodes
+            )
+        |> inferredLetDeclarationsInsertLetDestructurings
+            letDestructurings
+
+
+inferredExpressionTypedNodeUsedLocalReferences :
+    ElmSyntaxTypeInfer.TypedNode ElmSyntaxTypeInfer.Expression
+    -> FastSet.Set String
+inferredExpressionTypedNodeUsedLocalReferences inferredExpressionTypedNode =
+    inferredExpressionUsedLocalReferences inferredExpressionTypedNode.value
+
+
+inferredExpressionUsedLocalReferences : ElmSyntaxTypeInfer.Expression -> FastSet.Set String
+inferredExpressionUsedLocalReferences inferredExpression =
+    -- IGNORE TCO
+    case inferredExpression of
+        ElmSyntaxTypeInfer.ExpressionUnit ->
+            FastSet.empty
+
+        ElmSyntaxTypeInfer.ExpressionReferenceVariant _ ->
+            FastSet.empty
+
+        ElmSyntaxTypeInfer.ExpressionReferenceRecordTypeAliasConstructorFunction _ ->
+            FastSet.empty
+
+        ElmSyntaxTypeInfer.ExpressionInteger _ ->
+            FastSet.empty
+
+        ElmSyntaxTypeInfer.ExpressionFloat _ ->
+            FastSet.empty
+
+        ElmSyntaxTypeInfer.ExpressionChar _ ->
+            FastSet.empty
+
+        ElmSyntaxTypeInfer.ExpressionString _ ->
+            FastSet.empty
+
+        ElmSyntaxTypeInfer.ExpressionOperatorFunction _ ->
+            FastSet.empty
+
+        ElmSyntaxTypeInfer.ExpressionRecordAccessFunction _ ->
+            FastSet.empty
+
+        ElmSyntaxTypeInfer.ExpressionReference reference ->
+            case reference.moduleOrigin of
+                "" ->
+                    FastSet.singleton reference.name
+
+                _ ->
+                    FastSet.empty
+
+        ElmSyntaxTypeInfer.ExpressionParenthesized inParens ->
+            inferredExpressionTypedNodeUsedLocalReferences inParens
+
+        ElmSyntaxTypeInfer.ExpressionNegation inNegation ->
+            inferredExpressionTypedNodeUsedLocalReferences inNegation
+
+        ElmSyntaxTypeInfer.ExpressionLambda lambda ->
+            inferredExpressionTypedNodeUsedLocalReferences lambda.result
+
+        ElmSyntaxTypeInfer.ExpressionRecordAccess recordAccess ->
+            inferredExpressionTypedNodeUsedLocalReferences recordAccess.record
+
+        ElmSyntaxTypeInfer.ExpressionInfixOperation infixOperation ->
+            infixOperation.left
+                |> inferredExpressionTypedNodeUsedLocalReferences
+                |> FastSet.union
+                    (infixOperation.right
+                        |> inferredExpressionTypedNodeUsedLocalReferences
+                    )
+
+        ElmSyntaxTypeInfer.ExpressionTuple parts ->
+            (parts.part0 |> inferredExpressionTypedNodeUsedLocalReferences)
+                |> FastSet.union
+                    (parts.part1 |> inferredExpressionTypedNodeUsedLocalReferences)
+
+        ElmSyntaxTypeInfer.ExpressionTriple parts ->
+            parts.part0
+                |> inferredExpressionTypedNodeUsedLocalReferences
+                |> FastSet.union
+                    (parts.part1 |> inferredExpressionTypedNodeUsedLocalReferences)
+                |> FastSet.union
+                    (parts.part2 |> inferredExpressionTypedNodeUsedLocalReferences)
+
+        ElmSyntaxTypeInfer.ExpressionIfThenElse ifThenElse ->
+            ifThenElse.condition
+                |> inferredExpressionTypedNodeUsedLocalReferences
+                |> FastSet.union
+                    (ifThenElse.onTrue
+                        |> inferredExpressionTypedNodeUsedLocalReferences
+                    )
+                |> FastSet.union
+                    (ifThenElse.onFalse
+                        |> inferredExpressionTypedNodeUsedLocalReferences
+                    )
+
+        ElmSyntaxTypeInfer.ExpressionList elements ->
+            elements
+                |> listMapToFastSetsAndUnify
+                    inferredExpressionTypedNodeUsedLocalReferences
+
+        ElmSyntaxTypeInfer.ExpressionRecord fields ->
+            fields
+                |> listMapToFastSetsAndUnify
+                    (\field ->
+                        field.value
+                            |> inferredExpressionTypedNodeUsedLocalReferences
+                    )
+
+        ElmSyntaxTypeInfer.ExpressionRecordUpdate recordUpdate ->
+            (case recordUpdate.recordVariable.value.moduleOrigin of
+                "" ->
+                    FastSet.empty
+
+                _ ->
+                    FastSet.singleton recordUpdate.recordVariable.value.name
+            )
+                |> FastSet.union
+                    (recordUpdate.field0.value
+                        |> inferredExpressionTypedNodeUsedLocalReferences
+                    )
+                |> FastSet.union
+                    (recordUpdate.field1Up
+                        |> listMapToFastSetsAndUnify
+                            (\field ->
+                                field.value
+                                    |> inferredExpressionTypedNodeUsedLocalReferences
+                            )
+                    )
+
+        ElmSyntaxTypeInfer.ExpressionCaseOf caseOf ->
+            caseOf.matched
+                |> inferredExpressionTypedNodeUsedLocalReferences
+                |> FastSet.union
+                    (caseOf.case0.result
+                        |> inferredExpressionTypedNodeUsedLocalReferences
+                    )
+                |> FastSet.union
+                    (caseOf.case1Up
+                        |> listMapToFastSetsAndUnify
+                            (\laterCase ->
+                                laterCase.result
+                                    |> inferredExpressionTypedNodeUsedLocalReferences
+                            )
+                    )
+
+        ElmSyntaxTypeInfer.ExpressionCall call ->
+            call.called
+                |> inferredExpressionTypedNodeUsedLocalReferences
+                |> FastSet.union
+                    (call.argument0
+                        |> inferredExpressionTypedNodeUsedLocalReferences
+                    )
+                |> FastSet.union
+                    (call.argument1Up
+                        |> listMapToFastSetsAndUnify
+                            inferredExpressionTypedNodeUsedLocalReferences
+                    )
+
+        ElmSyntaxTypeInfer.ExpressionLetIn letIn ->
+            letIn.result
+                |> inferredExpressionTypedNodeUsedLocalReferences
+                |> FastSet.union
+                    (letIn.declaration0.declaration
+                        |> inferredLetDeclarationUsedLocalReferences
+                    )
+                |> FastSet.union
+                    (letIn.declaration1Up
+                        |> listMapToFastSetsAndUnify
+                            (\letDeclarationNode ->
+                                letDeclarationNode.declaration
+                                    |> inferredLetDeclarationUsedLocalReferences
+                            )
+                    )
+
+
+inferredLetDeclarationUsedLocalReferences : ElmSyntaxTypeInfer.LetDeclaration -> FastSet.Set String
+inferredLetDeclarationUsedLocalReferences inferredLetDeclaration =
+    case inferredLetDeclaration of
+        ElmSyntaxTypeInfer.LetValueOrFunctionDeclaration inferredLetValueOrFunctionDeclaration ->
+            inferredLetValueOrFunctionDeclaration.result.value
+                |> inferredExpressionUsedLocalReferences
+
+        ElmSyntaxTypeInfer.LetDestructuring inferredLetDestructuring ->
+            inferredLetDestructuring.expression.value
+                |> inferredExpressionUsedLocalReferences
+
+
+inferredLetDeclarationsInsertLetDestructurings :
+    List
+        { range : Elm.Syntax.Range.Range
+        , declaration :
+            { pattern : ElmSyntaxTypeInfer.TypedNode ElmSyntaxTypeInfer.Pattern
+            , expression : ElmSyntaxTypeInfer.TypedNode ElmSyntaxTypeInfer.Expression
+            }
+        }
+    ->
+        List
+            { declaration : ElmSyntaxTypeInfer.LetDeclaration
+            , range : Elm.Syntax.Range.Range
+            }
+    ->
+        List
+            { declaration : ElmSyntaxTypeInfer.LetDeclaration
+            , range : Elm.Syntax.Range.Range
+            }
+inferredLetDeclarationsInsertLetDestructurings fsharpLetDestructuringsToInsert existingLetDeclarations =
+    fsharpLetDestructuringsToInsert
+        |> List.foldl
+            (\fsharpLetDestructuringToInsert soFar ->
+                soFar
+                    |> fsharpLetDeclarationsInsertFsharpLetDestructuring
+                        fsharpLetDestructuringToInsert
+            )
+            existingLetDeclarations
+
+
+fsharpLetDeclarationsInsertFsharpLetDestructuring :
+    { range : Elm.Syntax.Range.Range
+    , declaration :
+        { pattern : ElmSyntaxTypeInfer.TypedNode ElmSyntaxTypeInfer.Pattern
+        , expression : ElmSyntaxTypeInfer.TypedNode ElmSyntaxTypeInfer.Expression
+        }
+    }
+    ->
+        List
+            { declaration : ElmSyntaxTypeInfer.LetDeclaration
+            , range : Elm.Syntax.Range.Range
+            }
+    ->
+        List
+            { declaration : ElmSyntaxTypeInfer.LetDeclaration
+            , range : Elm.Syntax.Range.Range
+            }
+fsharpLetDeclarationsInsertFsharpLetDestructuring fsharpLetDestructuringToInsert existingLetDeclarationsMostToLeastDependedOn =
+    let
+        variablesIntroducedInDestructuringPattern : FastSet.Set String
+        variablesIntroducedInDestructuringPattern =
+            fsharpLetDestructuringToInsert.declaration.pattern
+                |> inferredPatternIntroducedVariables
+                |> List.foldl
+                    (\variable soFar ->
+                        soFar |> FastSet.insert variable.name
+                    )
+                    FastSet.empty
+
+        withLetDestructuring :
+            { destructuringHasBeenInserted : Bool
+            , leastToMostDependedOn :
+                List
+                    { declaration : ElmSyntaxTypeInfer.LetDeclaration
+                    , range : Elm.Syntax.Range.Range
+                    }
+            }
+        withLetDestructuring =
+            existingLetDeclarationsMostToLeastDependedOn
+                |> List.foldl
+                    (\existingLetDeclaration soFar ->
+                        if soFar.destructuringHasBeenInserted then
+                            { destructuringHasBeenInserted = True
+                            , leastToMostDependedOn =
+                                existingLetDeclaration
+                                    :: soFar.leastToMostDependedOn
+                            }
+
+                        else
+                            let
+                                existingLetDeclarationUsedLocalReferences : FastSet.Set String
+                                existingLetDeclarationUsedLocalReferences =
+                                    existingLetDeclaration.declaration
+                                        |> inferredLetDeclarationUsedLocalReferences
+                            in
+                            if fastSetsIntersect variablesIntroducedInDestructuringPattern existingLetDeclarationUsedLocalReferences then
+                                { destructuringHasBeenInserted = True
+                                , leastToMostDependedOn =
+                                    existingLetDeclaration
+                                        :: { declaration =
+                                                ElmSyntaxTypeInfer.LetDestructuring
+                                                    fsharpLetDestructuringToInsert.declaration
+                                           , range = fsharpLetDestructuringToInsert.range
+                                           }
+                                        :: soFar.leastToMostDependedOn
+                                }
+
+                            else
+                                { destructuringHasBeenInserted = False
+                                , leastToMostDependedOn =
+                                    existingLetDeclaration
+                                        :: soFar.leastToMostDependedOn
+                                }
+                    )
+                    destructuringHasBeenInsertedFalseLeastToMostDependedOnListEmpty
+    in
+    if withLetDestructuring.destructuringHasBeenInserted then
+        withLetDestructuring.leastToMostDependedOn |> List.reverse
+
+    else
+        { declaration =
+            ElmSyntaxTypeInfer.LetDestructuring
+                fsharpLetDestructuringToInsert.declaration
+        , range = fsharpLetDestructuringToInsert.range
+        }
+            :: withLetDestructuring.leastToMostDependedOn
+            |> List.reverse
+
+
+destructuringHasBeenInsertedFalseLeastToMostDependedOnListEmpty :
+    { destructuringHasBeenInserted : Bool
+    , leastToMostDependedOn : List a_
+    }
+destructuringHasBeenInsertedFalseLeastToMostDependedOnListEmpty =
+    { destructuringHasBeenInserted = False
+    , leastToMostDependedOn = []
+    }
+
+
+fastSetsIntersect : FastSet.Set comparable -> FastSet.Set comparable -> Bool
+fastSetsIntersect aSet bSet =
+    aSet
+        |> fastSetAny
+            (\aElement ->
+                bSet |> FastSet.member aElement
+            )
+
+
+fastSetAny : (a -> Bool) -> FastSet.Set a -> Bool
+fastSetAny isFound fastSet =
+    fastSet
+        |> FastSet.foldl
+            (\element soFar ->
+                soFar || (element |> isFound)
+            )
+            False
 
 
 inferredTypeIsConcreteSwiftType : ElmSyntaxTypeInfer.Type -> Bool
