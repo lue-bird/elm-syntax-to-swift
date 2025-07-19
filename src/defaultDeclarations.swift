@@ -687,10 +687,10 @@ public enum Elm {
     @Sendable public static func String_foldl<state>(
         _ reduce: @escaping (UnicodeScalar) -> (state) -> state
     ) -> (state) -> (String) -> state {
-        { initialFolded in
+        { initialState in
             { string in
                 string.unicodeScalars.reduce(
-                    initialFolded,
+                    initialState,
                     { (soFar, char) in
                         reduce(char)(soFar)
                     }
@@ -702,10 +702,10 @@ public enum Elm {
     @Sendable public static func String_foldr<state>(
         _ reduce: @escaping (UnicodeScalar) -> (state) -> state
     ) -> (state) -> (String) -> state {
-        { initialFolded in
+        { initialState in
             { string in
                 string.unicodeScalars.reversed().reduce(
-                    initialFolded,
+                    initialState,
                     { (soFar, char) in
                         reduce(char)(soFar)
                     }
@@ -1423,17 +1423,17 @@ public enum Elm {
 
     private static func List_foldl<a, state>(
         _ reduce: (a, state) -> state,
-        _ initialFolded: state,
+        _ initialState: state,
         _ list: List_List<a>
     ) -> state {
-        var foldedSoFar = initialFolded
-        var remainingList = list
+        var stateSoFar: state = initialState
+        var remainingList: List_List<a> = list
         while true {
             switch remainingList {
             case .List_Empty:
-                return foldedSoFar
+                return stateSoFar
             case .List_Cons(let head, let tail):
-                foldedSoFar = reduce(head, initialFolded)
+                stateSoFar = reduce(head, stateSoFar)
                 remainingList = tail
             }
         }
@@ -1441,16 +1441,16 @@ public enum Elm {
     @Sendable public static func List_foldl<a, state>(
         _ reduce: @escaping (a) -> (state) -> state
     ) -> (state) -> (List_List<a>) -> state {
-        { initialFolded in
+        { initialState in
             { list in
-                var foldedSoFar = initialFolded
-                var remainingList = list
+                var stateSoFar: state = initialState
+                var remainingList: List_List<a> = list
                 while true {
                     switch remainingList {
                     case .List_Empty:
-                        return foldedSoFar
+                        return stateSoFar
                     case .List_Cons(let head, let tail):
-                        foldedSoFar = reduce(head)(foldedSoFar)
+                        stateSoFar = reduce(head)(stateSoFar)
                         remainingList = tail
                     }
                 }
@@ -1460,15 +1460,19 @@ public enum Elm {
 
     private static func List_foldr<a, state>(
         _ reduce: (a, state) -> state,
-        _ initialFolded: state,
+        _ initialState: state,
         _ list: List_List<a>
     ) -> state {
-        List_foldl(reduce, initialFolded, List_reverse(list))
+        List_foldl(reduce, initialState, List_reverse(list))
     }
     @Sendable public static func List_foldr<a, state>(
         _ reduce: @escaping (a) -> (state) -> state,
     ) -> (state) -> (List_List<a>) -> state {
-        { initialFolded in { list in List_foldl(reduce)(initialFolded)(List_reverse(list)) } }
+        { initialState in
+            { list in
+                List_foldl(reduce)(initialState)(List_reverse(list))
+            }
+        }
     }
 
     @Sendable public static func List_reverse<a>(_ list: List_List<a>) -> List_List<a> {
