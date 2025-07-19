@@ -1322,10 +1322,7 @@ printSwiftTypeTuple parts =
                             |> Print.lineSpreadListMapAndCombine Print.lineSpread
                     )
     in
-    -- doubly-parenthesized because swift interprets the pattern
-    -- { (x, y) in ... } as a function taking two arguments which is different from
-    -- a function taking a tuple
-    Print.exactly "(("
+    Print.exactly "("
         |> Print.followedBy
             (Print.withIndentIncreasedBy 3
                 ((part0Print :: part1Print :: part2UpPrints)
@@ -1342,7 +1339,7 @@ printSwiftTypeTuple parts =
         |> Print.followedBy
             (Print.emptyOrLinebreakIndented lineSpread)
         |> Print.followedBy
-            (Print.exactly "))")
+            (Print.exactly ")")
 
 
 printSwiftTypeConstruct :
