@@ -1413,10 +1413,10 @@ printSwiftTypeConstruct positionOrNothing typeConstruct =
                                                 (Print.spaceOrLinebreakIndented fullLineSpread)
                                         )
                                 )
-                            |> Print.followedBy
-                                (Print.emptyOrLinebreakIndented fullLineSpread)
                         )
                     )
+                |> Print.followedBy
+                    (Print.emptyOrLinebreakIndented fullLineSpread)
                 |> Print.followedBy
                     printExactlyGreaterThan
 
