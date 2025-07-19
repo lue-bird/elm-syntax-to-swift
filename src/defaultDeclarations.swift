@@ -1565,6 +1565,7 @@ public enum Elm {
             switch list {
             case .List_Empty: .List_Empty
             case .List_Cons(let head, let tail):
+                // can be optimized
                 List_foldr(
                     { (element, soFar) in
                         .List_Cons(element, .List_Cons(inBetween, soFar))
@@ -1614,8 +1615,8 @@ public enum Elm {
     ) -> (List_List<a>) -> (List_List<b>) -> List_List<c> {
         { aList in
             { bList in
-                var remainingAList = aList
-                var remainingBList = bList
+                var remainingAList: List_List<a> = aList
+                var remainingBList: List_List<b> = bList
                 var combinedArraySoFar: [c] = []
                 while case let (
                     a: .List_Cons(aHead, aTail),
@@ -1635,9 +1636,9 @@ public enum Elm {
         { aList in
             { bList in
                 { cList in
-                    var remainingAList = aList
-                    var remainingBList = bList
-                    var remainingCList = cList
+                    var remainingAList: List_List<a> = aList
+                    var remainingBList: List_List<b> = bList
+                    var remainingCList: List_List<c> = cList
                     var combinedArraySoFar: [combined] = []
                     while case let (
                         .List_Cons(aHead, aTail),
@@ -1662,10 +1663,10 @@ public enum Elm {
             { bList in
                 { cList in
                     { dList in
-                        var remainingAList = aList
-                        var remainingBList = bList
-                        var remainingCList = cList
-                        var remainingDList = dList
+                        var remainingAList: List_List<a> = aList
+                        var remainingBList: List_List<b> = bList
+                        var remainingCList: List_List<c> = cList
+                        var remainingDList: List_List<d> = dList
                         var combinedArraySoFar: [combined] = []
                         while case let (
                             .List_Cons(aHead, aTail),
@@ -1695,11 +1696,11 @@ public enum Elm {
                 { cList in
                     { dList in
                         { eList in
-                            var remainingAList = aList
-                            var remainingBList = bList
-                            var remainingCList = cList
-                            var remainingDList = dList
-                            var remainingEList = eList
+                            var remainingAList: List_List<a> = aList
+                            var remainingBList: List_List<b> = bList
+                            var remainingCList: List_List<c> = cList
+                            var remainingDList: List_List<d> = dList
+                            var remainingEList: List_List<e> = eList
                             var combinedArraySoFar: [combined] = []
                             while case let (
                                 .List_Cons(aHead, aTail),
@@ -1728,17 +1729,17 @@ public enum Elm {
     }
 
     @Sendable public static func List_zip<a, b>(_ aList: List_List<a>) -> (List_List<b>)
-        -> List_List<(first: a, second: b)>
+        -> List_List<(a, b)>
     {
-        { bList in List_map2({ a in { b in (first: a, second: b) } })(aList)(bList) }
+        { bList in List_map2({ a in { b in (a, b) } })(aList)(bList) }
     }
 
-    @Sendable public static func List_unzip<a, b>(_ abList: List_List<(first: a, second: b)>)
-        -> (first: List_List<a>, second: List_List<b>)
+    @Sendable public static func List_unzip<a, b>(_ abList: List_List<(a, b)>)
+        -> (List_List<a>, List_List<b>)
     {
         (
-            first: List_map({ ab in ab.first })(abList),
-            second: List_map({ ab in ab.second })(abList)
+            List_map({ ab in ab.0 })(abList),
+            List_map({ ab in ab.1 })(abList)
         )
     }
 
@@ -1765,6 +1766,7 @@ public enum Elm {
         _ element_toMaybe_Maybe: @escaping (a) -> Maybe_Maybe<b>,
     ) -> (List_List<a>) -> List_List<b> {
         { list in
+            // can be optimized
             List_foldr(
                 { (element, soFar) in
                     switch element_toMaybe_Maybe(element) {
