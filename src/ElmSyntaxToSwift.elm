@@ -8707,8 +8707,8 @@ okResultSwiftExpressionRecordEmptyStatementsEmpty =
 swiftExpressionReferenceListAppend : SwiftExpression
 swiftExpressionReferenceListAppend =
     SwiftExpressionReference
-        { moduleOrigin = Just "List"
-        , name = "append"
+        { moduleOrigin = Nothing
+        , name = "List_append"
         }
 
 
@@ -10389,7 +10389,7 @@ okReferenceStringAppend =
 
 okReferenceListAppend : Result error_ { moduleOrigin : Maybe String, name : String }
 okReferenceListAppend =
-    Ok { moduleOrigin = Just "List", name = "append" }
+    Ok { moduleOrigin = Nothing, name = "List_append" }
 
 
 inferredTypeString : ElmSyntaxTypeInfer.Type
