@@ -486,7 +486,6 @@ syntaxExpressionContainedConstructedRecords syntaxExpressionNode =
                             (\declaration ->
                                 case Elm.Syntax.Node.value declaration of
                                     Elm.Syntax.Expression.LetFunction function ->
-                                        -- TODO let annotation as well?
                                         function.declaration
                                             |> Elm.Syntax.Node.value
                                             |> .expression
