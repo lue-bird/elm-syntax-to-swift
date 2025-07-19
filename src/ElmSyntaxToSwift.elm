@@ -30093,12 +30093,12 @@ public static let JsonDecode_value: JsonDecode_Decoder<JsonDecode_Value> =
     })
 }
 @Sendable public static func JsonDecode_lazy<a: Sendable>(
-    _ buildDecoder: @escaping @Sendable () -> JsonDecode_Decoder<a>
+    _ buildDecoder: @escaping @Sendable (()) -> JsonDecode_Decoder<a>
 )
     -> JsonDecode_Decoder<a>
 {
     JsonDecode_Decoder(decode: { toDecode in
-        buildDecoder().decode(toDecode)
+        buildDecoder(()).decode(toDecode)
     })
 }
 @Sendable public static func JsonDecode_andThen<a: Sendable, b: Sendable>(
@@ -31175,7 +31175,7 @@ private static func surrogatePairToUnicodeScalar(
 }
 
 @Sendable public static func ElmKernelParser_isSubString(_ smallString: String)
-    -> (Double)
+    -> @Sendable (Double)
     -> (Double)
     -> (Double)
     -> (String)
@@ -31230,7 +31230,7 @@ private static func surrogatePairToUnicodeScalar(
 @Sendable public static func ElmKernelParser_isSubChar(
     _ predicate: @escaping (UnicodeScalar) -> Bool
 )
-    -> (Double) -> (String) -> Double
+    -> @Sendable (Double) -> (String) -> Double
 {
     { offset in
         { string in
@@ -31264,7 +31264,7 @@ private static func surrogatePairToUnicodeScalar(
 }
 
 @Sendable public static func ElmKernelParser_isAsciiCode(_ code: Double)
-    -> (Double) -> (String) -> Bool
+    -> @Sendable (Double) -> (String) -> Bool
 {
     { offset in
         { string in
@@ -31274,7 +31274,7 @@ private static func surrogatePairToUnicodeScalar(
 }
 
 @Sendable public static func ElmKernelParser_chompBase10(_ offsetOriginal: Double)
-    -> (String) -> Double
+    -> @Sendable (String) -> Double
 {
     { string in
         var offset: Int = Int(offsetOriginal)
@@ -31289,7 +31289,7 @@ private static func surrogatePairToUnicodeScalar(
 }
 
 @Sendable public static func ElmKernelParser_consumeBase(_ baseAsDouble: Double)
-    -> (Double) -> (String) -> (Double, Double)
+    -> @Sendable (Double) -> (String) -> (Double, Double)
 {
     { offsetOriginal in
         { string in
@@ -31312,7 +31312,7 @@ private static func surrogatePairToUnicodeScalar(
 }
 
 @Sendable public static func ElmKernelParser_consumeBase16(_ offsetOriginal: Double)
-    -> (String) -> (Double, Double)
+    -> @Sendable (String) -> (Double, Double)
 {
     { string in
         var offset: Int = Int(offsetOriginal)
@@ -31338,7 +31338,7 @@ private static func surrogatePairToUnicodeScalar(
 }
 
 @Sendable public static func ElmKernelParser_findSubString(_ smallString: String)
-    -> (Double)
+    -> @Sendable (Double)
     -> (Double)
     -> (Double)
     -> (String)

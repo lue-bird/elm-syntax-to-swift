@@ -2759,12 +2759,12 @@ public enum Elm {
         })
     }
     @Sendable public static func JsonDecode_lazy<a: Sendable>(
-        _ buildDecoder: @escaping @Sendable () -> JsonDecode_Decoder<a>
+        _ buildDecoder: @escaping @Sendable (()) -> JsonDecode_Decoder<a>
     )
         -> JsonDecode_Decoder<a>
     {
         JsonDecode_Decoder(decode: { toDecode in
-            buildDecoder().decode(toDecode)
+            buildDecoder(()).decode(toDecode)
         })
     }
     @Sendable public static func JsonDecode_andThen<a: Sendable, b: Sendable>(
@@ -4004,7 +4004,7 @@ public enum Elm {
     }
 
     @Sendable public static func ElmKernelParser_findSubString(_ smallString: String)
-        -> @Sendable  (Double)
+        -> @Sendable (Double)
         -> (Double)
         -> (Double)
         -> (String)
