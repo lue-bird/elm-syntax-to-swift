@@ -1056,16 +1056,20 @@ printSwiftTypeFunction positionOrNothing typeFunction =
     Print.exactly
         (case positionOrNothing of
             Nothing ->
-                "@Sendable "
+                "@Sendable"
 
             Just position ->
                 case position of
                     TypeIncoming ->
-                        "@Sendable @escaping "
+                        "@Sendable @escaping"
 
                     TypeOutgoing ->
-                        "@Sendable "
+                        "@Sendable"
         )
+        |> Print.followedBy
+            (Print.spaceOrLinebreakIndented
+                fullLineSpread
+            )
         |> Print.followedBy
             (input0Print
                 |> Print.followedBy
@@ -10839,30 +10843,28 @@ printSwiftFuncDeclaration swiftValueOrFunctionDeclaration =
                                 printSwiftTypeNotParenthesized (Just TypeIncoming)
                                     parameter.type_
                         in
-                        Print.exactly ("_ " ++ parameter.name)
-                            |> Print.followedBy printExactlyColon
+                        Print.exactly ("_ " ++ parameter.name ++ ":")
                             |> Print.followedBy
-                                (Print.withIndentIncreasedBy 1
-                                    (Print.withIndentAtNextMultipleOf4
-                                        (Print.spaceOrLinebreakIndented
-                                            (parameterTypePrint |> Print.lineSpread)
-                                            |> Print.followedBy
-                                                parameterTypePrint
-                                        )
+                                (Print.withIndentAtNextMultipleOf4
+                                    (Print.spaceOrLinebreakIndented
+                                        (parameterTypePrint |> Print.lineSpread)
+                                        |> Print.followedBy
+                                            parameterTypePrint
                                     )
                                 )
                     )
 
+        parametersLineSpread : Print.LineSpread
+        parametersLineSpread =
+            parameterPrints
+                |> Print.lineSpreadListMapAndCombine
+                    Print.lineSpread
+
         headerLineSpread : Print.LineSpread
         headerLineSpread =
-            resultTypePrint
-                |> Print.lineSpread
+            parametersLineSpread
                 |> Print.lineSpreadMergeWith
-                    (\() ->
-                        parameterPrints
-                            |> Print.lineSpreadListMapAndCombine
-                                Print.lineSpread
-                    )
+                    (\() -> resultTypePrint |> Print.lineSpread)
 
         typeVariablesToDeclare : List String
         typeVariablesToDeclare =
@@ -10885,21 +10887,24 @@ printSwiftFuncDeclaration swiftValueOrFunctionDeclaration =
         |> Print.followedBy
             (Print.withIndentIncreasedBy 4
                 (printParenthesized
-                    (parameterPrints
-                        |> Print.listMapAndIntersperseAndFlatten
-                            (\parameterPrint -> parameterPrint)
-                            (Print.exactly ","
-                                |> Print.followedBy
-                                    (Print.spaceOrLinebreakIndented headerLineSpread)
+                    (Print.emptyOrLinebreakIndented parametersLineSpread
+                        |> Print.followedBy
+                            (parameterPrints
+                                |> Print.listMapAndIntersperseAndFlatten
+                                    (\parameterPrint -> parameterPrint)
+                                    (Print.exactly ","
+                                        |> Print.followedBy
+                                            (Print.spaceOrLinebreakIndented parametersLineSpread)
+                                    )
                             )
                         |> Print.followedBy
-                            (Print.emptyOrLinebreakIndented headerLineSpread)
+                            (Print.emptyOrLinebreakIndented parametersLineSpread)
                     )
                     |> Print.followedBy printExactlySpaceMinusGreaterThanSpace
                     |> Print.followedBy
-                        (Print.withIndentIncreasedBy 3
-                            resultTypePrint
-                        )
+                        (Print.spaceOrLinebreakIndented headerLineSpread)
+                    |> Print.followedBy
+                        resultTypePrint
                     |> Print.followedBy printExactlySpaceCurlyOpening
                     |> Print.followedBy Print.linebreakIndented
                     |> Print.followedBy
@@ -11112,16 +11117,17 @@ printSwiftLocalFuncDeclaration swiftValueOrFunctionDeclaration =
                                 )
                     )
 
+        parametersLineSpread : Print.LineSpread
+        parametersLineSpread =
+            parameterPrints
+                |> Print.lineSpreadListMapAndCombine
+                    Print.lineSpread
+
         headerLineSpread : Print.LineSpread
         headerLineSpread =
-            resultTypePrint
-                |> Print.lineSpread
+            parametersLineSpread
                 |> Print.lineSpreadMergeWith
-                    (\() ->
-                        parameterPrints
-                            |> Print.lineSpreadListMapAndCombine
-                                Print.lineSpread
-                    )
+                    (\() -> resultTypePrint |> Print.lineSpread)
     in
     Print.exactly
         ("@Sendable func "
@@ -11133,21 +11139,24 @@ printSwiftLocalFuncDeclaration swiftValueOrFunctionDeclaration =
         |> Print.followedBy
             (Print.withIndentIncreasedBy 4
                 (printParenthesized
-                    (parameterPrints
-                        |> Print.listMapAndIntersperseAndFlatten
-                            (\parameterPrint -> parameterPrint)
-                            (Print.exactly ","
-                                |> Print.followedBy
-                                    (Print.spaceOrLinebreakIndented headerLineSpread)
+                    (Print.emptyOrLinebreakIndented parametersLineSpread
+                        |> Print.followedBy
+                            (parameterPrints
+                                |> Print.listMapAndIntersperseAndFlatten
+                                    (\parameterPrint -> parameterPrint)
+                                    (Print.exactly ","
+                                        |> Print.followedBy
+                                            (Print.spaceOrLinebreakIndented parametersLineSpread)
+                                    )
                             )
                         |> Print.followedBy
-                            (Print.emptyOrLinebreakIndented headerLineSpread)
+                            (Print.emptyOrLinebreakIndented parametersLineSpread)
                     )
                     |> Print.followedBy printExactlySpaceMinusGreaterThanSpace
                     |> Print.followedBy
-                        (Print.withIndentIncreasedBy 3
-                            resultTypePrint
-                        )
+                        (Print.spaceOrLinebreakIndented headerLineSpread)
+                    |> Print.followedBy
+                        resultTypePrint
                     |> Print.followedBy printExactlySpaceCurlyOpening
                     |> Print.followedBy Print.linebreakIndented
                     |> Print.followedBy
@@ -13803,7 +13812,7 @@ printSwiftStatements swiftStatements =
     swiftStatements
         |> Print.listMapAndIntersperseAndFlatten
             printSwiftStatement
-            printLinebreakIndentedLinebreakIndented
+            Print.linebreakIndented
 
 
 printSwiftStatement : SwiftStatement -> Print
