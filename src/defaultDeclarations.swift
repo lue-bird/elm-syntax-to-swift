@@ -39,65 +39,65 @@ public enum Elm {
         case List_Cons(_ head: a, _ tail: List_List<a>)
     }
 
-    public static func Debug_toString<a>(_ data: a) -> String {
+    @Sendable public static func Debug_toString<a>(_ data: a) -> String {
         String(reflecting: data)
     }
 
-    public static func Debug_log<a>(_ tag: String) -> (a) -> a {
+    @Sendable public static func Debug_log<a>(_ tag: String) -> (a) -> a {
         { data in
             print(tag, data)
             return data
         }
     }
 
-    public static func Debug_todo<a>(_ message: String) -> a {
+    @Sendable public static func Debug_todo<a>(_ message: String) -> a {
         fatalError("TODO " + message)
     }
 
-    public static func Basics_identity<a>(_ a: a) -> a {
+    @Sendable public static func Basics_identity<a>(_ a: a) -> a {
         a
     }
 
-    public static func Basics_always<ignored, kept>(_ kept: kept) -> (ignored) -> kept {
+    @Sendable public static func Basics_always<ignored, kept>(_ kept: kept) -> (ignored) -> kept {
         { _ in kept }
     }
-    public static func Basics_apR<a, b>(_ food: a) -> ((a) -> b) -> b {
+    @Sendable public static func Basics_apR<a, b>(_ food: a) -> ((a) -> b) -> b {
         { eat in eat(food) }
     }
-    public static func Basics_apL<a, b>(_ toApply: @escaping (a) -> b) -> (a) -> b {
+    @Sendable public static func Basics_apL<a, b>(_ toApply: @escaping (a) -> b) -> (a) -> b {
         toApply
     }
-    public static func Basics_composeR<a, b, c>(_ earlier: @escaping (a) -> b)
+    @Sendable public static func Basics_composeR<a, b, c>(_ earlier: @escaping (a) -> b)
         -> (@escaping (b) -> c) -> (a) -> c
     {
         { later in { food in later(earlier(food)) } }
     }
-    public static func Basics_composeL<a, b, c>(_ later: @escaping (b) -> c)
+    @Sendable public static func Basics_composeL<a, b, c>(_ later: @escaping (b) -> c)
         -> (@escaping (a) -> b) -> (a) -> c
     {
         { earlier in { food in later(earlier(food)) } }
     }
 
-    public static func Basics_never<a>(_: Never) -> a {
+    @Sendable public static func Basics_never<a>(_: Never) -> a {
     }
 
-    public static func Basics_not(_ bool: Bool) -> Bool {
+    @Sendable public static func Basics_not(_ bool: Bool) -> Bool {
         !bool
     }
 
-    public static func Basics_or(_ a: Bool) -> (Bool) -> Bool {
+    @Sendable public static func Basics_or(_ a: Bool) -> (Bool) -> Bool {
         { b in a || b }
     }
 
-    public static func Basics_and(_ a: Bool) -> (Bool) -> Bool {
+    @Sendable public static func Basics_and(_ a: Bool) -> (Bool) -> Bool {
         { b in a && b }
     }
 
-    public static func Basics_eq<a: Equatable>(_ a: a) -> (a) -> Bool {
+    @Sendable public static func Basics_eq<a: Equatable>(_ a: a) -> (a) -> Bool {
         { b in a == b }
     }
     // TODO is this overload necessary?
-    public static func Basics_eq<a>(_ a: a) -> (a) -> Bool {
+    @Sendable public static func Basics_eq<a>(_ a: a) -> (a) -> Bool {
         { b in
             if let a = a as? AnyHashable,
                 let b = b as? AnyHashable
@@ -109,11 +109,11 @@ public enum Elm {
         }
     }
 
-    public static func Basics_neq<a: Equatable>(_ a: a) -> (a) -> Bool {
+    @Sendable public static func Basics_neq<a: Equatable>(_ a: a) -> (a) -> Bool {
         { b in a != b }
     }
     // TODO is this overload necessary?
-    public static func Basics_neq<a>(_ a: a) -> (a) -> Bool {
+    @Sendable public static func Basics_neq<a>(_ a: a) -> (a) -> Bool {
         { b in
             if let a = a as? AnyHashable,
                 let b = b as? AnyHashable
@@ -125,23 +125,23 @@ public enum Elm {
         }
     }
 
-    public static func Basics_lt<a: Comparable>(_ a: a) -> (a) -> Bool {
+    @Sendable public static func Basics_lt<a: Comparable>(_ a: a) -> (a) -> Bool {
         { b in a < b }
     }
 
-    public static func Basics_gt<a: Comparable>(_ a: a) -> (a) -> Bool {
+    @Sendable public static func Basics_gt<a: Comparable>(_ a: a) -> (a) -> Bool {
         { b in a > b }
     }
 
-    public static func Basics_le<a: Comparable>(_ a: a) -> (a) -> Bool {
+    @Sendable public static func Basics_le<a: Comparable>(_ a: a) -> (a) -> Bool {
         { b in a <= b }
     }
 
-    public static func Basics_ge<a: Comparable>(_ a: a) -> (a) -> Bool {
+    @Sendable public static func Basics_ge<a: Comparable>(_ a: a) -> (a) -> Bool {
         { b in a >= b }
     }
 
-    public static func Basics_compare<a: Comparable>(_ a: a) -> (a) -> Basics_Order {
+    @Sendable public static func Basics_compare<a: Comparable>(_ a: a) -> (a) -> Basics_Order {
         { b in
             if a < b {
                 .Basics_LT
@@ -154,7 +154,9 @@ public enum Elm {
     }
 
     // TODO is this overload necessary?
-    public static func Basics_compare<comparable: RawRepresentable>(_ a: comparable) -> (comparable)
+    @Sendable public static func Basics_compare<comparable: RawRepresentable>(_ a: comparable) -> (
+        comparable
+    )
         -> Basics_Order
     where comparable.RawValue: Comparable {
         { b in
@@ -168,7 +170,9 @@ public enum Elm {
         }
     }
 
-    public static func Basics_compare<a: Comparable>(_ aList: List_List<a>) -> (List_List<a>) ->
+    @Sendable public static func Basics_compare<a: Comparable>(_ aList: List_List<a>) -> (
+        List_List<a>
+    ) ->
         Basics_Order
     {
         { bList in
@@ -188,17 +192,17 @@ public enum Elm {
         }
     }
 
-    public static func Basics_min<a: Comparable>(_ a: a) -> (a) -> a {
+    @Sendable public static func Basics_min<a: Comparable>(_ a: a) -> (a) -> a {
         { b in if a < b { a } else { b } }
     }
 
-    public static func Basics_max<a: Comparable>(_ a: a) -> (a) -> a {
+    @Sendable public static func Basics_max<a: Comparable>(_ a: a) -> (a) -> a {
         { b in if a > b { a } else { b } }
     }
 
     public static let Basics_e: Double = exp(1.0)
 
-    public static func Basics_clamp(_ low: Double) -> (Double) -> (Double) -> Double {
+    @Sendable public static func Basics_clamp(_ low: Double) -> (Double) -> (Double) -> Double {
         { high in
             { number in
                 if number < low { low } else if number > high { high } else { number }
@@ -206,110 +210,111 @@ public enum Elm {
         }
     }
 
-    public static func Basics_negate(_ float: Double) -> Double {
+    @Sendable public static func Basics_negate(_ float: Double) -> Double {
         -float
     }
 
-    public static func Basics_abs(_ float: Double) -> Double {
+    @Sendable public static func Basics_abs(_ float: Double) -> Double {
         abs(float)
     }
 
-    public static func Basics_truncate(_ float: Double) -> Double {
+    @Sendable public static func Basics_truncate(_ float: Double) -> Double {
         float.rounded(.towardZero)
     }
 
-    public static func Basics_round(_ float: Double) -> Double {
+    @Sendable public static func Basics_round(_ float: Double) -> Double {
         float.rounded()
     }
 
-    public static func Basics_floor(_ float: Double) -> Double {
+    @Sendable public static func Basics_floor(_ float: Double) -> Double {
         float.rounded(.down)
     }
 
-    public static func Basics_ceiling(_ float: Double) -> Double {
+    @Sendable public static func Basics_ceiling(_ float: Double) -> Double {
         float.rounded(.up)
     }
 
-    public static func Basics_isInfinite(_ float: Double) -> Bool {
+    @Sendable public static func Basics_isInfinite(_ float: Double) -> Bool {
         float.isInfinite
     }
 
-    public static func Basics_isNaN(_ float: Double) -> Bool {
+    @Sendable public static func Basics_isNaN(_ float: Double) -> Bool {
         float.isNaN
     }
 
-    public static func Basics_add(_ a: Double) -> (Double) -> Double {
+    @Sendable public static func Basics_add(_ a: Double) -> (Double) -> Double {
         { b in a + b }
     }
 
-    public static func Basics_sub(_ base: Double) -> (Double) -> Double {
+    @Sendable public static func Basics_sub(_ base: Double) -> (Double) -> Double {
         { toSubtract in base - toSubtract }
     }
 
-    public static func Basics_mul(_ a: Double) -> (Double) -> Double {
+    @Sendable public static func Basics_mul(_ a: Double) -> (Double) -> Double {
         { b in a * b }
     }
 
-    public static func Basics_idiv(_ toDivide: Double) -> (Double) -> Double {
+    @Sendable public static func Basics_idiv(_ toDivide: Double) -> (Double) -> Double {
         { divisor in (toDivide / divisor).rounded(.towardZero) }
     }
 
-    public static func Basics_fdiv(_ toDivide: Double) -> (Double) -> Double {
+    @Sendable public static func Basics_fdiv(_ toDivide: Double) -> (Double) -> Double {
         { divisor in toDivide / divisor }
     }
 
-    public static func Basics_remainderBy(_ divisor: Double) -> (Double) -> Double {
+    @Sendable public static func Basics_remainderBy(_ divisor: Double) -> (Double) -> Double {
         { toDivide in toDivide.truncatingRemainder(dividingBy: divisor) }
     }
 
-    public static func Basics_modBy(_ divisor: Double) -> (Double) -> Double {
+    @Sendable public static func Basics_modBy(_ divisor: Double) -> (Double) -> Double {
         { toDivide in toDivide.remainder(dividingBy: divisor) }
     }
 
-    public static func Basics_pow(_ base: Double) -> (Double) -> Double {
+    @Sendable public static func Basics_pow(_ base: Double) -> (Double) -> Double {
         { exponent in pow(base, exponent) }
     }
-    public static func Basics_logBase(_ base: Double) -> (Double) -> Double {
+    @Sendable public static func Basics_logBase(_ base: Double) -> (Double) -> Double {
         { float in log(float) / log(base) }
     }
-    public static func Basics_degrees(_ angleInDegrees: Double) -> Double {
+    @Sendable public static func Basics_degrees(_ angleInDegrees: Double) -> Double {
         (angleInDegrees * Double.pi) / 180
     }
-    public static func Basics_turns(_ angleInTurns: Double) -> Double {
+    @Sendable public static func Basics_turns(_ angleInTurns: Double) -> Double {
         angleInTurns * Double.pi * 2
     }
-    public static func Basics_fromPolar(_ polar: (Double, Double)) -> (Double, Double) {
+    @Sendable public static func Basics_fromPolar(_ polar: (Double, Double)) -> (Double, Double) {
         let (radius, theta) = polar
         return (radius * (cos(theta)), radius * (sin(theta)))
     }
-    public static func Basics_toPolar(_ coordinates: (Double, Double)) -> (Double, Double) {
+    @Sendable public static func Basics_toPolar(_ coordinates: (Double, Double)) -> (Double, Double)
+    {
         let (x, y) = coordinates
         return (sqrt((x * x) + (y * y)), atan2(y, x))
     }
 
-    public static func Basics_atan2(_ y: Double) -> (Double) -> Double {
+    @Sendable public static func Basics_atan2(_ y: Double) -> (Double) -> Double {
         { x in atan2(y, x) }
     }
 
-    public static func Bitwise_complement(_ int: Double) -> Double {
+    @Sendable public static func Bitwise_complement(_ int: Double) -> Double {
         Double(~(Int32(int)))
     }
-    public static func Bitwise_and(_ a: Double) -> (Double) -> Double {
+    @Sendable public static func Bitwise_and(_ a: Double) -> (Double) -> Double {
         { b in Double(Int32(a) & Int32(b)) }
     }
-    public static func Bitwise_or(_ a: Double) -> (Double) -> Double {
+    @Sendable public static func Bitwise_or(_ a: Double) -> (Double) -> Double {
         { b in Double(Int32(a) | Int32(b)) }
     }
-    public static func Bitwise_xor(_ a: Double) -> (Double) -> Double {
+    @Sendable public static func Bitwise_xor(_ a: Double) -> (Double) -> Double {
         { b in Double(Int32(a) ^ Int32(b)) }
     }
-    public static func Bitwise_shiftLeftBy(_ shifts: Double) -> (Double) -> Double {
+    @Sendable public static func Bitwise_shiftLeftBy(_ shifts: Double) -> (Double) -> Double {
         { float in Double(Int32(float) << Int32(shifts)) }
     }
-    public static func Bitwise_shiftRightBy(_ shifts: Double) -> (Double) -> Double {
+    @Sendable public static func Bitwise_shiftRightBy(_ shifts: Double) -> (Double) -> Double {
         { float in Double(Int32(float) >> Int32(shifts)) }
     }
-    public static func Bitwise_shiftRightZfBy(_ shifts: Double) -> (Double) -> Double {
+    @Sendable public static func Bitwise_shiftRightZfBy(_ shifts: Double) -> (Double) -> Double {
         { float in
             Double(
                 UInt32(bitPattern: Int32(float))
@@ -318,11 +323,11 @@ public enum Elm {
         }
     }
 
-    public static func Char_toCode(_ char: UnicodeScalar) -> Double {
+    @Sendable public static func Char_toCode(_ char: UnicodeScalar) -> Double {
         Double(char.value)
     }
 
-    public static func Char_fromCode(_ charCode: Double) -> UnicodeScalar {
+    @Sendable public static func Char_fromCode(_ charCode: Double) -> UnicodeScalar {
         return if let scalar = UnicodeScalar(Int(charCode)) {
             scalar
         } else {
@@ -330,35 +335,35 @@ public enum Elm {
         }
     }
 
-    public static func Char_isHexDigit(_ char: UnicodeScalar) -> Bool {
+    @Sendable public static func Char_isHexDigit(_ char: UnicodeScalar) -> Bool {
         (0x30 <= char.value && char.value <= 0x39)
             || (0x41 <= char.value && char.value <= 0x46)
             || (0x61 <= char.value && char.value <= 0x66)
     }
-    public static func Char_isDigit(_ char: UnicodeScalar) -> Bool {
+    @Sendable public static func Char_isDigit(_ char: UnicodeScalar) -> Bool {
         char.value <= 0x39 && 0x30 <= char.value
     }
-    public static func Char_isUpper(_ char: UnicodeScalar) -> Bool {
+    @Sendable public static func Char_isUpper(_ char: UnicodeScalar) -> Bool {
         char.value <= 0x5A && 0x41 <= char.value
     }
-    public static func Char_isLower(_ char: UnicodeScalar) -> Bool {
+    @Sendable public static func Char_isLower(_ char: UnicodeScalar) -> Bool {
         0x61 <= char.value && char.value <= 0x7A
     }
-    public static func Char_isAlpha(_ char: UnicodeScalar) -> Bool {
+    @Sendable public static func Char_isAlpha(_ char: UnicodeScalar) -> Bool {
         Char_isLower(char) || Char_isUpper(char)
     }
-    public static func Char_isAlphaNum(_ char: UnicodeScalar) -> Bool {
+    @Sendable public static func Char_isAlphaNum(_ char: UnicodeScalar) -> Bool {
         Char_isAlpha(char) || Char_isDigit(char)
     }
 
-    public static func Char_toUpper(_ char: UnicodeScalar) -> UnicodeScalar {
+    @Sendable public static func Char_toUpper(_ char: UnicodeScalar) -> UnicodeScalar {
         if let uppercasedChar = Character(char).uppercased().unicodeScalars.first {
             uppercasedChar
         } else {
             char
         }
     }
-    public static func Char_toLocaleUpper(_ char: UnicodeScalar) -> UnicodeScalar {
+    @Sendable public static func Char_toLocaleUpper(_ char: UnicodeScalar) -> UnicodeScalar {
         // Character does not have uppercased(with: Locale)
         if let uppercasedChar = String(char).uppercased(with: Locale.current).unicodeScalars.first {
             uppercasedChar
@@ -367,7 +372,7 @@ public enum Elm {
         }
     }
 
-    public static func Char_toLower(_ char: UnicodeScalar) -> UnicodeScalar {
+    @Sendable public static func Char_toLower(_ char: UnicodeScalar) -> UnicodeScalar {
         // Character does not have lowercased(with: Locale)
         if let uppercasedChar = Character(char).lowercased().unicodeScalars.first {
             uppercasedChar
@@ -375,7 +380,7 @@ public enum Elm {
             char
         }
     }
-    public static func Char_toLocaleLower(_ char: UnicodeScalar) -> UnicodeScalar {
+    @Sendable public static func Char_toLocaleLower(_ char: UnicodeScalar) -> UnicodeScalar {
         if let uppercasedChar = String(char).lowercased(with: Locale.current).unicodeScalars.first {
             uppercasedChar
         } else {
@@ -383,19 +388,19 @@ public enum Elm {
         }
     }
 
-    public static func String_fromChar(_ char: UnicodeScalar) -> String {
+    @Sendable public static func String_fromChar(_ char: UnicodeScalar) -> String {
         String(char)
     }
 
-    public static func String_fromInt(_ int: Double) -> String {
+    @Sendable public static func String_fromInt(_ int: Double) -> String {
         String(Int64(int))
     }
 
-    public static func String_fromFloat(_ float: Double) -> String {
+    @Sendable public static func String_fromFloat(_ float: Double) -> String {
         String(float)
     }
 
-    public static func String_toInt(_ string: String) -> Maybe_Maybe<Double> {
+    @Sendable public static func String_toInt(_ string: String) -> Maybe_Maybe<Double> {
         switch Int64(string) {
         case .some(let parseResult):
             .Maybe_Just(Double(parseResult))
@@ -404,11 +409,13 @@ public enum Elm {
         }
     }
 
-    public static func String_toFloat(_ string: String) -> Maybe_Maybe<Double> {
+    @Sendable public static func String_toFloat(_ string: String) -> Maybe_Maybe<Double> {
         Maybe_fromOptional(Double(string))
     }
 
-    public static func String_uncons(_ string: String) -> Maybe_Maybe<(UnicodeScalar, String)> {
+    @Sendable public static func String_uncons(_ string: String) -> Maybe_Maybe<
+        (UnicodeScalar, String)
+    > {
         if string.isEmpty {
             return .Maybe_Nothing
         } else {
@@ -419,7 +426,7 @@ public enum Elm {
         }
     }
 
-    public static func String_toList(_ string: String) -> List_List<UnicodeScalar> {
+    @Sendable public static func String_toList(_ string: String) -> List_List<UnicodeScalar> {
         var chars: List_List<UnicodeScalar> = .List_Empty
         for char in string.unicodeScalars.reversed() {
             chars = .List_Cons(char, chars)
@@ -427,7 +434,7 @@ public enum Elm {
         return chars
     }
 
-    public static func String_fromList(_ chars: List_List<UnicodeScalar>) -> String {
+    @Sendable public static func String_fromList(_ chars: List_List<UnicodeScalar>) -> String {
         var remainingChars = chars
         var stringBuffer = String()
         while case .List_Cons(let head, let tail) = remainingChars {
@@ -437,35 +444,35 @@ public enum Elm {
         return stringBuffer
     }
 
-    public static func String_length(_ string: String) -> Double {
+    @Sendable public static func String_length(_ string: String) -> Double {
         Double(string.utf16.count)
     }
 
-    public static func String_isEmpty(_ string: String) -> Bool {
+    @Sendable public static func String_isEmpty(_ string: String) -> Bool {
         string.isEmpty
     }
 
-    public static func String_cons(_ headChar: UnicodeScalar) -> (String) -> String {
+    @Sendable public static func String_cons(_ headChar: UnicodeScalar) -> (String) -> String {
         { tailString in String(headChar) + tailString }
     }
 
-    public static func String_append(_ earlier: String) -> (String) -> String {
+    @Sendable public static func String_append(_ earlier: String) -> (String) -> String {
         { later in earlier + later }
     }
 
-    public static func String_contains(_ sub: String) -> (String) -> Bool {
+    @Sendable public static func String_contains(_ sub: String) -> (String) -> Bool {
         { string in string.contains(sub) }
     }
 
-    public static func String_startsWith(_ start: String) -> (String) -> Bool {
+    @Sendable public static func String_startsWith(_ start: String) -> (String) -> Bool {
         { string in string.hasPrefix(start) }
     }
 
-    public static func String_endsWith(_ end: String) -> (String) -> Bool {
+    @Sendable public static func String_endsWith(_ end: String) -> (String) -> Bool {
         { string in string.hasSuffix(end) }
     }
 
-    public static func String_concat(_ segments: List_List<String>) -> String {
+    @Sendable public static func String_concat(_ segments: List_List<String>) -> String {
         var remainingSegments = segments
         var stringBuffer = String()
         while case .List_Cons(let head, let tail) = remainingSegments {
@@ -475,7 +482,7 @@ public enum Elm {
         return stringBuffer
     }
 
-    public static func String_join(_ inBetween: String) -> (List_List<String>) -> String {
+    @Sendable public static func String_join(_ inBetween: String) -> (List_List<String>) -> String {
         { segments in
             switch segments {
             case .List_Empty:
@@ -494,35 +501,35 @@ public enum Elm {
         }
     }
 
-    public static func String_reverse(_ string: String) -> String {
+    @Sendable public static func String_reverse(_ string: String) -> String {
         String(decoding: string.utf16.reversed(), as: Unicode.UTF16.self)
     }
 
-    public static func String_dropLeft(_ countToSkip: Double) -> (String) -> String {
+    @Sendable public static func String_dropLeft(_ countToSkip: Double) -> (String) -> String {
         { string in
             String(decoding: string.utf16.dropFirst(Int(countToSkip)), as: Unicode.UTF16.self)
         }
     }
 
-    public static func String_dropRight(_ countToSkip: Double) -> (String) -> String {
+    @Sendable public static func String_dropRight(_ countToSkip: Double) -> (String) -> String {
         { string in
             String(decoding: string.utf16.dropLast(Int(countToSkip)), as: Unicode.UTF16.self)
         }
     }
 
-    public static func String_left(_ countToTake: Double) -> (String) -> String {
+    @Sendable public static func String_left(_ countToTake: Double) -> (String) -> String {
         { string in
             String(decoding: string.utf16.prefix(Int(countToTake)), as: Unicode.UTF16.self)
         }
     }
 
-    public static func String_right(_ countToTake: Double) -> (String) -> String {
+    @Sendable public static func String_right(_ countToTake: Double) -> (String) -> String {
         { string in
             String(decoding: string.utf16.suffix(Int(countToTake)), as: Unicode.UTF16.self)
         }
     }
 
-    public static func String_padRight(_ desiredLength: Double) -> (String) -> (String)
+    @Sendable public static func String_padRight(_ desiredLength: Double) -> (String) -> (String)
         -> String
     {
         { padChar in
@@ -532,7 +539,9 @@ public enum Elm {
         }
     }
 
-    public static func String_padLeft(_ desiredLength: Double) -> (String) -> (String) -> String {
+    @Sendable public static func String_padLeft(_ desiredLength: Double) -> (String) -> (String) ->
+        String
+    {
         { string in
             { padChar in
                 String(
@@ -544,13 +553,13 @@ public enum Elm {
         }
     }
 
-    public static func String_repeat(_ count: Double) -> (String) -> String {
+    @Sendable public static func String_repeat(_ count: Double) -> (String) -> String {
         { segment in
             String(repeating: segment, count: Int(count))
         }
     }
 
-    public static func String_replace(_ toReplace: String) -> (String) -> (String)
+    @Sendable public static func String_replace(_ toReplace: String) -> (String) -> (String)
         -> String
     {
         { replacement in
@@ -560,15 +569,15 @@ public enum Elm {
         }
     }
 
-    public static func String_toLower(_ string: String) -> String {
+    @Sendable public static func String_toLower(_ string: String) -> String {
         string.lowercased()
     }
 
-    public static func String_toUpper(_ string: String) -> String {
+    @Sendable public static func String_toUpper(_ string: String) -> String {
         string.uppercased()
     }
 
-    public static func String_trimLeft(_ string: String) -> String {
+    @Sendable public static func String_trimLeft(_ string: String) -> String {
         String(
             string.trimmingPrefix(while: { character in
                 character.isWhitespace || character.isNewline
@@ -576,7 +585,7 @@ public enum Elm {
         )
     }
 
-    public static func String_trimRight(_ string: String) -> String {
+    @Sendable public static func String_trimRight(_ string: String) -> String {
         let startToRestoreAfterTrimming: String.SubSequence =
             string.prefix(while: { character in
                 character.isWhitespace || character.isNewline
@@ -585,11 +594,13 @@ public enum Elm {
             + string.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    public static func String_trim(_ string: String) -> String {
+    @Sendable public static func String_trim(_ string: String) -> String {
         string.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    public static func String_map(_ characterChange: @escaping (UnicodeScalar) -> UnicodeScalar)
+    @Sendable public static func String_map(
+        _ characterChange: @escaping (UnicodeScalar) -> UnicodeScalar
+    )
         -> (String) -> String
     {
         { string in
@@ -597,7 +608,8 @@ public enum Elm {
         }
     }
 
-    public static func String_filter(_ keepCharacter: @escaping (UnicodeScalar) -> Bool) -> (String)
+    @Sendable public static func String_filter(_ keepCharacter: @escaping (UnicodeScalar) -> Bool)
+        -> (String)
         -> String
     {
         { string in
@@ -605,11 +617,12 @@ public enum Elm {
         }
     }
 
-    public static func String_lines(_ string: String) -> List_List<String> {
+    @Sendable public static func String_lines(_ string: String) -> List_List<String> {
         Array_toList(string.components(separatedBy: .newlines))
     }
 
-    public static func String_split(_ separator: String) -> (String) -> List_List<String> {
+    @Sendable public static func String_split(_ separator: String) -> (String) -> List_List<String>
+    {
         { string in
             Array_toList(
                 string.split(separator: separator)
@@ -618,17 +631,19 @@ public enum Elm {
         }
     }
 
-    public static func String_all(_ isExpected: @escaping (UnicodeScalar) -> Bool)
+    @Sendable public static func String_all(_ isExpected: @escaping (UnicodeScalar) -> Bool)
         -> (String) -> Bool
     {
         { string in string.unicodeScalars.allSatisfy(isExpected) }
     }
 
-    public static func String_any(_ isOdd: @escaping (UnicodeScalar) -> Bool) -> (String) -> Bool {
+    @Sendable public static func String_any(_ isOdd: @escaping (UnicodeScalar) -> Bool) -> (String)
+        -> Bool
+    {
         { string in string.unicodeScalars.contains(where: isOdd) }
     }
 
-    public static func String_slice(_ startInclusivePossiblyNegativeAsDouble: Double)
+    @Sendable public static func String_slice(_ startInclusivePossiblyNegativeAsDouble: Double)
         -> (Double) -> (String) -> String
     {
         { endExclusivePossiblyNegative in
@@ -669,7 +684,7 @@ public enum Elm {
         }
     }
 
-    public static func String_foldl<state>(
+    @Sendable public static func String_foldl<state>(
         _ reduce: @escaping (UnicodeScalar) -> (state) -> state
     ) -> (state) -> (String) -> state {
         { initialFolded in
@@ -684,7 +699,7 @@ public enum Elm {
         }
     }
 
-    public static func String_foldr<state>(
+    @Sendable public static func String_foldr<state>(
         _ reduce: @escaping (UnicodeScalar) -> (state) -> state
     ) -> (state) -> (String) -> state {
         { initialFolded in
@@ -699,19 +714,20 @@ public enum Elm {
         }
     }
 
-    public static func Maybe_toOptional<a>(_ optional: Maybe_Maybe<a>) -> a? {
+    @Sendable public static func Maybe_toOptional<a>(_ optional: Maybe_Maybe<a>) -> a? {
         switch optional {
         case .Maybe_Nothing: .none
         case let .Maybe_Just(value): .some(value)
         }
     }
-    public static func Maybe_fromOptional<a>(_ optional: a?) -> Maybe_Maybe<a> {
+    @Sendable public static func Maybe_fromOptional<a>(_ optional: a?) -> Maybe_Maybe<a> {
         switch optional {
         case .none: .Maybe_Nothing
         case let .some(value): .Maybe_Just(value)
         }
     }
-    public static func Maybe_withDefault<a>(_ valueOnNothing: a) -> (Maybe_Maybe<a>) -> a {
+    @Sendable public static func Maybe_withDefault<a>(_ valueOnNothing: a) -> (Maybe_Maybe<a>) -> a
+    {
         { maybe in
             switch maybe {
             case .Maybe_Nothing: valueOnNothing
@@ -719,7 +735,9 @@ public enum Elm {
             }
         }
     }
-    public static func Maybe_map<a, b>(_ valueChange: @escaping (a) -> b) -> (Maybe_Maybe<a>) ->
+    @Sendable public static func Maybe_map<a, b>(_ valueChange: @escaping (a) -> b) -> (
+        Maybe_Maybe<a>
+    ) ->
         Maybe_Maybe<b>
     {
         { maybe in
@@ -729,7 +747,9 @@ public enum Elm {
             }
         }
     }
-    public static func Maybe_map2<a, b, combined>(_ valueCombine: @escaping (a) -> (b) -> combined)
+    @Sendable public static func Maybe_map2<a, b, combined>(
+        _ valueCombine: @escaping (a) -> (b) -> combined
+    )
         -> (Maybe_Maybe<a>) -> (Maybe_Maybe<b>) -> Maybe_Maybe<combined>
     {
         { aMaybe in
@@ -746,7 +766,7 @@ public enum Elm {
             }
         }
     }
-    public static func Maybe_map3<a, b, c, combined>(
+    @Sendable public static func Maybe_map3<a, b, c, combined>(
         _ valueCombine: @escaping (a) -> (b) -> (c) -> combined
     )
         -> (Maybe_Maybe<a>) -> (Maybe_Maybe<b>) -> (Maybe_Maybe<c>) -> Maybe_Maybe<combined>
@@ -771,7 +791,7 @@ public enum Elm {
             }
         }
     }
-    public static func Maybe_map4<a, b, c, d, combined>(
+    @Sendable public static func Maybe_map4<a, b, c, d, combined>(
         _ valueCombine: @escaping (a) -> (b) -> (c) -> (d) -> combined
     )
         -> (Maybe_Maybe<a>) -> (Maybe_Maybe<b>) -> (Maybe_Maybe<c>) -> (Maybe_Maybe<d>) ->
@@ -803,7 +823,7 @@ public enum Elm {
             }
         }
     }
-    public static func Maybe_map5<a, b, c, d, e, combined>(
+    @Sendable public static func Maybe_map5<a, b, c, d, e, combined>(
         _ valueCombine: @escaping (a) -> (b) -> (c) -> (d) -> (e) -> combined
     )
         -> (Maybe_Maybe<a>) -> (Maybe_Maybe<b>) -> (Maybe_Maybe<c>) -> (Maybe_Maybe<d>) -> (
@@ -847,7 +867,9 @@ public enum Elm {
         }
     }
 
-    public static func Maybe_andThen<a, b>(_ valueToMaybe: @escaping (a) -> Maybe_Maybe<b>)
+    @Sendable public static func Maybe_andThen<a, b>(
+        _ valueToMaybe: @escaping (a) -> Maybe_Maybe<b>
+    )
         -> (Maybe_Maybe<a>) -> Maybe_Maybe<b>
     {
         { maybe in
@@ -858,7 +880,7 @@ public enum Elm {
         }
     }
 
-    public static func Result_fromMaybe<a, x>(_ errorOnNothing: x)
+    @Sendable public static func Result_fromMaybe<a, x>(_ errorOnNothing: x)
         -> (Maybe_Maybe<a>) -> Result_Result<x, a>
     {
         { (maybe: Maybe_Maybe<a>) in
@@ -869,14 +891,18 @@ public enum Elm {
         }
     }
 
-    public static func Result_toMaybe<a, x>(_ result: Result_Result<x, a>) -> Maybe_Maybe<a> {
+    @Sendable public static func Result_toMaybe<a, x>(_ result: Result_Result<x, a>) -> Maybe_Maybe<
+        a
+    > {
         switch result {
         case let .Result_Ok(value): .Maybe_Just(value)
         case .Result_Err(_): .Maybe_Nothing
         }
     }
 
-    public static func Result_withDefault<a, x>(_ valueOnError: a) -> (Result_Result<x, a>) -> a {
+    @Sendable public static func Result_withDefault<a, x>(_ valueOnError: a) -> (
+        Result_Result<x, a>
+    ) -> a {
         { (result: Result_Result<x, a>) in
             switch result {
             case let .Result_Ok(value): value
@@ -885,7 +911,7 @@ public enum Elm {
         }
     }
 
-    public static func Result_mapError<a, x, y>(_ errorChange: @escaping (x) -> y)
+    @Sendable public static func Result_mapError<a, x, y>(_ errorChange: @escaping (x) -> y)
         -> (Result_Result<x, a>) -> Result_Result<y, a>
     {
         { (result: Result_Result<x, a>) in
@@ -896,7 +922,7 @@ public enum Elm {
         }
     }
 
-    public static func Result_andThen<a, b, x>(
+    @Sendable public static func Result_andThen<a, b, x>(
         _ onOk: @escaping (a) -> Result_Result<x, b>
     ) -> (Result_Result<x, a>) -> Result_Result<x, b> {
         { (result: Result_Result<x, a>) in
@@ -907,7 +933,7 @@ public enum Elm {
         }
     }
 
-    public static func Result_map<a, b, x>(_ valueChange: @escaping (a) -> b)
+    @Sendable public static func Result_map<a, b, x>(_ valueChange: @escaping (a) -> b)
         -> (Result_Result<x, a>) -> Result_Result<x, b>
     {
         { (result: Result_Result<x, a>) in
@@ -919,7 +945,7 @@ public enum Elm {
         }
     }
 
-    public static func Result_map2<a, b, combined, x>(
+    @Sendable public static func Result_map2<a, b, combined, x>(
         _ combine: @escaping (a) -> (b) -> combined
     ) -> (Result_Result<x, a>) -> (Result_Result<x, b>) -> Result_Result<x, combined> {
         { (aResult: Result_Result<x, a>) in
@@ -937,7 +963,7 @@ public enum Elm {
         }
     }
 
-    public static func Result_map3<a, b, c, combined, x>(
+    @Sendable public static func Result_map3<a, b, c, combined, x>(
         _ combine: @escaping (a) -> (b) -> (c) -> combined
     ) -> (Result_Result<x, a>) -> (Result_Result<x, b>) -> (Result_Result<x, c>)
         -> Result_Result<x, combined>
@@ -963,7 +989,7 @@ public enum Elm {
         }
     }
 
-    public static func Result_map4<a, b, c, d, combined, x>(
+    @Sendable public static func Result_map4<a, b, c, d, combined, x>(
         _ combine: @escaping (a) -> (b) -> (c) -> (d) -> combined
     ) -> (Result_Result<x, a>) -> (Result_Result<x, b>) -> (Result_Result<x, c>)
         -> (Result_Result<x, d>) -> Result_Result<x, combined>
@@ -997,7 +1023,7 @@ public enum Elm {
         }
     }
 
-    public static func Result_map5<a, b, c, d, e, combined, x>(
+    @Sendable public static func Result_map5<a, b, c, d, e, combined, x>(
         _ combine: @escaping (a) -> (b) -> (c) -> (d) -> (e) -> combined
     ) -> (Result_Result<x, a>) -> (Result_Result<x, b>) -> (Result_Result<x, c>)
         -> (Result_Result<x, d>) -> (Result_Result<x, e>) -> Result_Result<x, combined>
@@ -1166,14 +1192,14 @@ public enum Elm {
         return soFar
     }
 
-    public static func Array_toList<a>(_ array: [a]) -> List_List<a> {
+    @Sendable public static func Array_toList<a>(_ array: [a]) -> List_List<a> {
         var soFar: List_List<a> = .List_Empty
         for element in array.reversed() {
             soFar = .List_Cons(element, soFar)
         }
         return soFar
     }
-    public static func Array_toIndexedList<a>(_ array: [a]) -> List_List<(Double, a)> {
+    @Sendable public static func Array_toIndexedList<a>(_ array: [a]) -> List_List<(Double, a)> {
         var soFar: List_List<(Double, a)> = .List_Empty
         var index: Int = array.count - 1
         for element in array.reversed() {
@@ -1199,7 +1225,7 @@ public enum Elm {
         }
     }
 
-    public static func Array_fromList<a>(_ fullList: List_List<a>) -> [a] {
+    @Sendable public static func Array_fromList<a>(_ fullList: List_List<a>) -> [a] {
         var soFar: [a] = Array()
         var remainingList = fullList
         while true {
@@ -1213,13 +1239,13 @@ public enum Elm {
         }
     }
 
-    public static func Array_isEmpty<a>(_ array: [a]) -> Bool {
+    @Sendable public static func Array_isEmpty<a>(_ array: [a]) -> Bool {
         array.isEmpty
     }
-    public static func Array_length<a>(_ array: [a]) -> Double {
+    @Sendable public static func Array_length<a>(_ array: [a]) -> Double {
         Double(array.count)
     }
-    public static func Array_get<a>(_ indexAsDouble: Double) -> ([a]) -> Maybe_Maybe<a> {
+    @Sendable public static func Array_get<a>(_ indexAsDouble: Double) -> ([a]) -> Maybe_Maybe<a> {
         { array in
             let index = Int(indexAsDouble)
             if (index >= 0) && (index < array.count) {
@@ -1229,10 +1255,10 @@ public enum Elm {
             }
         }
     }
-    public static func Array_empty<a>() -> [a] {
+    @Sendable public static func Array_empty<a>() -> [a] {
         []
     }
-    public static func Array_repeat<a>(_ finalLengthAsDouble: Double)
+    @Sendable public static func Array_repeat<a>(_ finalLengthAsDouble: Double)
         -> (a) -> [a]
     {
         { elementToRepeat in
@@ -1244,7 +1270,7 @@ public enum Elm {
             }
         }
     }
-    public static func Array_initialize<a>(_ finalLengthAsDouble: Double)
+    @Sendable public static func Array_initialize<a>(_ finalLengthAsDouble: Double)
         -> (@escaping (Double) -> a) -> [a]
     {
         { indexToElement in
@@ -1263,14 +1289,14 @@ public enum Elm {
             }
         }
     }
-    public static func Array_push<a>(_ newElement: a) -> ([a]) -> [a] {
+    @Sendable public static func Array_push<a>(_ newElement: a) -> ([a]) -> [a] {
         { array in
             var arrayMutable = array
             arrayMutable.append(newElement)
             return arrayMutable
         }
     }
-    public static func Array_set<a>(_ indexAsDouble: Double) -> (a) -> ([a]) -> [a] {
+    @Sendable public static func Array_set<a>(_ indexAsDouble: Double) -> (a) -> ([a]) -> [a] {
         { newElement in
             { array in
                 let index = Int(indexAsDouble)
@@ -1284,16 +1310,20 @@ public enum Elm {
             }
         }
     }
-    public static func Array_reverse<a>(_ array: [a]) -> [a] {
+    @Sendable public static func Array_reverse<a>(_ array: [a]) -> [a] {
         array.reversed()
     }
-    public static func Array_filter<a>(_ keepElement: @escaping (a) -> Bool) -> ([a]) -> [a] {
+    @Sendable public static func Array_filter<a>(_ keepElement: @escaping (a) -> Bool) -> ([a]) ->
+        [a]
+    {
         { array in array.filter(keepElement) }
     }
-    public static func Array_map<a, b>(_ elementChange: @escaping (a) -> b) -> ([a]) -> [b] {
+    @Sendable public static func Array_map<a, b>(_ elementChange: @escaping (a) -> b) -> ([a]) ->
+        [b]
+    {
         { array in array.map(elementChange) }
     }
-    public static func Array_indexedMap<a, b>(
+    @Sendable public static func Array_indexedMap<a, b>(
         _ indexAndElementToNew: @escaping (Double) -> (a) -> b
     ) -> ([a]) -> [b] {
         { array in
@@ -1303,7 +1333,7 @@ public enum Elm {
                 })
         }
     }
-    public static func Array_slice<a>(
+    @Sendable public static func Array_slice<a>(
         _ startInclusivePossiblyNegativeAsDouble: Double
     ) -> (Double) -> ([a]) -> [a] {
         { endExclusivePossiblyNegative in
@@ -1327,11 +1357,11 @@ public enum Elm {
         }
     }
 
-    public static func Array_append<a>(_ left: [a]) -> ([a]) -> [a] {
+    @Sendable public static func Array_append<a>(_ left: [a]) -> ([a]) -> [a] {
         { right in left + right }
     }
 
-    public static func Array_foldl<a, state>(_ reduce: @escaping (a) -> (state) -> state)
+    @Sendable public static func Array_foldl<a, state>(_ reduce: @escaping (a) -> (state) -> state)
         -> (state) -> ([a]) -> state
     {
         { initialState in
@@ -1345,7 +1375,7 @@ public enum Elm {
             }
         }
     }
-    public static func Array_foldr<a, state>(_ reduce: @escaping (a) -> (state) -> state)
+    @Sendable public static func Array_foldr<a, state>(_ reduce: @escaping (a) -> (state) -> state)
         -> (state) -> ([a]) -> state
     {
         { initialState in
@@ -1359,35 +1389,35 @@ public enum Elm {
         }
     }
 
-    public static func List_singleton<a>(_ onlyElement: a) -> List_List<a> {
+    @Sendable public static func List_singleton<a>(_ onlyElement: a) -> List_List<a> {
         .List_Cons(onlyElement, .List_Empty)
     }
 
-    public static func List_cons<a>(_ newHead: a) -> (List_List<a>) -> List_List<a> {
+    @Sendable public static func List_cons<a>(_ newHead: a) -> (List_List<a>) -> List_List<a> {
         { tail in List_List.List_Cons(newHead, tail) }
     }
 
-    public static func List_isEmpty<a>(_ list: List_List<a>) -> Bool {
+    @Sendable public static func List_isEmpty<a>(_ list: List_List<a>) -> Bool {
         switch list {
         case .List_Empty: true
         case .List_Cons(_, _): false
         }
     }
 
-    public static func List_head<a>(_ list: List_List<a>) -> Maybe_Maybe<a> {
+    @Sendable public static func List_head<a>(_ list: List_List<a>) -> Maybe_Maybe<a> {
         switch list {
         case .List_Empty: .Maybe_Nothing
         case .List_Cons(let head, _): .Maybe_Just(head)
         }
     }
-    public static func List_tail<a>(_ list: List_List<a>) -> Maybe_Maybe<List_List<a>> {
+    @Sendable public static func List_tail<a>(_ list: List_List<a>) -> Maybe_Maybe<List_List<a>> {
         switch list {
         case .List_Empty: .Maybe_Nothing
         case .List_Cons(_, let tail): .Maybe_Just(tail)
         }
     }
 
-    public static func List_length<a>(_ list: List_List<a>) -> Double {
+    @Sendable public static func List_length<a>(_ list: List_List<a>) -> Double {
         Double(List_foldl({ (_, soFar) in soFar + 1 }, 0, list))
     }
 
@@ -1408,7 +1438,7 @@ public enum Elm {
             }
         }
     }
-    public static func List_foldl<a, state>(
+    @Sendable public static func List_foldl<a, state>(
         _ reduce: @escaping (a) -> (state) -> state
     ) -> (state) -> (List_List<a>) -> state {
         { initialFolded in
@@ -1435,17 +1465,19 @@ public enum Elm {
     ) -> state {
         List_foldl(reduce, initialFolded, List_reverse(list))
     }
-    public static func List_foldr<a, state>(
+    @Sendable public static func List_foldr<a, state>(
         _ reduce: @escaping (a) -> (state) -> state,
     ) -> (state) -> (List_List<a>) -> state {
         { initialFolded in { list in List_foldl(reduce)(initialFolded)(List_reverse(list)) } }
     }
 
-    public static func List_reverse<a>(_ list: List_List<a>) -> List_List<a> {
+    @Sendable public static func List_reverse<a>(_ list: List_List<a>) -> List_List<a> {
         List_foldl(List_List.List_Cons, .List_Empty, list)
     }
 
-    public static func List_all<a>(_ isExpected: @escaping (a) -> Bool) -> (List_List<a>) -> Bool {
+    @Sendable public static func List_all<a>(_ isExpected: @escaping (a) -> Bool) -> (List_List<a>)
+        -> Bool
+    {
         { list in
             var remainingList = list
             while case .List_Cons(let head, let tail) = remainingList {
@@ -1459,7 +1491,9 @@ public enum Elm {
         }
     }
 
-    public static func List_any<a>(_ isOdd: @escaping (a) -> Bool) -> (List_List<a>) -> Bool {
+    @Sendable public static func List_any<a>(_ isOdd: @escaping (a) -> Bool) -> (List_List<a>) ->
+        Bool
+    {
         { list in
             var remainingList = list
             while case .List_Cons(let head, let tail) = remainingList {
@@ -1473,11 +1507,13 @@ public enum Elm {
         }
     }
 
-    public static func List_member<a>(_ needle: (a)) -> (List_List<a>) -> Bool {
+    @Sendable public static func List_member<a>(_ needle: (a)) -> (List_List<a>) -> Bool {
         List_any({ element in Basics_eq(element)(needle) })
     }
 
-    public static func List_drop<a>(_ countToSkip: Double) -> (List_List<a>) -> List_List<a> {
+    @Sendable public static func List_drop<a>(_ countToSkip: Double) -> (List_List<a>) -> List_List<
+        a
+    > {
         { list in
             var remainingCountToSkip = countToSkip
             var remainingList = list
@@ -1494,7 +1530,9 @@ public enum Elm {
         }
     }
 
-    public static func List_take<a>(_ countToTake: Double) -> (List_List<a>) -> List_List<a> {
+    @Sendable public static func List_take<a>(_ countToTake: Double) -> (List_List<a>) -> List_List<
+        a
+    > {
         { list in
             var remainingCountToTake = countToTake
             var remainingList = list
@@ -1513,7 +1551,9 @@ public enum Elm {
         }
     }
 
-    public static func List_intersperse<a>(_ inBetween: a) -> (List_List<a>) -> List_List<a> {
+    @Sendable public static func List_intersperse<a>(_ inBetween: a) -> (List_List<a>) -> List_List<
+        a
+    > {
         { list in
             switch list {
             case .List_Empty: .List_Empty
@@ -1529,7 +1569,9 @@ public enum Elm {
         }
     }
 
-    public static func List_map<a, b>(_ elementChange: @escaping (a) -> b) -> (List_List<a>)
+    @Sendable public static func List_map<a, b>(_ elementChange: @escaping (a) -> b) -> (
+        List_List<a>
+    )
         -> List_List<b>
     {
         { list in
@@ -1544,7 +1586,7 @@ public enum Elm {
         }
     }
 
-    public static func List_indexedMap<a, b>(
+    @Sendable public static func List_indexedMap<a, b>(
         _ indexedElementChange: @escaping (Double) -> (a) -> b,
     ) -> (List_List<a>) -> List_List<b> {
         { list in
@@ -1562,7 +1604,7 @@ public enum Elm {
         }
     }
 
-    public static func List_map2<a, b, c>(
+    @Sendable public static func List_map2<a, b, c>(
         _ combineAb: @escaping (a) -> (b) -> c,
     ) -> (List_List<a>) -> (List_List<b>) -> List_List<c> {
         { aList in
@@ -1582,7 +1624,7 @@ public enum Elm {
             }
         }
     }
-    public static func List_map3<a, b, c, combined>(
+    @Sendable public static func List_map3<a, b, c, combined>(
         _ combine: @escaping (a) -> (b) -> (c) -> combined,
     ) -> (List_List<a>) -> (List_List<b>) -> (List_List<c>) -> List_List<combined> {
         { aList in
@@ -1607,7 +1649,7 @@ public enum Elm {
             }
         }
     }
-    public static func List_map4<a, b, c, d, combined>(
+    @Sendable public static func List_map4<a, b, c, d, combined>(
         _ combine: @escaping (a) -> (b) -> (c) -> (d) -> combined,
     ) -> (List_List<a>) -> (List_List<b>) -> (List_List<c>) -> (List_List<d>) -> List_List<combined>
     {
@@ -1638,7 +1680,7 @@ public enum Elm {
             }
         }
     }
-    public static func List_map5<a, b, c, d, e, combined>(
+    @Sendable public static func List_map5<a, b, c, d, e, combined>(
         _ combine: @escaping (a) -> (b) -> (c) -> (d) -> (e) -> combined,
     ) -> (List_List<a>) -> (List_List<b>) -> (List_List<c>) -> (List_List<d>) -> (List_List<e>) ->
         List_List<combined>
@@ -1680,13 +1722,13 @@ public enum Elm {
         }
     }
 
-    public static func List_zip<a, b>(_ aList: List_List<a>) -> (List_List<b>)
+    @Sendable public static func List_zip<a, b>(_ aList: List_List<a>) -> (List_List<b>)
         -> List_List<(first: a, second: b)>
     {
         { bList in List_map2({ a in { b in (first: a, second: b) } })(aList)(bList) }
     }
 
-    public static func List_unzip<a, b>(_ abList: List_List<(first: a, second: b)>)
+    @Sendable public static func List_unzip<a, b>(_ abList: List_List<(first: a, second: b)>)
         -> (first: List_List<a>, second: List_List<b>)
     {
         (
@@ -1695,7 +1737,7 @@ public enum Elm {
         )
     }
 
-    public static func List_filter<a>(_ keepElement: @escaping (a) -> Bool)
+    @Sendable public static func List_filter<a>(_ keepElement: @escaping (a) -> Bool)
         -> (List_List<a>) -> List_List<a>
     {
         { list in
@@ -1714,7 +1756,7 @@ public enum Elm {
         }
     }
 
-    public static func List_filterMap<a, b>(
+    @Sendable public static func List_filterMap<a, b>(
         _ element_toMaybe_Maybe: @escaping (a) -> Maybe_Maybe<b>,
     ) -> (List_List<a>) -> List_List<b> {
         { list in
@@ -1733,7 +1775,9 @@ public enum Elm {
         }
     }
 
-    public static func List_append<a>(_ earlier: List_List<a>) -> (List_List<a>) -> List_List<a> {
+    @Sendable public static func List_append<a>(_ earlier: List_List<a>) -> (List_List<a>) ->
+        List_List<a>
+    {
         { later in
             // can be optimized
             List_foldr(
@@ -1746,7 +1790,9 @@ public enum Elm {
         }
     }
 
-    public static func List_concatMap<a, b>(_ elementToList: @escaping (a) -> List_List<b>)
+    @Sendable public static func List_concatMap<a, b>(
+        _ elementToList: @escaping (a) -> List_List<b>
+    )
         -> (List_List<a>) -> List_List<b>
     {
         { list in
@@ -1761,7 +1807,7 @@ public enum Elm {
         }
     }
 
-    public static func List_concat<a>(_ list: List_List<List_List<a>>) -> List_List<a> {
+    @Sendable public static func List_concat<a>(_ list: List_List<List_List<a>>) -> List_List<a> {
         // can be optimized
         List_foldr(
             { (element, soFar) in
@@ -1772,7 +1818,7 @@ public enum Elm {
         )
     }
 
-    public static func List_repeat<a>(_ count: Double) -> (a) -> List_List<a> {
+    @Sendable public static func List_repeat<a>(_ count: Double) -> (a) -> List_List<a> {
         { element in
             if count <= 0 {
                 return .List_Empty
@@ -1786,7 +1832,7 @@ public enum Elm {
         }
     }
 
-    public static func List_range(_ start: Double) -> (Double) -> List_List<Double> {
+    @Sendable public static func List_range(_ start: Double) -> (Double) -> List_List<Double> {
         { end in
             if start > end {
                 return .List_Empty
@@ -1799,7 +1845,7 @@ public enum Elm {
             }
         }
     }
-    public static func List_sum(_ list: List_List<Double>) -> Double {
+    @Sendable public static func List_sum(_ list: List_List<Double>) -> Double {
         var sumSoFar: Double = 0.0
         var remainingList = list
         while case let .List_Cons(head, tail) = remainingList {
@@ -1808,7 +1854,7 @@ public enum Elm {
         }
         return sumSoFar
     }
-    public static func List_product(_ list: List_List<Double>) -> Double {
+    @Sendable public static func List_product(_ list: List_List<Double>) -> Double {
         var productSoFar: Double = 1.0
         var remainingList = list
         while case let .List_Cons(head, tail) = remainingList {
@@ -1818,7 +1864,8 @@ public enum Elm {
         return productSoFar
     }
 
-    public static func List_maximum<a: Comparable>(_ list: List_List<a>) -> Maybe_Maybe<a> {
+    @Sendable public static func List_maximum<a: Comparable>(_ list: List_List<a>) -> Maybe_Maybe<a>
+    {
         switch list {
         case .List_Empty:
             .Maybe_Nothing
@@ -1827,7 +1874,8 @@ public enum Elm {
         }
     }
 
-    public static func List_minimum<a: Comparable>(_ list: List_List<a>) -> Maybe_Maybe<a> {
+    @Sendable public static func List_minimum<a: Comparable>(_ list: List_List<a>) -> Maybe_Maybe<a>
+    {
         switch list {
         case .List_Empty:
             .Maybe_Nothing
@@ -1836,7 +1884,9 @@ public enum Elm {
         }
     }
 
-    public static func List_sortWith<a>(_ elementCompare: @escaping (a) -> (a) -> Basics_Order)
+    @Sendable public static func List_sortWith<a>(
+        _ elementCompare: @escaping (a) -> (a) -> Basics_Order
+    )
         -> (List_List<a>) -> List_List<a>
     {
         { list in
@@ -1846,7 +1896,7 @@ public enum Elm {
         }
     }
 
-    public static func List_sortBy<element, comparable>(
+    @Sendable public static func List_sortBy<element, comparable>(
         _ elementToComparable: @escaping (element) -> comparable
     ) -> (List_List<element>) -> List_List<element>
     where comparable: Comparable {
@@ -1857,7 +1907,7 @@ public enum Elm {
         }
     }
 
-    public static func List_sort<comparable>(_ list: List_List<comparable>)
+    @Sendable public static func List_sort<comparable>(_ list: List_List<comparable>)
         -> List_List<comparable>
     where comparable: Comparable {
         var asArray = Array_fromList(list)
@@ -1865,16 +1915,16 @@ public enum Elm {
         return Array_toList(asArray)
     }
 
-    public static func Set_size<a>(_ set: Set<a>) -> Double {
+    @Sendable public static func Set_size<a>(_ set: Set<a>) -> Double {
         Double(set.count)
     }
-    public static func Set_empty<a>() -> Set<a> {
+    @Sendable public static func Set_empty<a>() -> Set<a> {
         Set()
     }
-    public static func Set_singleton<a>(_ onlyElement: a) -> Set<a> {
+    @Sendable public static func Set_singleton<a>(_ onlyElement: a) -> Set<a> {
         [onlyElement]
     }
-    public static func Set_fromList<a>(_ list: List_List<a>) -> Set<a> {
+    @Sendable public static func Set_fromList<a>(_ list: List_List<a>) -> Set<a> {
         var set: Set<a> = Set()
         var remainingList = list
         while case let .List_Cons(element, afterElement) = remainingList {
@@ -1883,53 +1933,57 @@ public enum Elm {
         }
         return set
     }
-    public static func Set_toList<a>(_ set: Set<a>) -> List_List<a> {
+    @Sendable public static func Set_toList<a>(_ set: Set<a>) -> List_List<a> {
         var list: List_List<a> = .List_Empty
         for element in set.reversed() {
             list = .List_Cons(element, list)
         }
         return list
     }
-    public static func Set_isEmpty<a>(_ set: Set<a>) -> Bool {
+    @Sendable public static func Set_isEmpty<a>(_ set: Set<a>) -> Bool {
         set.isEmpty
     }
-    public static func Set_member<a>(_ needle: a) -> (Set<a>) -> Bool {
+    @Sendable public static func Set_member<a>(_ needle: a) -> (Set<a>) -> Bool {
         { set in set.contains(needle) }
     }
-    public static func Set_insert<a>(_ newElement: a) -> (Set<a>) -> Set<a> {
+    @Sendable public static func Set_insert<a>(_ newElement: a) -> (Set<a>) -> Set<a> {
         { set in
             var setMutable = set
             setMutable.insert(newElement)
             return setMutable
         }
     }
-    public static func Set_remove<a>(_ badApple: a) -> (Set<a>) -> Set<a> {
+    @Sendable public static func Set_remove<a>(_ badApple: a) -> (Set<a>) -> Set<a> {
         { set in
             var setMutable = set
             setMutable.remove(badApple)
             return setMutable
         }
     }
-    public static func Set_diff<a>(_ baseSet: Set<a>) -> (Set<a>) -> Set<a> {
+    @Sendable public static func Set_diff<a>(_ baseSet: Set<a>) -> (Set<a>) -> Set<a> {
         { badApples in
             var setMutable = baseSet
             setMutable.subtract(badApples)
             return setMutable
         }
     }
-    public static func Set_intersect<a>(_ aSet: Set<a>) -> (Set<a>) -> Set<a> {
+    @Sendable public static func Set_intersect<a>(_ aSet: Set<a>) -> (Set<a>) -> Set<a> {
         { bSet in aSet.intersection(bSet) }
     }
-    public static func Set_union<a>(_ aSet: Set<a>) -> (Set<a>) -> Set<a> {
+    @Sendable public static func Set_union<a>(_ aSet: Set<a>) -> (Set<a>) -> Set<a> {
         { bSet in aSet.union(bSet) }
     }
-    public static func Set_map<a, b>(_ elementChange: @escaping (a) -> b) -> (Set<a>) -> Set<b> {
+    @Sendable public static func Set_map<a, b>(_ elementChange: @escaping (a) -> b) -> (Set<a>) ->
+        Set<b>
+    {
         { set in Set(set.map(elementChange)) }
     }
-    public static func Set_filter<a>(_ keepElement: @escaping (a) -> Bool) -> (Set<a>) -> Set<a> {
+    @Sendable public static func Set_filter<a>(_ keepElement: @escaping (a) -> Bool) -> (Set<a>) ->
+        Set<a>
+    {
         { set in set.filter(keepElement) }
     }
-    public static func Set_partition<a>(_ isLeft: @escaping (a) -> Bool) -> (Set<a>) -> (
+    @Sendable public static func Set_partition<a>(_ isLeft: @escaping (a) -> Bool) -> (Set<a>) -> (
         Set<a>, Set<a>
     ) {
         { set in
@@ -1945,7 +1999,7 @@ public enum Elm {
             return (left, right)
         }
     }
-    public static func Set_foldl<a, state>(_ reduce: @escaping (a) -> (state) -> state)
+    @Sendable public static func Set_foldl<a, state>(_ reduce: @escaping (a) -> (state) -> state)
         -> (state) -> (Set<a>) -> (state)
     {
         { initialState in
@@ -1957,7 +2011,7 @@ public enum Elm {
             }
         }
     }
-    public static func Set_foldr<a, state>(_ reduce: @escaping (a) -> (state) -> state)
+    @Sendable public static func Set_foldr<a, state>(_ reduce: @escaping (a) -> (state) -> state)
         -> (state) -> (Set<a>) -> (state)
     {
         { initialState in
@@ -1970,16 +2024,16 @@ public enum Elm {
         }
     }
 
-    public static func Dict_size<key, value>(_ dictionary: [key: value]) -> Double {
+    @Sendable public static func Dict_size<key, value>(_ dictionary: [key: value]) -> Double {
         Double(dictionary.count)
     }
-    public static func Dict_empty<key, value>() -> [key: value] {
+    @Sendable public static func Dict_empty<key, value>() -> [key: value] {
         Dictionary()
     }
-    public static func Dict_singleton<key, value>(_ key: key) -> (value) -> [key: value] {
+    @Sendable public static func Dict_singleton<key, value>(_ key: key) -> (value) -> [key: value] {
         { value in [key: value] }
     }
-    public static func Dict_fromList<key, value>(_ list: List_List<(key, value)>)
+    @Sendable public static func Dict_fromList<key, value>(_ list: List_List<(key, value)>)
         -> [key: value]
     {
         var dictionary: [key: value] = Dictionary()
@@ -1990,7 +2044,7 @@ public enum Elm {
         }
         return dictionary
     }
-    public static func Dict_toList<key, value>(_ dictionary: [key: value])
+    @Sendable public static func Dict_toList<key, value>(_ dictionary: [key: value])
         -> List_List<(key, value)>
     {
         var list: List_List<(key, value)> = .List_Empty
@@ -1999,7 +2053,7 @@ public enum Elm {
         }
         return list
     }
-    public static func Dict_keys<key, value>(_ dictionary: [key: value])
+    @Sendable public static func Dict_keys<key, value>(_ dictionary: [key: value])
         -> List_List<key>
     {
         var list: List_List<key> = .List_Empty
@@ -2008,7 +2062,7 @@ public enum Elm {
         }
         return list
     }
-    public static func Dict_keys<key, value>(_ dictionary: [key: value])
+    @Sendable public static func Dict_keys<key, value>(_ dictionary: [key: value])
         -> List_List<value>
     {
         var list: List_List<value> = .List_Empty
@@ -2017,10 +2071,10 @@ public enum Elm {
         }
         return list
     }
-    public static func Dict_isEmpty<key, value>(_ dictionary: [key: value]) -> Bool {
+    @Sendable public static func Dict_isEmpty<key, value>(_ dictionary: [key: value]) -> Bool {
         dictionary.isEmpty
     }
-    public static func Dict_member<key, value>(_ needle: key) -> ([key: value]) -> Bool {
+    @Sendable public static func Dict_member<key, value>(_ needle: key) -> ([key: value]) -> Bool {
         { dictionary in
             switch dictionary[needle] {
             case .none: false
@@ -2028,10 +2082,12 @@ public enum Elm {
             }
         }
     }
-    public static func Dict_get<key, value>(_ key: key) -> ([key: value]) -> Maybe_Maybe<value> {
+    @Sendable public static func Dict_get<key, value>(_ key: key) -> ([key: value]) -> Maybe_Maybe<
+        value
+    > {
         { dictionary in Maybe_fromOptional(dictionary[key]) }
     }
-    public static func Dict_insert<key, value>(_ key: key)
+    @Sendable public static func Dict_insert<key, value>(_ key: key)
         -> (value) -> ([key: value]) -> [key: value]
     {
         { value in
@@ -2042,7 +2098,7 @@ public enum Elm {
             }
         }
     }
-    public static func Dict_update<key, value>(_ key: key)
+    @Sendable public static func Dict_update<key, value>(_ key: key)
         -> (@escaping (Maybe_Maybe<value>) -> Maybe_Maybe<value>) -> ([key: value]) -> [key: value]
     {
         { maybeValueToMaybeValue in
@@ -2057,7 +2113,7 @@ public enum Elm {
             }
         }
     }
-    public static func Dict_remove<key, value>(_ badApple: key)
+    @Sendable public static func Dict_remove<key, value>(_ badApple: key)
         -> ([key: value]) -> [key: value]
     {
         { dictionary in
@@ -2066,7 +2122,7 @@ public enum Elm {
             return dictionaryMutable
         }
     }
-    public static func Dict_diff<key, a, b>(_ baseDictionary: [key: a])
+    @Sendable public static func Dict_diff<key, a, b>(_ baseDictionary: [key: a])
         -> ([key: b]) -> [key: a]
     {
         { badApples in
@@ -2078,7 +2134,7 @@ public enum Elm {
             })
         }
     }
-    public static func Dict_intersect<key, value>(_ aDictionary: [key: value])
+    @Sendable public static func Dict_intersect<key, value>(_ aDictionary: [key: value])
         -> ([key: value]) -> [key: value]
     {
         { bDictionary in
@@ -2090,7 +2146,7 @@ public enum Elm {
             })
         }
     }
-    public static func Dict_union<key, value>(_ aDictionary: [key: value])
+    @Sendable public static func Dict_union<key, value>(_ aDictionary: [key: value])
         -> ([key: value]) -> [key: value]
     {
         { bDictionary in
@@ -2099,7 +2155,7 @@ public enum Elm {
             return aDictionaryMutable
         }
     }
-    public static func Dict_merge<key, a, b, state>(
+    @Sendable public static func Dict_merge<key, a, b, state>(
         _ onlyA: @escaping (key) -> (a) -> (state) -> state
     )
         -> (@escaping (key) -> (a) -> (b) -> (state) -> state)
@@ -2133,7 +2189,7 @@ public enum Elm {
             }
         }
     }
-    public static func Dict_map<key, a, b>(
+    @Sendable public static func Dict_map<key, a, b>(
         _ entryToNewValue: @escaping (key) -> (a) -> b
     )
         -> ([key: a]) -> [key: b]
@@ -2147,7 +2203,7 @@ public enum Elm {
             )
         }
     }
-    public static func Dict_filter<key, value>(
+    @Sendable public static func Dict_filter<key, value>(
         _ keepElement: @escaping (key) -> (value) -> Bool
     )
         -> ([key: value]) -> [key: value]
@@ -2158,7 +2214,7 @@ public enum Elm {
             )
         }
     }
-    public static func Dict_partition<key, value>(
+    @Sendable public static func Dict_partition<key, value>(
         _ isLeft: @escaping (key) -> (value) -> Bool
     )
         -> ([key: value])
@@ -2177,7 +2233,7 @@ public enum Elm {
             return (left, right)
         }
     }
-    public static func Dict_foldl<key, value, state>(
+    @Sendable public static func Dict_foldl<key, value, state>(
         _ reduce: @escaping (key) -> (value) -> (state) -> state
     )
         -> (state) -> ([key: value]) -> (state)
@@ -2191,7 +2247,7 @@ public enum Elm {
             }
         }
     }
-    public static func Dict_foldr<key, value, state>(
+    @Sendable public static func Dict_foldr<key, value, state>(
         _ reduce: @escaping (key) -> (value) -> (state) -> state
     )
         -> (state) -> ([key: value]) -> (state)
@@ -2218,7 +2274,7 @@ public enum Elm {
     )
 
     public static let Regex_never: Regex_Regex = .Regex_Regex("/.^/")
-    public static func Regex_fromString(_ string: String) -> Maybe_Maybe<Regex_Regex> {
+    @Sendable public static func Regex_fromString(_ string: String) -> Maybe_Maybe<Regex_Regex> {
         do {
             try _ = Regex(string)
             return .Maybe_Just(.Regex_Regex(string))
@@ -2226,7 +2282,7 @@ public enum Elm {
             return .Maybe_Nothing
         }
     }
-    public static func Regex_contains(_ regex: Regex_Regex) -> (String) -> Bool {
+    @Sendable public static func Regex_contains(_ regex: Regex_Regex) -> (String) -> Bool {
         { string in
             switch regex {
             case let .Regex_Regex(regexString):
@@ -2238,7 +2294,8 @@ public enum Elm {
             }
         }
     }
-    public static func Regex_split(_ regex: Regex_Regex) -> (String) -> List_List<String> {
+    @Sendable public static func Regex_split(_ regex: Regex_Regex) -> (String) -> List_List<String>
+    {
         { string in
             switch regex {
             case let .Regex_Regex(regexString):
@@ -2254,7 +2311,9 @@ public enum Elm {
         }
     }
 
-    public static func Regex_splitAtMost(_ maxSplitCount: Double) -> (Regex_Regex) -> (String) ->
+    @Sendable public static func Regex_splitAtMost(_ maxSplitCount: Double) -> (Regex_Regex) -> (
+        String
+    ) ->
         List_List<String>
     {
         { regex in
@@ -2319,22 +2378,23 @@ public enum Elm {
         year: Double
     )
 
-    public static func Time_posixToMillis(_ timePosix: Time_Posix) -> Double {
+    @Sendable public static func Time_posixToMillis(_ timePosix: Time_Posix) -> Double {
         switch timePosix {
         case let .Time_Posix(millis): millis
         }
     }
-    public static func Time_millisToPosix(_ millis: Double) -> Time_Posix {
+    @Sendable public static func Time_millisToPosix(_ millis: Double) -> Time_Posix {
         .Time_Posix(millis)
     }
 
     public static let Time_utc: Time_Zone = .Time_Zone(0, .List_Empty)
 
-    public static func Time_customZone(_ n: Double) -> (List_List<Time_Era>) -> Time_Zone {
+    @Sendable public static func Time_customZone(_ n: Double) -> (List_List<Time_Era>) -> Time_Zone
+    {
         { eras in .Time_Zone(n, eras) }
     }
 
-    public static func flooredDiv(_ numerator: Double, _ denominator: Double) -> Double {
+    @Sendable public static func flooredDiv(_ numerator: Double, _ denominator: Double) -> Double {
         (floor(numerator / denominator))
     }
 
@@ -2368,7 +2428,7 @@ public enum Elm {
         }
     }
 
-    public static func Time_toCivil(_ minutes: Double) -> Time_Civil {
+    @Sendable public static func Time_toCivil(_ minutes: Double) -> Time_Civil {
         let rawDay = flooredDiv(minutes, 60 * 24) + 719468
         let era = if rawDay >= 0 { rawDay / 146097 } else { (rawDay - 146096) / 146097 }
         let dayOfEra = rawDay - era * 146097  // [0, 146096]
@@ -2394,11 +2454,11 @@ public enum Elm {
         )
     }
 
-    public static func Time_toYear(_ zone: Time_Zone) -> (Time_Posix) -> Double {
+    @Sendable public static func Time_toYear(_ zone: Time_Zone) -> (Time_Posix) -> Double {
         { time in (Time_toCivil(Time_toAdjustedMinutes(zone, time))).year }
     }
 
-    public static func Time_toMonth(_ zone: Time_Zone) -> (Time_Posix) -> Time_Month {
+    @Sendable public static func Time_toMonth(_ zone: Time_Zone) -> (Time_Posix) -> Time_Month {
         { time in
             switch (Time_toCivil(Time_toAdjustedMinutes(zone, time))).month {
             case 1: .Time_Jan
@@ -2417,11 +2477,11 @@ public enum Elm {
         }
     }
 
-    public static func Time_toDay(_ zone: Time_Zone) -> (Time_Posix) -> Double {
+    @Sendable public static func Time_toDay(_ zone: Time_Zone) -> (Time_Posix) -> Double {
         { time in (Time_toCivil(Time_toAdjustedMinutes(zone, time))).day }
     }
 
-    public static func Time_toWeekday(_ zone: Time_Zone) -> (Time_Posix) -> Time_Weekday {
+    @Sendable public static func Time_toWeekday(_ zone: Time_Zone) -> (Time_Posix) -> Time_Weekday {
         { time in
             switch Basics_modBy(7)(flooredDiv(Time_toAdjustedMinutes(zone, time), 60 * 24))
             {
@@ -2436,19 +2496,19 @@ public enum Elm {
         }
     }
 
-    public static func Time_toHour(_ zone: Time_Zone) -> (Time_Posix) -> Double {
+    @Sendable public static func Time_toHour(_ zone: Time_Zone) -> (Time_Posix) -> Double {
         { time in Basics_modBy(24)(flooredDiv(Time_toAdjustedMinutes(zone, time), 60)) }
     }
 
-    public static func Time_toMinute(_ zone: Time_Zone) -> (Time_Posix) -> Double {
+    @Sendable public static func Time_toMinute(_ zone: Time_Zone) -> (Time_Posix) -> Double {
         { time in Basics_modBy(60)(Time_toAdjustedMinutes(zone, time)) }
     }
 
-    public static func Time_toSecond(_ zone: Time_Zone) -> (Time_Posix) -> Double {
+    @Sendable public static func Time_toSecond(_ zone: Time_Zone) -> (Time_Posix) -> Double {
         { time in Basics_modBy(60)(flooredDiv(Time_posixToMillis(time), 1000)) }
     }
 
-    public static func Time_toMillis(_ zone: Time_Zone) -> (Time_Posix) -> Double {
+    @Sendable public static func Time_toMillis(_ zone: Time_Zone) -> (Time_Posix) -> Double {
         { time in Basics_modBy(1000)(Time_posixToMillis(time)) }
     }
 
@@ -2465,14 +2525,14 @@ public enum Elm {
     public typealias PlatformCmd_Cmd<event> =
         [PlatformCmd_CmdSingle<event>]
 
-    public static func PlatformCmd_none<event>() -> PlatformCmd_Cmd<event> { [] }
-    public static func PlatformCmd_batch<event>(_ cmds: List_List<PlatformCmd_Cmd<event>>)
+    @Sendable public static func PlatformCmd_none<event>() -> PlatformCmd_Cmd<event> { [] }
+    @Sendable public static func PlatformCmd_batch<event>(_ cmds: List_List<PlatformCmd_Cmd<event>>)
         -> PlatformCmd_Cmd<event>
     {
         // can be optimized
         Array_fromList(cmds).flatMap({ cmd in cmd })
     }
-    public static func PlatformCmd_map<event, eventMapped>(
+    @Sendable public static func PlatformCmd_map<event, eventMapped>(
         _: @escaping (event) -> eventMapped
     )
         -> (PlatformCmd_Cmd<event>) -> PlatformCmd_Cmd<eventMapped>
@@ -2492,14 +2552,14 @@ public enum Elm {
     }
     public typealias PlatformSub_Sub<event> = [PlatformSub_SubSingle<event>]
 
-    public static func PlatformSub_none<event>() -> PlatformSub_Sub<event> { [] }
-    public static func PlatformSub_batch<event>(_ subs: List_List<PlatformSub_Sub<event>>)
+    @Sendable public static func PlatformSub_none<event>() -> PlatformSub_Sub<event> { [] }
+    @Sendable public static func PlatformSub_batch<event>(_ subs: List_List<PlatformSub_Sub<event>>)
         -> PlatformSub_Sub<event>
     {
         // can be optimized
         Array_fromList(subs).flatMap({ sub in sub })
     }
-    public static func PlatformSub_map<event, eventMapped>(
+    @Sendable public static func PlatformSub_map<event, eventMapped>(
         _ eventChange: @escaping @Sendable (event) -> eventMapped
     )
         -> (PlatformSub_Sub<event>) -> PlatformSub_Sub<eventMapped>
@@ -2523,7 +2583,7 @@ public enum Elm {
         subscriptions: (state) -> PlatformSub_Sub<event>
     )
 
-    public static func Platform_worker<flags, state, event>(
+    @Sendable public static func Platform_worker<flags, state, event>(
         _ config: Platform_Program<flags, state, event>
     )
         -> Platform_Program<flags, state, event>
@@ -2539,19 +2599,19 @@ public enum Elm {
 
     public static let JsonEncode_null: JsonEncode_Value =
         JsonDecode_Value(value: NSNull())
-    public static func JsonEncode_int(_ int: Double) -> JsonEncode_Value {
+    @Sendable public static func JsonEncode_int(_ int: Double) -> JsonEncode_Value {
         JsonDecode_Value(value: NSNumber(value: int))
     }
-    public static func JsonEncode_float(_ float: Double) -> JsonEncode_Value {
+    @Sendable public static func JsonEncode_float(_ float: Double) -> JsonEncode_Value {
         JsonDecode_Value(value: NSNumber(value: float))
     }
-    public static func JsonEncode_string(_ string: String) -> JsonEncode_Value {
+    @Sendable public static func JsonEncode_string(_ string: String) -> JsonEncode_Value {
         JsonDecode_Value(value: NSString(string: string))
     }
-    public static func JsonEncode_bool(_ bool: Bool) -> JsonEncode_Value {
+    @Sendable public static func JsonEncode_bool(_ bool: Bool) -> JsonEncode_Value {
         JsonDecode_Value(value: NSNumber(value: bool))
     }
-    public static func JsonEncode_list<a>(
+    @Sendable public static func JsonEncode_list<a>(
         _ elementToJson: @escaping @Sendable (a) -> JsonEncode_Value
     )
         -> (List_List<a>) -> JsonEncode_Value
@@ -2564,7 +2624,7 @@ public enum Elm {
             )
         }
     }
-    public static func JsonEncode_array<a>(
+    @Sendable public static func JsonEncode_array<a>(
         _ elementToJson: @escaping @Sendable (a) -> JsonEncode_Value
     )
         -> ([a]) -> JsonEncode_Value
@@ -2577,7 +2637,7 @@ public enum Elm {
             )
         }
     }
-    public static func JsonEncode_set<a: Sendable>(
+    @Sendable public static func JsonEncode_set<a: Sendable>(
         _ elementToJson: @escaping @Sendable (a) -> JsonEncode_Value
     )
         -> (Set<a>) -> JsonEncode_Value
@@ -2590,7 +2650,7 @@ public enum Elm {
             )
         }
     }
-    public static func JsonEncode_object(_ fields: List_List<(String, JsonEncode_Value)>)
+    @Sendable public static func JsonEncode_object(_ fields: List_List<(String, JsonEncode_Value)>)
         -> JsonEncode_Value
     {
         var fieldsRemaining = fields
@@ -2601,13 +2661,15 @@ public enum Elm {
         }
         return JsonDecode_Value(value: NSDictionary(dictionary: fieldsDictionary))
     }
-    public static func JsonEncode_dict(_ fields: [String: JsonEncode_Value])
+    @Sendable public static func JsonEncode_dict(_ fields: [String: JsonEncode_Value])
         -> JsonEncode_Value
     {
         JsonDecode_Value(value: NSDictionary(dictionary: fields))
     }
 
-    public static func JsonEncode_encode(_ indentSize: Double) -> (JsonEncode_Value) -> String {
+    @Sendable public static func JsonEncode_encode(_ indentSize: Double) -> (JsonEncode_Value) ->
+        String
+    {
         { encoded in
             do {
                 let options: JSONSerialization.WritingOptions =
@@ -2650,14 +2712,14 @@ public enum Elm {
         let decode: @Sendable (JsonDecode_Value) -> Result_Result<JsonDecode_Error, value>
     }
 
-    public static func JsonDecode_decodeValue<value: Sendable>(
+    @Sendable public static func JsonDecode_decodeValue<value: Sendable>(
         _ decoder: JsonDecode_Decoder<value>
     )
         -> (JsonDecode_Value) -> Result_Result<JsonDecode_Error, value>
     {
         { toDecode in decoder.decode(toDecode) }
     }
-    public static func JsonDecode_decodeString<value: Sendable>(
+    @Sendable public static func JsonDecode_decodeString<value: Sendable>(
         _ decoder: JsonDecode_Decoder<value>
     )
         -> (String) -> Result_Result<JsonDecode_Error, value>
@@ -2684,19 +2746,19 @@ public enum Elm {
 
     public static let JsonDecode_value: JsonDecode_Decoder<JsonDecode_Value> =
         JsonDecode_Decoder(decode: { toDecode in .Result_Ok(toDecode) })
-    public static func JsonDecode_succeed<a: Sendable>(_ value: (a))
+    @Sendable public static func JsonDecode_succeed<a: Sendable>(_ value: (a))
         -> JsonDecode_Decoder<a>
     {
         JsonDecode_Decoder(decode: { _ in .Result_Ok(value) })
     }
-    public static func JsonDecode_fail<a: Sendable>(_ errorMessage: String)
+    @Sendable public static func JsonDecode_fail<a: Sendable>(_ errorMessage: String)
         -> JsonDecode_Decoder<a>
     {
         JsonDecode_Decoder(decode: { toDecode in
             .Result_Err(.JsonDecode_Failure(errorMessage, toDecode))
         })
     }
-    public static func JsonDecode_lazy<a: Sendable>(
+    @Sendable public static func JsonDecode_lazy<a: Sendable>(
         _ buildDecoder: @escaping @Sendable () -> JsonDecode_Decoder<a>
     )
         -> JsonDecode_Decoder<a>
@@ -2705,7 +2767,7 @@ public enum Elm {
             buildDecoder().decode(toDecode)
         })
     }
-    public static func JsonDecode_andThen<a: Sendable, b: Sendable>(
+    @Sendable public static func JsonDecode_andThen<a: Sendable, b: Sendable>(
         _ valueToDecoder: @escaping @Sendable (a) -> JsonDecode_Decoder<b>
     )
         -> (JsonDecode_Decoder<a>) -> JsonDecode_Decoder<b>
@@ -2721,7 +2783,7 @@ public enum Elm {
             })
         }
     }
-    public static func JsonDecode_map<a: Sendable, b: Sendable>(
+    @Sendable public static func JsonDecode_map<a: Sendable, b: Sendable>(
         _ valueChange: @escaping @Sendable (a) -> b
     )
         -> (JsonDecode_Decoder<a>) -> JsonDecode_Decoder<b>
@@ -2732,7 +2794,7 @@ public enum Elm {
             })
         }
     }
-    public static func JsonDecode_map2<a: Sendable, b: Sendable, combined: Sendable>(
+    @Sendable public static func JsonDecode_map2<a: Sendable, b: Sendable, combined: Sendable>(
         _ combine: @escaping @Sendable (a) -> (b) -> combined
     )
         -> (JsonDecode_Decoder<a>)
@@ -2747,6 +2809,7 @@ public enum Elm {
             }
         }
     }
+    @Sendable
     public static func JsonDecode_map3<a: Sendable, b: Sendable, c: Sendable, combined: Sendable>(
         _ combine: @escaping @Sendable (a) -> (b) -> (c) -> combined
     )
@@ -2766,6 +2829,7 @@ public enum Elm {
             }
         }
     }
+    @Sendable
     public static func JsonDecode_map4<
         a: Sendable, b: Sendable, c: Sendable, d: Sendable, combined: Sendable
     >(
@@ -2791,6 +2855,7 @@ public enum Elm {
             }
         }
     }
+    @Sendable
     public static func JsonDecode_map5<
         a: Sendable, b: Sendable, c: Sendable, d: Sendable, e: Sendable, combined: Sendable
     >(
@@ -2820,6 +2885,7 @@ public enum Elm {
             }
         }
     }
+    @Sendable
     public static func JsonDecode_map6<
         a: Sendable, b: Sendable, c: Sendable, d: Sendable, e: Sendable, f: Sendable,
         combined: Sendable
@@ -2856,6 +2922,7 @@ public enum Elm {
             }
         }
     }
+    @Sendable
     public static func JsonDecode_map7<
         a: Sendable, b: Sendable, c: Sendable, d: Sendable, e: Sendable, f: Sendable, g: Sendable,
         combined: Sendable
@@ -2895,6 +2962,7 @@ public enum Elm {
             }
         }
     }
+    @Sendable
     public static func JsonDecode_map8<
         a: Sendable, b: Sendable, c: Sendable, d: Sendable, e: Sendable, f: Sendable, g: Sendable,
         h: Sendable, combined: Sendable
@@ -2942,7 +3010,7 @@ public enum Elm {
         }
     }
 
-    public static func JsonDecode_oneOf<value: Sendable>(
+    @Sendable public static func JsonDecode_oneOf<value: Sendable>(
         _ options: List_List<JsonDecode_Decoder<value>>
     )
         -> JsonDecode_Decoder<value>
@@ -2962,7 +3030,7 @@ public enum Elm {
         })
     }
 
-    public static func JsonDecode_null<a: Sendable>(_ value: a) -> JsonDecode_Decoder<a> {
+    @Sendable public static func JsonDecode_null<a: Sendable>(_ value: a) -> JsonDecode_Decoder<a> {
         JsonDecode_Decoder(decode: { toDecode in
             switch toDecode.value {
             case _ as NSNull:
@@ -3032,7 +3100,7 @@ public enum Elm {
             }
         })
 
-    public static func JsonDecode_field<value: Sendable>(_ fieldName: String)
+    @Sendable public static func JsonDecode_field<value: Sendable>(_ fieldName: String)
         -> (JsonDecode_Decoder<value>) -> JsonDecode_Decoder<value>
     {
         { valueDecoder in
@@ -3074,7 +3142,7 @@ public enum Elm {
         })
     }
 
-    public static func JsonDecode_at<value: Sendable>(_ fieldNames: List_List<String>)
+    @Sendable public static func JsonDecode_at<value: Sendable>(_ fieldNames: List_List<String>)
         -> (JsonDecode_Decoder<value>) -> JsonDecode_Decoder<value>
     {
         { valueDecoder in
@@ -3103,7 +3171,7 @@ public enum Elm {
             })
         }
     }
-    public static func JsonDecode_dict<value: Sendable>(
+    @Sendable public static func JsonDecode_dict<value: Sendable>(
         _ valueDecoder: JsonDecode_Decoder<value>
     )
         -> JsonDecode_Decoder<[String: value]>
@@ -3146,7 +3214,7 @@ public enum Elm {
             }
         })
     }
-    public static func JsonDecode_keyValuePairs<value: Sendable>(
+    @Sendable public static func JsonDecode_keyValuePairs<value: Sendable>(
         _ valueDecoder: JsonDecode_Decoder<value>
     )
         -> JsonDecode_Decoder<List_List<(String, value)>>
@@ -3189,7 +3257,7 @@ public enum Elm {
             }
         })
     }
-    public static func JsonDecode_array<a: Sendable>(
+    @Sendable public static func JsonDecode_array<a: Sendable>(
         _ elementDecoder: JsonDecode_Decoder<a>
     )
         -> JsonDecode_Decoder<[a]>
@@ -3214,7 +3282,7 @@ public enum Elm {
             }
         })
     }
-    public static func JsonDecode_index<a: Sendable>(_ indexAsDouble: Double)
+    @Sendable public static func JsonDecode_index<a: Sendable>(_ indexAsDouble: Double)
         -> (JsonDecode_Decoder<a>)
         -> JsonDecode_Decoder<a>
     {
@@ -3249,7 +3317,7 @@ public enum Elm {
             })
         }
     }
-    public static func JsonDecode_list<a: Sendable>(
+    @Sendable public static func JsonDecode_list<a: Sendable>(
         _ elementDecoder: JsonDecode_Decoder<a>
     )
         -> JsonDecode_Decoder<List_List<a>>
@@ -3274,7 +3342,7 @@ public enum Elm {
             }
         })
     }
-    public static func JsonDecode_oneOrMore<a: Sendable, combined: Sendable>(
+    @Sendable public static func JsonDecode_oneOrMore<a: Sendable, combined: Sendable>(
         _ combineHeadTail: @escaping @Sendable (a) -> (List_List<a>) -> combined
     )
         -> (JsonDecode_Decoder<a>)
@@ -3285,7 +3353,7 @@ public enum Elm {
                 elementDecoder)(JsonDecode_list(elementDecoder))
         }
     }
-    public static func JsonDecode_maybe<a: Sendable>(
+    @Sendable public static func JsonDecode_maybe<a: Sendable>(
         _ valueDecoder: JsonDecode_Decoder<a>
     )
         -> JsonDecode_Decoder<Maybe_Maybe<a>>
@@ -3299,7 +3367,7 @@ public enum Elm {
             }
         })
     }
-    public static func JsonDecode_nullable<a>(_ valueDecoder: JsonDecode_Decoder<a>)
+    @Sendable public static func JsonDecode_nullable<a>(_ valueDecoder: JsonDecode_Decoder<a>)
         -> JsonDecode_Decoder<Maybe_Maybe<a>>
     {
         JsonDecode_Decoder(decode: { toDecode in
@@ -3323,7 +3391,7 @@ public enum Elm {
     static func indent(_ str: String) -> String {
         ((str.split(separator: "\n").joined(separator: "\n    ")))
     }
-    public static func JsonDecode_errorToString(_ error: JsonDecode_Error) -> String {
+    @Sendable public static func JsonDecode_errorToString(_ error: JsonDecode_Error) -> String {
         JsonDecode_errorToStringHelp(error, .List_Empty)
     }
     static func JsonDecode_errorToStringHelp(
@@ -3415,158 +3483,184 @@ public enum Elm {
     public typealias MathVector3_Vec3 = SIMD3<Double>
     public typealias MathVector4_Vec4 = SIMD4<Double>
 
-    public static func MathVector2_vec2(_ x: Double) -> (Double) -> MathVector2_Vec2 {
+    @Sendable public static func MathVector2_vec2(_ x: Double) -> (Double) -> MathVector2_Vec2 {
         { y in SIMD2(x, y) }
     }
-    public static func MathVector2_fromRecord(_ vec2: (x: Double, y: Double)) -> MathVector2_Vec2 {
+    @Sendable public static func MathVector2_fromRecord(_ vec2: (x: Double, y: Double))
+        -> MathVector2_Vec2
+    {
         SIMD2(x: vec2.x, y: vec2.y)
     }
-    public static func MathVector2_toRecord(_ vec2: MathVector2_Vec2) -> (x: Double, y: Double) {
+    @Sendable public static func MathVector2_toRecord(_ vec2: MathVector2_Vec2) -> (
+        x: Double, y: Double
+    ) {
         (x: vec2.x, y: vec2.y)
     }
-    public static func MathVector2_getX(_ vec2: MathVector2_Vec2) -> Double {
+    @Sendable public static func MathVector2_getX(_ vec2: MathVector2_Vec2) -> Double {
         vec2.x
     }
-    public static func MathVector2_getY(_ vec2: MathVector2_Vec2) -> Double {
+    @Sendable public static func MathVector2_getY(_ vec2: MathVector2_Vec2) -> Double {
         vec2.y
     }
-    public static func MathVector2_setX(_ newX: Double) -> (MathVector2_Vec2) -> MathVector2_Vec2 {
+    @Sendable public static func MathVector2_setX(_ newX: Double) -> (MathVector2_Vec2) ->
+        MathVector2_Vec2
+    {
         { vec2 in
             var vec2Mutable = vec2
             vec2Mutable.x = newX
             return vec2Mutable
         }
     }
-    public static func MathVector2_setY(_ newY: Double) -> (MathVector2_Vec2) -> MathVector2_Vec2 {
+    @Sendable public static func MathVector2_setY(_ newY: Double) -> (MathVector2_Vec2) ->
+        MathVector2_Vec2
+    {
         { vec2 in
             var vec2Mutable = vec2
             vec2Mutable.y = newY
             return vec2Mutable
         }
     }
-    public static func MathVector2_add(a: MathVector2_Vec2) -> (MathVector2_Vec2) ->
+    @Sendable public static func MathVector2_add(a: MathVector2_Vec2) -> (MathVector2_Vec2) ->
         MathVector2_Vec2
     {
         { b in a + b }
     }
-    public static func MathVector2_sub(_ a: MathVector2_Vec2) -> (MathVector2_Vec2) ->
+    @Sendable public static func MathVector2_sub(_ a: MathVector2_Vec2) -> (MathVector2_Vec2) ->
         MathVector2_Vec2
     {
         { b in a - b }
     }
-    public static func MathVector2_negate(_ vec2: MathVector2_Vec2) -> MathVector2_Vec2 {
+    @Sendable public static func MathVector2_negate(_ vec2: MathVector2_Vec2) -> MathVector2_Vec2 {
         -vec2
     }
-    public static func MathVector2_scale(_ factor: Double) -> (MathVector2_Vec2) -> MathVector2_Vec2
+    @Sendable public static func MathVector2_scale(_ factor: Double) -> (MathVector2_Vec2) ->
+        MathVector2_Vec2
     {
         { vec2 in vec2 * factor }
     }
-    public static func MathVector2_dot(_ a: MathVector2_Vec2) -> (MathVector2_Vec2) ->
+    @Sendable public static func MathVector2_dot(_ a: MathVector2_Vec2) -> (MathVector2_Vec2) ->
         Double
     {
         { b in a.x * b.x + a.y * b.y }
     }
-    public static func MathVector2_normalize(_ vec2: MathVector2_Vec2) -> MathVector2_Vec2 {
+    @Sendable public static func MathVector2_normalize(_ vec2: MathVector2_Vec2) -> MathVector2_Vec2
+    {
         vec2 / MathVector2_length(vec2)
         // alternative: vec2 * vec2 / MathVector2_lengthSquared(vec2)
     }
-    public static func MathVector2_direction(_ a: MathVector2_Vec2) -> (MathVector2_Vec2) ->
+    @Sendable public static func MathVector2_direction(_ a: MathVector2_Vec2) -> (MathVector2_Vec2)
+        ->
         MathVector2_Vec2
     {
         { b in MathVector2_normalize(a - b) }
     }
-    public static func MathVector2_length(_ vec2: MathVector2_Vec2) -> Double {
+    @Sendable public static func MathVector2_length(_ vec2: MathVector2_Vec2) -> Double {
         sqrt(vec2.x * vec2.x + vec2.y + vec2.y)
     }
-    public static func MathVector2_lengthSquared(_ vec2: MathVector2_Vec2) -> Double {
+    @Sendable public static func MathVector2_lengthSquared(_ vec2: MathVector2_Vec2) -> Double {
         vec2.x * vec2.x + vec2.y + vec2.y
     }
-    public static func MathVector2_distance(_ a: MathVector2_Vec2)
+    @Sendable public static func MathVector2_distance(_ a: MathVector2_Vec2)
         -> (MathVector2_Vec2) -> Double
     {
         { b in MathVector2_length(a - b) }
     }
-    public static func MathVector2_distanceSquared(_ a: MathVector2_Vec2)
+    @Sendable public static func MathVector2_distanceSquared(_ a: MathVector2_Vec2)
         -> (MathVector2_Vec2) -> Double
     {
         { b in MathVector2_lengthSquared(a - b) }
     }
 
-    public static func MathVector3_i(_ x: Double) -> (Double) -> (Double) -> MathVector3_Vec3 {
+    @Sendable public static func MathVector3_i(_ x: Double) -> (Double) -> (Double) ->
+        MathVector3_Vec3
+    {
         { y in { z in SIMD3(1, 0, 0) } }
     }
-    public static func MathVector3_j(_ x: Double) -> (Double) -> (Double) -> MathVector3_Vec3 {
+    @Sendable public static func MathVector3_j(_ x: Double) -> (Double) -> (Double) ->
+        MathVector3_Vec3
+    {
         { y in { z in SIMD3(0, 1, 0) } }
     }
-    public static func MathVector3_k(_ x: Double) -> (Double) -> (Double) -> MathVector3_Vec3 {
+    @Sendable public static func MathVector3_k(_ x: Double) -> (Double) -> (Double) ->
+        MathVector3_Vec3
+    {
         { y in { z in SIMD3(0, 0, 1) } }
     }
-    public static func MathVector3_vec3(_ x: Double) -> (Double) -> (Double) -> MathVector3_Vec3 {
+    @Sendable public static func MathVector3_vec3(_ x: Double) -> (Double) -> (Double) ->
+        MathVector3_Vec3
+    {
         { y in { z in SIMD3(x, y, z) } }
     }
-    public static func MathVector3_fromRecord(_ vec3: (x: Double, y: Double, z: Double))
+    @Sendable public static func MathVector3_fromRecord(_ vec3: (x: Double, y: Double, z: Double))
         -> MathVector3_Vec3
     {
         SIMD3(x: vec3.x, y: vec3.y, z: vec3.z)
     }
-    public static func MathVector3_toRecord(_ vec3: MathVector3_Vec3) -> (
+    @Sendable public static func MathVector3_toRecord(_ vec3: MathVector3_Vec3) -> (
         x: Double, y: Double, z: Double
     ) {
         (x: vec3.x, y: vec3.y, z: vec3.z)
     }
-    public static func MathVector3_getX(_ vec3: MathVector3_Vec3) -> Double {
+    @Sendable public static func MathVector3_getX(_ vec3: MathVector3_Vec3) -> Double {
         vec3.x
     }
-    public static func MathVector3_getY(_ vec3: MathVector3_Vec3) -> Double {
+    @Sendable public static func MathVector3_getY(_ vec3: MathVector3_Vec3) -> Double {
         vec3.y
     }
-    public static func MathVector3_getZ(_ vec3: MathVector3_Vec3) -> Double {
+    @Sendable public static func MathVector3_getZ(_ vec3: MathVector3_Vec3) -> Double {
         vec3.z
     }
-    public static func MathVector3_setX(_ newX: Double) -> (MathVector3_Vec3) -> MathVector3_Vec3 {
+    @Sendable public static func MathVector3_setX(_ newX: Double) -> (MathVector3_Vec3) ->
+        MathVector3_Vec3
+    {
         { vec3 in
             var vec3Mutable: MathVector3_Vec3 = vec3
             vec3Mutable.x = newX
             return vec3Mutable
         }
     }
-    public static func MathVector3_setY(_ newY: Double) -> (MathVector3_Vec3) -> MathVector3_Vec3 {
+    @Sendable public static func MathVector3_setY(_ newY: Double) -> (MathVector3_Vec3) ->
+        MathVector3_Vec3
+    {
         { vec3 in
             var vec3Mutable: MathVector3_Vec3 = vec3
             vec3Mutable.y = newY
             return vec3Mutable
         }
     }
-    public static func MathVector3_setZ(_ newZ: Double) -> (MathVector3_Vec3) -> MathVector3_Vec3 {
+    @Sendable public static func MathVector3_setZ(_ newZ: Double) -> (MathVector3_Vec3) ->
+        MathVector3_Vec3
+    {
         { vec3 in
             var vec3Mutable: MathVector3_Vec3 = vec3
             vec3Mutable.z = newZ
             return vec3Mutable
         }
     }
-    public static func MathVector3_add(a: MathVector3_Vec3) -> (MathVector3_Vec3) ->
+    @Sendable public static func MathVector3_add(a: MathVector3_Vec3) -> (MathVector3_Vec3) ->
         MathVector3_Vec3
     {
         { b in a + b }
     }
-    public static func MathVector3_sub(_ a: MathVector3_Vec3) -> (MathVector3_Vec3) ->
+    @Sendable public static func MathVector3_sub(_ a: MathVector3_Vec3) -> (MathVector3_Vec3) ->
         MathVector3_Vec3
     {
         { b in a - b }
     }
-    public static func MathVector3_negate(_ vec3: MathVector3_Vec3) -> MathVector3_Vec3 {
+    @Sendable public static func MathVector3_negate(_ vec3: MathVector3_Vec3) -> MathVector3_Vec3 {
         -vec3
     }
-    public static func MathVector3_scale(_ factor: Double) -> (MathVector3_Vec3) -> MathVector3_Vec3
+    @Sendable public static func MathVector3_scale(_ factor: Double) -> (MathVector3_Vec3) ->
+        MathVector3_Vec3
     {
         { vec3 in vec3 * factor }
     }
-    public static func MathVector3_dot(_ a: MathVector3_Vec3) -> (MathVector3_Vec3) ->
+    @Sendable public static func MathVector3_dot(_ a: MathVector3_Vec3) -> (MathVector3_Vec3) ->
         Double
     {
         { b in a.x * b.x + a.y * b.y + a.z * b.z }
     }
-    public static func MathVector3_cross(_ a: MathVector3_Vec3) -> (MathVector3_Vec3) ->
+    @Sendable public static func MathVector3_cross(_ a: MathVector3_Vec3) -> (MathVector3_Vec3) ->
         MathVector3_Vec3
     {
         { b in
@@ -3577,130 +3671,148 @@ public enum Elm {
             )
         }
     }
-    public static func MathVector3_normalize(_ vec3: MathVector3_Vec3) -> MathVector3_Vec3 {
+    @Sendable public static func MathVector3_normalize(_ vec3: MathVector3_Vec3) -> MathVector3_Vec3
+    {
         vec3 / MathVector3_length(vec3)
         // alternative: vec3 * vec3 / MathVector3_lengthSquared(vec3)
     }
-    public static func MathVector3_direction(_ a: MathVector3_Vec3) -> (MathVector3_Vec3) ->
+    @Sendable public static func MathVector3_direction(_ a: MathVector3_Vec3) -> (MathVector3_Vec3)
+        ->
         MathVector3_Vec3
     {
         { b in MathVector3_normalize(a - b) }
     }
-    public static func MathVector3_length(_ vec3: MathVector3_Vec3) -> Double {
+    @Sendable public static func MathVector3_length(_ vec3: MathVector3_Vec3) -> Double {
         sqrt(vec3.x * vec3.x + vec3.y + vec3.y + vec3.z * vec3.z)
     }
-    public static func MathVector3_lengthSquared(_ vec3: MathVector3_Vec3) -> Double {
+    @Sendable public static func MathVector3_lengthSquared(_ vec3: MathVector3_Vec3) -> Double {
         vec3.x * vec3.x + vec3.y + vec3.y + vec3.z * vec3.z
     }
-    public static func MathVector3_distance(_ a: MathVector3_Vec3) -> (MathVector3_Vec3) ->
+    @Sendable public static func MathVector3_distance(_ a: MathVector3_Vec3) -> (MathVector3_Vec3)
+        ->
         Double
     {
         { b in MathVector3_length(a - b) }
     }
-    public static func MathVector3_distanceSquared(_ a: MathVector3_Vec3) -> (MathVector3_Vec3) ->
+    @Sendable public static func MathVector3_distanceSquared(_ a: MathVector3_Vec3) -> (
+        MathVector3_Vec3
+    ) ->
         Double
     {
         { b in MathVector3_lengthSquared(a - b) }
     }
 
-    public static func MathVector4_vec4(_ x: Double) -> (Double) -> (Double) -> (Double) ->
+    @Sendable public static func MathVector4_vec4(_ x: Double) -> (Double) -> (Double) -> (Double)
+        ->
         MathVector4_Vec4
     {
         { y in { z in { w in SIMD4(x, y, z, w) } } }
     }
-    public static func MathVector4_fromRecord(_ vec4: (x: Double, y: Double, z: Double, w: Double))
+    @Sendable public static func MathVector4_fromRecord(
+        _ vec4: (x: Double, y: Double, z: Double, w: Double)
+    )
         -> MathVector4_Vec4
     {
         SIMD4(x: vec4.x, y: vec4.y, z: vec4.z, w: vec4.w)
     }
-    public static func MathVector4_toRecord(_ vec4: MathVector4_Vec4) -> (
+    @Sendable public static func MathVector4_toRecord(_ vec4: MathVector4_Vec4) -> (
         x: Double, y: Double, z: Double, w: Double
     ) {
         (x: vec4.x, y: vec4.y, z: vec4.z, w: vec4.w)
     }
-    public static func MathVector4_getX(_ vec4: MathVector4_Vec4) -> Double {
+    @Sendable public static func MathVector4_getX(_ vec4: MathVector4_Vec4) -> Double {
         vec4.x
     }
-    public static func MathVector4_getY(_ vec4: MathVector4_Vec4) -> Double {
+    @Sendable public static func MathVector4_getY(_ vec4: MathVector4_Vec4) -> Double {
         vec4.y
     }
-    public static func MathVector4_getZ(_ vec4: MathVector4_Vec4) -> Double {
+    @Sendable public static func MathVector4_getZ(_ vec4: MathVector4_Vec4) -> Double {
         vec4.z
     }
-    public static func MathVector4_getW(_ vec4: MathVector4_Vec4) -> Double {
+    @Sendable public static func MathVector4_getW(_ vec4: MathVector4_Vec4) -> Double {
         vec4.w
     }
-    public static func MathVector4_setX(_ newX: Double) -> (MathVector4_Vec4) -> MathVector4_Vec4 {
+    @Sendable public static func MathVector4_setX(_ newX: Double) -> (MathVector4_Vec4) ->
+        MathVector4_Vec4
+    {
         { vec4 in
             var vec4Mutable: MathVector4_Vec4 = vec4
             vec4Mutable.x = newX
             return vec4Mutable
         }
     }
-    public static func MathVector4_setY(_ newY: Double) -> (MathVector4_Vec4) -> MathVector4_Vec4 {
+    @Sendable public static func MathVector4_setY(_ newY: Double) -> (MathVector4_Vec4) ->
+        MathVector4_Vec4
+    {
         { vec4 in
             var vec4Mutable: MathVector4_Vec4 = vec4
             vec4Mutable.y = newY
             return vec4Mutable
         }
     }
-    public static func MathVector4_setZ(_ newZ: Double) -> (MathVector4_Vec4) -> MathVector4_Vec4 {
+    @Sendable public static func MathVector4_setZ(_ newZ: Double) -> (MathVector4_Vec4) ->
+        MathVector4_Vec4
+    {
         { vec4 in
             var vec4Mutable: MathVector4_Vec4 = vec4
             vec4Mutable.z = newZ
             return vec4Mutable
         }
     }
-    public static func MathVector4_setW(_ newW: Double) -> (MathVector4_Vec4) -> MathVector4_Vec4 {
+    @Sendable public static func MathVector4_setW(_ newW: Double) -> (MathVector4_Vec4) ->
+        MathVector4_Vec4
+    {
         { vec4 in
             var vec4Mutable: MathVector4_Vec4 = vec4
             vec4Mutable.w = newW
             return vec4Mutable
         }
     }
-    public static func MathVector4_add(a: MathVector4_Vec4) -> (MathVector4_Vec4) ->
+    @Sendable public static func MathVector4_add(a: MathVector4_Vec4) -> (MathVector4_Vec4) ->
         MathVector4_Vec4
     {
         { b in a + b }
     }
-    public static func MathVector4_sub(_ a: MathVector4_Vec4) -> (MathVector4_Vec4) ->
+    @Sendable public static func MathVector4_sub(_ a: MathVector4_Vec4) -> (MathVector4_Vec4) ->
         MathVector4_Vec4
     {
         { b in a - b }
     }
-    public static func MathVector4_negate(_ vec4: MathVector4_Vec4) -> MathVector4_Vec4 {
+    @Sendable public static func MathVector4_negate(_ vec4: MathVector4_Vec4) -> MathVector4_Vec4 {
         -vec4
     }
-    public static func MathVector4_scale(_ factor: Double) -> (MathVector4_Vec4) -> MathVector4_Vec4
+    @Sendable public static func MathVector4_scale(_ factor: Double) -> (MathVector4_Vec4) ->
+        MathVector4_Vec4
     {
         { vec4 in vec4 * factor }
     }
-    public static func MathVector4_dot(_ a: MathVector4_Vec4)
+    @Sendable public static func MathVector4_dot(_ a: MathVector4_Vec4)
         -> (MathVector4_Vec4) -> Double
     {
         { b in a.x * b.x + a.y * b.y + a.z * b.z + a.w * b.w }
     }
-    public static func MathVector4_normalize(_ vec4: MathVector4_Vec4) -> MathVector4_Vec4 {
+    @Sendable public static func MathVector4_normalize(_ vec4: MathVector4_Vec4) -> MathVector4_Vec4
+    {
         vec4 / MathVector4_length(vec4)
         // alternative: vec4 * vec4 / MathVector4_lengthSquared(vec4)
     }
-    public static func MathVector4_direction(_ a: MathVector4_Vec4)
+    @Sendable public static func MathVector4_direction(_ a: MathVector4_Vec4)
         -> (MathVector4_Vec4) -> MathVector4_Vec4
     {
         { b in MathVector4_normalize(a - b) }
     }
-    public static func MathVector4_length(_ vec4: MathVector4_Vec4) -> Double {
+    @Sendable public static func MathVector4_length(_ vec4: MathVector4_Vec4) -> Double {
         sqrt(vec4.x * vec4.x + vec4.y + vec4.y + vec4.z * vec4.z + vec4.w * vec4.w)
     }
-    public static func MathVector4_lengthSquared(_ vec4: MathVector4_Vec4) -> Double {
+    @Sendable public static func MathVector4_lengthSquared(_ vec4: MathVector4_Vec4) -> Double {
         vec4.x * vec4.x + vec4.y + vec4.y + vec4.z * vec4.z + vec4.w * vec4.w
     }
-    public static func MathVector4_distance(_ a: MathVector4_Vec4)
+    @Sendable public static func MathVector4_distance(_ a: MathVector4_Vec4)
         -> (MathVector4_Vec4) -> Double
     {
         { b in MathVector4_length(a - b) }
     }
-    public static func MathVector4_distanceSquared(_ a: MathVector4_Vec4)
+    @Sendable public static func MathVector4_distanceSquared(_ a: MathVector4_Vec4)
         -> (MathVector4_Vec4) -> Double
     {
         { b in MathVector4_lengthSquared(a - b) }
@@ -3728,8 +3840,8 @@ public enum Elm {
         )
     }
 
-    public static func ElmKernelParser_isSubString(_ smallString: String)
-        -> (Double)
+    @Sendable public static func ElmKernelParser_isSubString(_ smallString: String)
+        -> @Sendable (Double)
         -> (Double)
         -> (Double)
         -> (String)
@@ -3781,8 +3893,10 @@ public enum Elm {
         }
     }
 
-    public static func ElmKernelParser_isSubChar(_ predicate: @escaping (UnicodeScalar) -> Bool)
-        -> (Double) -> (String) -> Double
+    @Sendable public static func ElmKernelParser_isSubChar(
+        _ predicate: @escaping (UnicodeScalar) -> Bool
+    )
+        -> @Sendable (Double) -> (String) -> Double
     {
         { offset in
             { string in
@@ -3815,8 +3929,8 @@ public enum Elm {
         }
     }
 
-    public static func ElmKernelParser_isAsciiCode(_ code: Double)
-        -> (Double) -> (String) -> Bool
+    @Sendable public static func ElmKernelParser_isAsciiCode(_ code: Double)
+        -> @Sendable (Double) -> (String) -> Bool
     {
         { offset in
             { string in
@@ -3825,8 +3939,8 @@ public enum Elm {
         }
     }
 
-    public static func ElmKernelParser_chompBase10(_ offsetOriginal: Double)
-        -> (String) -> Double
+    @Sendable public static func ElmKernelParser_chompBase10(_ offsetOriginal: Double)
+        -> @Sendable (String) -> Double
     {
         { string in
             var offset: Int = Int(offsetOriginal)
@@ -3840,8 +3954,8 @@ public enum Elm {
         }
     }
 
-    public static func ElmKernelParser_consumeBase(_ baseAsDouble: Double)
-        -> (Double) -> (String) -> (Double, Double)
+    @Sendable public static func ElmKernelParser_consumeBase(_ baseAsDouble: Double)
+        -> @Sendable (Double) -> (String) -> (Double, Double)
     {
         { offsetOriginal in
             { string in
@@ -3863,8 +3977,8 @@ public enum Elm {
         }
     }
 
-    public static func ElmKernelParser_consumeBase16(_ offsetOriginal: Double)
-        -> (String) -> (Double, Double)
+    @Sendable public static func ElmKernelParser_consumeBase16(_ offsetOriginal: Double)
+        -> @Sendable (String) -> (Double, Double)
     {
         { string in
             var offset: Int = Int(offsetOriginal)
@@ -3889,8 +4003,8 @@ public enum Elm {
         }
     }
 
-    public static func ElmKernelParser_findSubString(_ smallString: String)
-        -> (Double)
+    @Sendable public static func ElmKernelParser_findSubString(_ smallString: String)
+        -> @Sendable  (Double)
         -> (Double)
         -> (Double)
         -> (String)
