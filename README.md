@@ -37,6 +37,13 @@ public enum Elm {
 ### be aware
 
 -   not supported are
+    -   🚧 calling `==`, `/=` etc on records, tuples or types that include either of them will crash.
+        This functionality was supported once in swift and likely will be again with 6.2. I don't want to wait for that, so an alternative would be for example to transpile `{ a = "hello", b = "you" }` to
+        ```swift
+        enum Generated_a_b<a, b> { case Record(a: a, b: b) }
+        let someRecord: Generated_a_b<String, String> = .Record(a: "hello", b: "you")
+        ```
+        and similarly for tuples (must be a single-case enum instead of a struct to allow pattern matching). The user experience is bad but equality etc will be implicitly supported.
     -   ports that use non-json values like `port sendMessage : String -> Cmd msg`, glsl
     -   `elm/file`, `elm/http`, `elm/browser`, `elm-explorations/markdown`, `elm-explorations/webgl`, `elm-explorations/benchmark`
     -   `Task`, `Process`, `Platform.Task`, `Platform.ProcessId`, `Platform.Router`, `Platform.sendToApp`, `Platform.sendToSelf`, `Random.generate`, `Time.now`, `Time.every`, `Time.here`, `Time.getZoneName`, `Bytes.getHostEndianness`, `Math.Matrix4` (due to swift's standard library not exposing many [simd types and operations available in apple's SDK](https://developer.apple.com/documentation/simd/simd_double4x4))
