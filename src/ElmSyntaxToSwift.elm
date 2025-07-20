@@ -8356,7 +8356,7 @@ expression context expressionTypedNode =
                 )
 
         ElmSyntaxTypeInfer.ExpressionParenthesized inParens ->
-            inParens |> expression context
+            expression context inParens
 
         ElmSyntaxTypeInfer.ExpressionNegation inNegationNode ->
             Result.map
@@ -8885,8 +8885,8 @@ expression context expressionTypedNode =
 
         ElmSyntaxTypeInfer.ExpressionLetIn letIn ->
             let
-                variablesForWholeLetIn : FastSet.Set String
-                variablesForWholeLetIn =
+                letIntroducedBindings : FastSet.Set String
+                letIntroducedBindings =
                     (letIn.declaration0 :: letIn.declaration1Up)
                         |> listMapToFastSetsAndUnify
                             (\syntaxLetDeclarationAndRange ->
@@ -8929,24 +8929,39 @@ expression context expressionTypedNode =
                                                             )
                             )
                             context.declaredValuesToConstructLazily
+
+                letIntroducedBindingNameWithPath : String -> String
+                letIntroducedBindingNameWithPath withoutPath =
+                    "generated_let_"
+                        ++ (context.path |> String.join "_")
+                        ++ "_"
+                        ++ withoutPath
             in
             Result.map2
                 (\declarations result ->
-                    -- TODO preferably lift statements up
-                    { statements = []
+                    let
+                        substituteLetIntroducedBindingByNameWithPath : String -> String
+                        substituteLetIntroducedBindingByNameWithPath existingBindingName =
+                            if letIntroducedBindings |> FastSet.member existingBindingName then
+                                letIntroducedBindingNameWithPath existingBindingName
+
+                            else
+                                existingBindingName
+                    in
+                    { statements =
+                        ((declarations |> List.concat)
+                            ++ result.statements
+                        )
+                            |> List.map
+                                (\statement ->
+                                    statement
+                                        |> swiftStatementAlterBindingNames
+                                            substituteLetIntroducedBindingByNameWithPath
+                                )
                     , result =
-                        SwiftExpressionCall
-                            { called =
-                                SwiftExpressionLambda
-                                    { parameters = []
-                                    , statements =
-                                        (declarations |> List.concat)
-                                            ++ result.statements
-                                    , result =
-                                        result.result
-                                    }
-                            , arguments = []
-                            }
+                        result.result
+                            |> swiftExpressionAlterBindingNames
+                                substituteLetIntroducedBindingByNameWithPath
                     }
                 )
                 ((letIn.declaration0 :: letIn.declaration1Up)
@@ -8963,7 +8978,7 @@ expression context expressionTypedNode =
                                     , variablesFromWithinDeclarationInScope =
                                         context.variablesFromWithinDeclarationInScope
                                             |> FastSet.union
-                                                variablesForWholeLetIn
+                                                letIntroducedBindings
                                     , declaredValuesToConstructLazily =
                                         declaredValuesToConstructLazilyIncludingCurrentFromLets
                                     , path =
@@ -8978,12 +8993,390 @@ expression context expressionTypedNode =
                         , variablesFromWithinDeclarationInScope =
                             context.variablesFromWithinDeclarationInScope
                                 |> FastSet.union
-                                    variablesForWholeLetIn
+                                    letIntroducedBindings
                         , declaredValuesToConstructLazily =
                             declaredValuesToConstructLazilyIncludingCurrentFromLets
                         , path = "letResult" :: context.path
                         }
                 )
+
+
+{-| Rename declared and destructured variables including their uses and assignments
+-}
+swiftExpressionAlterBindingNames :
+    (String -> String)
+    -> SwiftExpression
+    -> SwiftExpression
+swiftExpressionAlterBindingNames variableNameChange swiftExpression =
+    -- IGNORE TCO
+    case swiftExpression of
+        SwiftExpressionDouble _ ->
+            swiftExpression
+
+        SwiftExpressionUnicodeScalar _ ->
+            swiftExpression
+
+        SwiftExpressionStringLiteral _ ->
+            swiftExpression
+
+        SwiftExpressionVariant _ ->
+            swiftExpression
+
+        SwiftExpressionSelf ->
+            swiftExpression
+
+        SwiftExpressionReference reference ->
+            case reference.moduleOrigin of
+                Just _ ->
+                    swiftExpression
+
+                Nothing ->
+                    SwiftExpressionReference
+                        { moduleOrigin = Nothing
+                        , name = reference.name |> variableNameChange
+                        }
+
+        SwiftExpressionNegateOperation inNegation ->
+            SwiftExpressionNegateOperation
+                (inNegation
+                    |> swiftExpressionAlterBindingNames variableNameChange
+                )
+
+        SwiftExpressionRecordAccess recordAccess ->
+            SwiftExpressionRecordAccess
+                { record =
+                    recordAccess.record
+                        |> swiftExpressionAlterBindingNames variableNameChange
+                , field = recordAccess.field
+                }
+
+        SwiftExpressionLambda lambda ->
+            SwiftExpressionLambda
+                { parameters =
+                    lambda.parameters
+                        |> List.map
+                            (\parameter ->
+                                { type_ = parameter.type_
+                                , name = parameter.name |> variableNameChange
+                                }
+                            )
+                , statements =
+                    lambda.statements
+                        |> List.map
+                            (\statement ->
+                                statement |> swiftStatementAlterBindingNames variableNameChange
+                            )
+                , result =
+                    lambda.result |> swiftExpressionAlterBindingNames variableNameChange
+                }
+
+        SwiftExpressionIfElse ifElse ->
+            SwiftExpressionIfElse
+                { condition =
+                    ifElse.condition
+                        |> swiftExpressionAlterBindingNames variableNameChange
+                , onTrue =
+                    ifElse.onTrue
+                        |> swiftExpressionAlterBindingNames variableNameChange
+                , onFalse =
+                    ifElse.onFalse
+                        |> swiftExpressionAlterBindingNames variableNameChange
+                }
+
+        SwiftExpressionTuple parts ->
+            SwiftExpressionTuple
+                { part0 =
+                    parts.part0 |> swiftExpressionAlterBindingNames variableNameChange
+                , part1 =
+                    parts.part1 |> swiftExpressionAlterBindingNames variableNameChange
+                , part2Up =
+                    parts.part2Up
+                        |> List.map
+                            (\part ->
+                                part |> swiftExpressionAlterBindingNames variableNameChange
+                            )
+                }
+
+        SwiftExpressionArrayLiteral elements ->
+            SwiftExpressionArrayLiteral
+                (elements
+                    |> List.map
+                        (\element ->
+                            element |> swiftExpressionAlterBindingNames variableNameChange
+                        )
+                )
+
+        SwiftExpressionRecord fields ->
+            SwiftExpressionRecord
+                (fields
+                    |> FastDict.map
+                        (\_ fieldValue ->
+                            fieldValue |> swiftExpressionAlterBindingNames variableNameChange
+                        )
+                )
+
+        SwiftExpressionCall call ->
+            SwiftExpressionCall
+                { called =
+                    call.called
+                        |> swiftExpressionAlterBindingNames variableNameChange
+                , arguments =
+                    call.arguments
+                        |> List.map
+                            (\argument ->
+                                { label = argument.label
+                                , value =
+                                    argument.value
+                                        |> swiftExpressionAlterBindingNames variableNameChange
+                                }
+                            )
+                }
+
+        SwiftExpressionSwitch switch ->
+            SwiftExpressionSwitch
+                { matched =
+                    switch.matched
+                        |> swiftExpressionAlterBindingNames variableNameChange
+                , case0 =
+                    switch.case0
+                        |> swiftExpressionSwitchCaseAlterBindingNames variableNameChange
+                , case1Up =
+                    switch.case1Up
+                        |> List.map
+                            (\switchCase ->
+                                switchCase
+                                    |> swiftExpressionSwitchCaseAlterBindingNames variableNameChange
+                            )
+                }
+
+
+swiftExpressionSwitchCaseAlterBindingNames :
+    (String -> String)
+    ->
+        { pattern : SwiftPattern
+        , result : SwiftExpression
+        }
+    ->
+        { pattern : SwiftPattern
+        , result : SwiftExpression
+        }
+swiftExpressionSwitchCaseAlterBindingNames variableNameChange swiftCase =
+    { pattern =
+        swiftCase.pattern
+            |> swiftPatternAlterBindingNames variableNameChange
+    , result =
+        swiftCase.result
+            |> swiftExpressionAlterBindingNames variableNameChange
+    }
+
+
+{-| Rename declared and destructured variables including their uses and assignments
+-}
+swiftStatementAlterBindingNames :
+    (String -> String)
+    -> SwiftStatement
+    -> SwiftStatement
+swiftStatementAlterBindingNames variableNameChange swiftStatement =
+    -- IGNORE TCO
+    case swiftStatement of
+        SwiftStatementLetDeclarationUninitialized existingName ->
+            SwiftStatementLetDeclarationUninitialized
+                { type_ = existingName.type_
+                , name = existingName.name |> variableNameChange
+                }
+
+        SwiftStatementLetDestructuring letDestructuring ->
+            SwiftStatementLetDestructuring
+                { pattern =
+                    letDestructuring.pattern
+                        |> swiftPatternAlterBindingNames variableNameChange
+                , expression =
+                    letDestructuring.expression
+                        |> swiftExpressionAlterBindingNames variableNameChange
+                }
+
+        SwiftStatementVarDeclaration varDeclaration ->
+            SwiftStatementVarDeclaration
+                { name = varDeclaration.name |> variableNameChange
+                , value =
+                    varDeclaration.value
+                        |> swiftExpressionAlterBindingNames variableNameChange
+                }
+
+        SwiftStatementBindingAssignment assignment ->
+            SwiftStatementBindingAssignment
+                { name = assignment.name |> variableNameChange
+                , assignedValue =
+                    assignment.assignedValue
+                        |> swiftExpressionAlterBindingNames variableNameChange
+                }
+
+        SwiftStatementRecordFieldAssignment assignment ->
+            SwiftStatementRecordFieldAssignment
+                { recordBindingName =
+                    assignment.recordBindingName |> variableNameChange
+                , fieldName = assignment.fieldName
+                , assignedValue =
+                    assignment.assignedValue
+                        |> swiftExpressionAlterBindingNames variableNameChange
+                }
+
+        SwiftStatementLetDeclaration swiftStatementLetDeclaration ->
+            SwiftStatementLetDeclaration
+                { name = swiftStatementLetDeclaration.name |> variableNameChange
+                , resultType = swiftStatementLetDeclaration.resultType
+                , result =
+                    swiftStatementLetDeclaration.result
+                        |> swiftExpressionAlterBindingNames variableNameChange
+                }
+
+        SwiftStatementFuncDeclaration funcDeclaration ->
+            SwiftStatementFuncDeclaration
+                { name = funcDeclaration.name |> variableNameChange
+                , parameters =
+                    funcDeclaration.parameters
+                        |> List.map
+                            (\parameter ->
+                                { type_ = parameter.type_
+                                , name = parameter.name |> variableNameChange
+                                }
+                            )
+                , statements =
+                    funcDeclaration.statements
+                        |> List.map
+                            (\statement ->
+                                statement |> swiftStatementAlterBindingNames variableNameChange
+                            )
+                , resultType = funcDeclaration.resultType
+                , introducedTypeParameters = funcDeclaration.introducedTypeParameters
+                , result =
+                    funcDeclaration.result
+                        |> swiftExpressionAlterBindingNames variableNameChange
+                }
+
+        SwiftStatementIfElse swiftStatementIfElse ->
+            SwiftStatementIfElse
+                { condition =
+                    swiftStatementIfElse.condition
+                        |> swiftExpressionAlterBindingNames variableNameChange
+                , onTrue =
+                    swiftStatementIfElse.onTrue
+                        |> List.map
+                            (\statement ->
+                                statement |> swiftStatementAlterBindingNames variableNameChange
+                            )
+                , onFalse =
+                    swiftStatementIfElse.onFalse
+                        |> List.map
+                            (\statement ->
+                                statement |> swiftStatementAlterBindingNames variableNameChange
+                            )
+                }
+
+        SwiftStatementSwitch switch ->
+            SwiftStatementSwitch
+                { matched =
+                    switch.matched
+                        |> swiftExpressionAlterBindingNames variableNameChange
+                , case0 =
+                    switch.case0
+                        |> swiftStatementSwitchCaseAlterBindingNames variableNameChange
+                , case1Up =
+                    switch.case1Up
+                        |> List.map
+                            (\switchCase ->
+                                switchCase
+                                    |> swiftStatementSwitchCaseAlterBindingNames variableNameChange
+                            )
+                }
+
+
+swiftStatementSwitchCaseAlterBindingNames :
+    (String -> String)
+    ->
+        { pattern : SwiftPattern
+        , statements : List SwiftStatement
+        }
+    ->
+        { pattern : SwiftPattern
+        , statements : List SwiftStatement
+        }
+swiftStatementSwitchCaseAlterBindingNames variableNameChange swiftCase =
+    { pattern =
+        swiftCase.pattern
+            |> swiftPatternAlterBindingNames variableNameChange
+    , statements =
+        swiftCase.statements
+            |> List.map
+                (\statement ->
+                    statement |> swiftStatementAlterBindingNames variableNameChange
+                )
+    }
+
+
+swiftPatternAlterBindingNames :
+    (String -> String)
+    -> SwiftPattern
+    -> SwiftPattern
+swiftPatternAlterBindingNames variableNameChange inferredPattern =
+    case inferredPattern of
+        SwiftPatternIgnore ->
+            SwiftPatternIgnore
+
+        SwiftPatternBool _ ->
+            inferredPattern
+
+        SwiftPatternUnicodeScalar _ ->
+            inferredPattern
+
+        SwiftPatternStringLiteral _ ->
+            inferredPattern
+
+        SwiftPatternInteger _ ->
+            inferredPattern
+
+        SwiftPatternVariable existingVariable ->
+            SwiftPatternVariable
+                (existingVariable |> variableNameChange)
+
+        SwiftPatternRecord fields ->
+            SwiftPatternRecord
+                (fields
+                    |> FastDict.map
+                        (\_ fieldValue ->
+                            fieldValue
+                                |> swiftPatternAlterBindingNames variableNameChange
+                        )
+                )
+
+        SwiftPatternVariant variant ->
+            SwiftPatternVariant
+                { originTypeName = variant.originTypeName
+                , name = variant.name
+                , values =
+                    variant.values
+                        |> List.map
+                            (\value ->
+                                { label = value.label
+                                , value =
+                                    value.value
+                                        |> swiftPatternAlterBindingNames variableNameChange
+                                }
+                            )
+                }
+
+        SwiftPatternTuple tuple ->
+            SwiftPatternTuple
+                { part0 = tuple.part0 |> swiftPatternAlterBindingNames variableNameChange
+                , part1 = tuple.part1 |> swiftPatternAlterBindingNames variableNameChange
+                , part2Up =
+                    tuple.part2Up
+                        |> List.map
+                            (\part ->
+                                part
+                                    |> swiftPatternAlterBindingNames variableNameChange
+                            )
+                }
 
 
 inferredLetDeclarationNodesSortFromMostToLeastDependedOn :
@@ -10569,8 +10962,12 @@ swiftStatementSubstituteReferences referenceToExpression swiftStatement =
 
         SwiftStatementSwitch switch ->
             SwiftStatementSwitch
-                { matched = switch.matched |> swiftExpressionSubstituteReferences referenceToExpression
-                , case0 = switch.case0 |> swiftStatementSwitchCaseSubstituteReferences referenceToExpression
+                { matched =
+                    switch.matched
+                        |> swiftExpressionSubstituteReferences referenceToExpression
+                , case0 =
+                    switch.case0
+                        |> swiftStatementSwitchCaseSubstituteReferences referenceToExpression
                 , case1Up =
                     switch.case1Up
                         |> List.map
@@ -10749,13 +11146,10 @@ letDeclaration context syntaxLetDeclarationNode =
                 )
 
         ElmSyntaxTypeInfer.LetValueOrFunctionDeclaration letValueOrFunction ->
-            Result.map
-                (\declaration -> [ declaration ])
-                ({ declaration = letValueOrFunction
-                 , range = syntaxLetDeclarationNode.range
-                 }
-                    |> letValueOrFunctionDeclaration context
-                )
+            { declaration = letValueOrFunction
+            , range = syntaxLetDeclarationNode.range
+            }
+                |> letValueOrFunctionDeclaration context
 
 
 letValueOrFunctionDeclaration :
@@ -10797,7 +11191,7 @@ letValueOrFunctionDeclaration :
             , type_ : ElmSyntaxTypeInfer.Type
             }
         }
-    -> Result String SwiftStatement
+    -> Result String (List SwiftStatement)
 letValueOrFunctionDeclaration context syntaxLetDeclarationValueOrFunctionNode =
     let
         typeAliasesInModule : String -> Maybe (FastDict.Dict String { parameters : List String, recordFieldOrder : Maybe (List String), type_ : ElmSyntaxTypeInfer.Type })
@@ -10841,29 +11235,16 @@ letValueOrFunctionDeclaration context syntaxLetDeclarationValueOrFunctionNode =
                                 |> type_ typeAliasesInModule
                     in
                     if swiftResultType |> swiftTypeIsConcrete then
-                        SwiftStatementLetDeclaration
-                            { name = swiftName
-                            , result =
-                                case result.statements of
-                                    [] ->
-                                        result.result
-
-                                    statement0 :: statement1Up ->
-                                        -- TODO preferably lift to parent level
-                                        SwiftExpressionCall
-                                            { called =
-                                                SwiftExpressionLambda
-                                                    { parameters = []
-                                                    , statements = statement0 :: statement1Up
-                                                    , result = result.result
-                                                    }
-                                            , arguments = []
-                                            }
-                            , resultType = swiftResultType
-                            }
+                        result.statements
+                            ++ [ SwiftStatementLetDeclaration
+                                    { name = swiftName
+                                    , resultType = swiftResultType
+                                    , result = result.result
+                                    }
+                               ]
 
                     else
-                        SwiftStatementFuncDeclaration
+                        [ SwiftStatementFuncDeclaration
                             { name = swiftName
                             , parameters = []
                             , statements = result.statements
@@ -10871,6 +11252,7 @@ letValueOrFunctionDeclaration context syntaxLetDeclarationValueOrFunctionNode =
                             , resultType = swiftResultType
                             , introducedTypeParameters = introducedTypeParameters
                             }
+                        ]
                 )
                 (syntaxLetDeclarationValueOrFunctionNode.declaration.result
                     |> expression context
@@ -10941,7 +11323,7 @@ letValueOrFunctionDeclaration context syntaxLetDeclarationValueOrFunctionNode =
                                             ++ result.statements
                                     }
                     in
-                    SwiftStatementFuncDeclaration
+                    [ SwiftStatementFuncDeclaration
                         { name = syntaxLetDeclarationValueOrFunctionNode.declaration.name
                         , parameters =
                             [ { name =
@@ -10974,6 +11356,7 @@ letValueOrFunctionDeclaration context syntaxLetDeclarationValueOrFunctionNode =
                         , introducedTypeParameters = introducedTypeParameters
                         , result = resultAndStatementsToAdd.result
                         }
+                    ]
                 )
                 (syntaxLetDeclarationValueOrFunctionNode.declaration.result
                     |> expression
