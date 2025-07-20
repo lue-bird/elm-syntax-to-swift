@@ -37,7 +37,8 @@ type SwiftType
         { moduleOrigin : Maybe String
         , name : String
         , arguments : List SwiftType
-        , isFunction : Bool
+        , -- TODO also encode if Equatable or not
+          isFunction : Bool
         }
     | SwiftTypeTuple
         { part0 : SwiftType
@@ -1225,21 +1226,22 @@ swiftTypeIsEquatable swiftType =
             False
 
         SwiftTypeConstruct construct ->
-            (case construct.moduleOrigin of
-                Just _ ->
-                    True
-
-                Nothing ->
-                    case construct.name of
-                        "JsonEncode_Value" ->
-                            False
-
-                        "JsonDecode_Value" ->
-                            False
-
-                        _ ->
+            construct.isFunction
+                || (case construct.moduleOrigin of
+                        Just _ ->
                             True
-            )
+
+                        Nothing ->
+                            case construct.name of
+                                "JsonEncode_Value" ->
+                                    False
+
+                                "JsonDecode_Value" ->
+                                    False
+
+                                _ ->
+                                    True
+                   )
                 && (construct.arguments
                         |> List.all swiftTypeIsEquatable
                    )
@@ -14144,9 +14146,9 @@ printSwiftStatementIfElse ifElse =
                 (Print.linebreakIndented
                     |> Print.followedBy
                         (printSwiftStatements ifElse.onTrue)
-                    |> Print.followedBy Print.linebreak
                 )
             )
+        |> Print.followedBy Print.linebreakIndented
         |> Print.followedBy printExactlyCurlyClosingSpaceElseSpaceCurlyOpening
         |> Print.followedBy
             (Print.withIndentAtNextMultipleOf4
