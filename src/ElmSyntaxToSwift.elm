@@ -85,6 +85,7 @@ type SwiftExpression
     | -- NUMBER currently represented as Double | SwiftExpressionInt64 Int
       SwiftExpressionUnicodeScalar Char
     | SwiftExpressionStringLiteral String
+    | SwiftExpressionSelf
     | SwiftExpressionReference
         { moduleOrigin : Maybe String
         , name : String
@@ -1174,27 +1175,45 @@ swiftTypeExpandFunctionIntoReverse soFarReverse swiftType =
             }
 
 
-swiftTypeContainsFunction : SwiftType -> Bool
-swiftTypeContainsFunction swiftType =
+{-| TODO invert
+-}
+swiftTypeIsNotEquatable : SwiftType -> Bool
+swiftTypeIsNotEquatable swiftType =
     -- IGNORE TCO
     case swiftType of
         SwiftTypeFunction _ ->
             True
 
         SwiftTypeConstruct construct ->
-            construct.arguments
-                |> List.any swiftTypeContainsFunction
+            (case construct.moduleOrigin of
+                Just _ ->
+                    False
+
+                Nothing ->
+                    case construct.name of
+                        "JsonEncode_Value" ->
+                            True
+
+                        "JsonDecode_Value" ->
+                            True
+
+                        _ ->
+                            False
+            )
+                || (construct.arguments
+                        |> List.any swiftTypeIsNotEquatable
+                   )
 
         SwiftTypeTuple parts ->
-            (parts.part0 |> swiftTypeContainsFunction)
-                || (parts.part1 |> swiftTypeContainsFunction)
-                || (parts.part2Up |> List.any swiftTypeContainsFunction)
+            (parts.part0 |> swiftTypeIsNotEquatable)
+                || (parts.part1 |> swiftTypeIsNotEquatable)
+                || (parts.part2Up |> List.any swiftTypeIsNotEquatable)
 
         SwiftTypeRecord fields ->
             fields
                 |> fastDictAny
                     (\_ fieldValue ->
-                        fieldValue |> swiftTypeContainsFunction
+                        fieldValue |> swiftTypeIsNotEquatable
                     )
 
         SwiftTypeVariable _ ->
@@ -6369,8 +6388,7 @@ modules syntaxDeclarationsIncludingOverwrittenOnes =
                             FastDict.Dict
                                 String
                                 { parameters : List String
-                                , -- TODO rename to cases
-                                  variants : FastDict.Dict String (List SwiftType)
+                                , cases : FastDict.Dict String (List SwiftType)
                                 }
                         }
                     }
@@ -6547,7 +6565,7 @@ modules syntaxDeclarationsIncludingOverwrittenOnes =
                                                                                 |> referenceToSwiftName
                                                                             )
                                                                             { parameters = swiftTypeAliasDeclaration.parameters
-                                                                            , variants =
+                                                                            , cases =
                                                                                 swiftTypeAliasDeclaration.variants
                                                                                     |> FastDict.foldl
                                                                                         (\variantName values variantsSoFar ->
@@ -6685,7 +6703,7 @@ modules syntaxDeclarationsIncludingOverwrittenOnes =
                         |> FastDict.map
                             (\_ typeAliasInfo ->
                                 { parameters = typeAliasInfo.parameters
-                                , cases = typeAliasInfo.variants
+                                , cases = typeAliasInfo.cases
                                 , computedProperties = FastDict.empty
                                 }
                             )
@@ -6729,12 +6747,7 @@ modules syntaxDeclarationsIncludingOverwrittenOnes =
                                                                                 { type_ = SwiftTypeVariable swiftRecordField
                                                                                 , value =
                                                                                     SwiftExpressionSwitch
-                                                                                        { matched =
-                                                                                            -- TODO convert to its own variant
-                                                                                            SwiftExpressionReference
-                                                                                                { moduleOrigin = Nothing
-                                                                                                , name = "self"
-                                                                                                }
+                                                                                        { matched = SwiftExpressionSelf
                                                                                         , case0 =
                                                                                             { pattern =
                                                                                                 SwiftPatternVariant
@@ -8827,6 +8840,24 @@ inferredLetDeclarationNodesSortFromMostToLeastDependedOn :
             }
 inferredLetDeclarationNodesSortFromMostToLeastDependedOn inferredLetDeclarationNodes =
     let
+        letValueOrFunctionDeclarations :
+            List
+                { range : Elm.Syntax.Range.Range
+                , declaration :
+                    { name : String
+                    , nameRange : Elm.Syntax.Range.Range
+                    , signature :
+                        Maybe
+                            { range : Elm.Syntax.Range.Range
+                            , nameRange : Elm.Syntax.Range.Range
+                            , annotationType : Elm.Syntax.TypeAnnotation.TypeAnnotation
+                            , annotationTypeRange : Elm.Syntax.Range.Range
+                            }
+                    , parameters : List (ElmSyntaxTypeInfer.TypedNode ElmSyntaxTypeInfer.Pattern)
+                    , result : ElmSyntaxTypeInfer.TypedNode ElmSyntaxTypeInfer.Expression
+                    , type_ : ElmSyntaxTypeInfer.Type
+                    }
+                }
         letValueOrFunctionDeclarations =
             inferredLetDeclarationNodes
                 |> List.filterMap
@@ -8842,6 +8873,14 @@ inferredLetDeclarationNodesSortFromMostToLeastDependedOn inferredLetDeclarationN
                                     }
                     )
 
+        letDestructurings :
+            List
+                { range : Elm.Syntax.Range.Range
+                , declaration :
+                    { pattern : ElmSyntaxTypeInfer.TypedNode ElmSyntaxTypeInfer.Pattern
+                    , expression : ElmSyntaxTypeInfer.TypedNode ElmSyntaxTypeInfer.Expression
+                    }
+                }
         letDestructurings =
             inferredLetDeclarationNodes
                 |> List.filterMap
@@ -9616,7 +9655,16 @@ swiftExpressionCallCondense call =
                             }
                     }
 
-        SwiftExpressionVariant reference ->
+        SwiftExpressionSelf ->
+            { statements = []
+            , result =
+                SwiftExpressionCall
+                    { called = call.called
+                    , arguments = [ call.argument ]
+                    }
+            }
+
+        SwiftExpressionVariant _ ->
             { statements = []
             , result =
                 SwiftExpressionCall
@@ -9729,6 +9777,9 @@ swiftExpressionContainsDelayedExecution swiftExpression =
         SwiftExpressionStringLiteral _ ->
             False
 
+        SwiftExpressionSelf ->
+            False
+
         SwiftExpressionReference _ ->
             False
 
@@ -9798,6 +9849,9 @@ swiftExpressionInnermostLambdaResult swiftExpression =
             { statements = [], result = swiftExpression }
 
         SwiftExpressionStringLiteral _ ->
+            { statements = [], result = swiftExpression }
+
+        SwiftExpressionSelf ->
             { statements = [], result = swiftExpression }
 
         SwiftExpressionReference _ ->
@@ -9884,6 +9938,9 @@ swiftExpressionIsConstant swiftExpression =
         SwiftExpressionStringLiteral _ ->
             True
 
+        SwiftExpressionSelf ->
+            True
+
         SwiftExpressionReference _ ->
             True
 
@@ -9934,6 +9991,9 @@ swiftExpressionCountUsesOfReference referenceToCountUsesOf swiftExpression =
 
             else
                 0
+
+        SwiftExpressionSelf ->
+            0
 
         SwiftExpressionVariant _ ->
             0
@@ -10140,6 +10200,9 @@ swiftExpressionSubstituteReferences referenceToExpression swiftExpression =
             swiftExpression
 
         SwiftExpressionVariant _ ->
+            swiftExpression
+
+        SwiftExpressionSelf ->
             swiftExpression
 
         SwiftExpressionReference reference ->
@@ -10568,9 +10631,6 @@ letValueOrFunctionDeclaration :
     -> Result String SwiftStatement
 letValueOrFunctionDeclaration context syntaxLetDeclarationValueOrFunctionNode =
     let
-        syntaxLetDeclarationValueOrFunction =
-            syntaxLetDeclarationValueOrFunctionNode.declaration
-
         typeAliasesInModule : String -> Maybe (FastDict.Dict String { parameters : List String, recordFieldOrder : Maybe (List String), type_ : ElmSyntaxTypeInfer.Type })
         typeAliasesInModule moduleNameToAccess =
             context.moduleInfo
@@ -10579,7 +10639,7 @@ letValueOrFunctionDeclaration context syntaxLetDeclarationValueOrFunctionNode =
 
         introducedTypeParameters : List String
         introducedTypeParameters =
-            syntaxLetDeclarationValueOrFunction.type_
+            syntaxLetDeclarationValueOrFunctionNode.declaration.type_
                 |> inferredTypeContainedVariables
                 |> FastDict.foldl
                     (\variableName variableUseRange soFar ->
@@ -10596,19 +10656,19 @@ letValueOrFunctionDeclaration context syntaxLetDeclarationValueOrFunctionNode =
                     )
                     []
     in
-    case syntaxLetDeclarationValueOrFunction.parameters of
+    case syntaxLetDeclarationValueOrFunctionNode.declaration.parameters of
         [] ->
             Result.map
                 (\result ->
                     let
                         swiftName : String
                         swiftName =
-                            syntaxLetDeclarationValueOrFunction.name
+                            syntaxLetDeclarationValueOrFunctionNode.declaration.name
                                 |> variableNameDisambiguateFromSwiftKeywords
 
                         swiftResultType : SwiftType
                         swiftResultType =
-                            syntaxLetDeclarationValueOrFunction.type_
+                            syntaxLetDeclarationValueOrFunctionNode.declaration.type_
                                 |> type_ typeAliasesInModule
                     in
                     if swiftResultType |> swiftTypeIsConcrete then
@@ -10643,7 +10703,7 @@ letValueOrFunctionDeclaration context syntaxLetDeclarationValueOrFunctionNode =
                             , introducedTypeParameters = introducedTypeParameters
                             }
                 )
-                (syntaxLetDeclarationValueOrFunction.result
+                (syntaxLetDeclarationValueOrFunctionNode.declaration.result
                     |> expression context
                 )
 
@@ -10713,7 +10773,7 @@ letValueOrFunctionDeclaration context syntaxLetDeclarationValueOrFunctionNode =
                                     }
                     in
                     SwiftStatementFuncDeclaration
-                        { name = syntaxLetDeclarationValueOrFunction.name
+                        { name = syntaxLetDeclarationValueOrFunctionNode.declaration.name
                         , parameters =
                             [ { name =
                                     case parameter0.value of
@@ -10739,20 +10799,20 @@ letValueOrFunctionDeclaration context syntaxLetDeclarationValueOrFunctionNode =
                                             , output = outputTypeSoFar
                                             }
                                     )
-                                    (syntaxLetDeclarationValueOrFunction.result.type_
+                                    (syntaxLetDeclarationValueOrFunctionNode.declaration.result.type_
                                         |> type_ typeAliasesInModule
                                     )
                         , introducedTypeParameters = introducedTypeParameters
                         , result = resultAndStatementsToAdd.result
                         }
                 )
-                (syntaxLetDeclarationValueOrFunction.result
+                (syntaxLetDeclarationValueOrFunctionNode.declaration.result
                     |> expression
                         { moduleInfo = context.moduleInfo
                         , variablesFromWithinDeclarationInScope =
                             context.variablesFromWithinDeclarationInScope
                                 |> FastSet.union
-                                    (syntaxLetDeclarationValueOrFunction.parameters
+                                    (syntaxLetDeclarationValueOrFunctionNode.declaration.parameters
                                         |> listMapToFastSetsAndUnify patternTypedNodeIntroducedVariables
                                         |> FastSet.map variableNameDisambiguateFromSwiftKeywords
                                     )
@@ -13335,6 +13395,9 @@ swiftExpressionIsSpaceSeparated swiftExpression =
         SwiftExpressionStringLiteral _ ->
             False
 
+        SwiftExpressionSelf ->
+            False
+
         SwiftExpressionReference _ ->
             False
 
@@ -13377,6 +13440,9 @@ printSwiftExpressionNotParenthesized swiftExpression =
     case swiftExpression of
         SwiftExpressionCall call ->
             printSwiftExpressionCall call
+
+        SwiftExpressionSelf ->
+            printSwiftExpressionSelf
 
         SwiftExpressionReference reference ->
             Print.exactly
@@ -13432,6 +13498,11 @@ printSwiftExpressionNotParenthesized swiftExpression =
 
         SwiftExpressionSwitch switch ->
             printSwiftExpressionSwitch switch
+
+
+printSwiftExpressionSelf : Print
+printSwiftExpressionSelf =
+    Print.exactly "self"
 
 
 printExactlyMinus : Print
@@ -14391,7 +14462,7 @@ swiftDeclarationsToModuleString :
     -> String
 swiftDeclarationsToModuleString swiftDeclarations =
     let
-        swiftEnumDeclarationsList :
+        swiftEnumDeclarationList :
             List
                 { name : String
                 , parameters : List String
@@ -14403,7 +14474,7 @@ swiftDeclarationsToModuleString swiftDeclarations =
                         , value : SwiftExpression
                         }
                 }
-        swiftEnumDeclarationsList =
+        swiftEnumDeclarationList =
             swiftDeclarations.enumTypes
                 |> fastDictMapAndToList
                     (\name info ->
@@ -14434,21 +14505,20 @@ swiftDeclarationsToModuleString swiftDeclarations =
                                 , type_ = info.type_
                                 }
                             )
-                , enums = swiftEnumDeclarationsList
+                , enums = swiftEnumDeclarationList
                 }
 
         deriveProtocolConformances : List String
         deriveProtocolConformances =
-            swiftEnumDeclarationsList
+            swiftEnumDeclarationList
                 |> List.concatMap
                     (\swiftEnumDeclaration ->
                         -- TODO also add Sendable conformance this way
-                        -- TODO don't generate if contains function type alias or json**code.Value
                         if
                             swiftEnumDeclaration.cases
                                 |> fastDictAny
                                     (\_ enumCaseValues ->
-                                        enumCaseValues |> List.any swiftTypeContainsFunction
+                                        enumCaseValues |> List.any swiftTypeIsNotEquatable
                                     )
                         then
                             []
