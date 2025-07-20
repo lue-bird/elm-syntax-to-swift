@@ -37,5 +37,8 @@ ElmjutsuDumMyM0DuL3.elm
 # not ready for release, yet
 example-transpile-itself
 
+# throwaway scripts
+contains-surrogates.js
+
 
 .fake
