@@ -1177,47 +1177,47 @@ swiftTypeExpandFunctionIntoReverse soFarReverse swiftType =
 
 {-| TODO invert
 -}
-swiftTypeIsNotEquatable : SwiftType -> Bool
-swiftTypeIsNotEquatable swiftType =
+swiftTypeIsEquatable : SwiftType -> Bool
+swiftTypeIsEquatable swiftType =
     -- IGNORE TCO
     case swiftType of
         SwiftTypeFunction _ ->
-            True
+            False
 
         SwiftTypeConstruct construct ->
             (case construct.moduleOrigin of
                 Just _ ->
-                    False
+                    True
 
                 Nothing ->
                     case construct.name of
                         "JsonEncode_Value" ->
-                            True
+                            False
 
                         "JsonDecode_Value" ->
-                            True
+                            False
 
                         _ ->
-                            False
+                            True
             )
-                || (construct.arguments
-                        |> List.any swiftTypeIsNotEquatable
+                && (construct.arguments
+                        |> List.all swiftTypeIsEquatable
                    )
 
         SwiftTypeTuple parts ->
-            (parts.part0 |> swiftTypeIsNotEquatable)
-                || (parts.part1 |> swiftTypeIsNotEquatable)
-                || (parts.part2Up |> List.any swiftTypeIsNotEquatable)
+            (parts.part0 |> swiftTypeIsEquatable)
+                && (parts.part1 |> swiftTypeIsEquatable)
+                && (parts.part2Up |> List.all swiftTypeIsEquatable)
 
         SwiftTypeRecord fields ->
             fields
-                |> fastDictAny
+                |> fastDictAll
                     (\_ fieldValue ->
-                        fieldValue |> swiftTypeIsNotEquatable
+                        fieldValue |> swiftTypeIsEquatable
                     )
 
         SwiftTypeVariable _ ->
-            False
+            True
 
 
 inferredTypeToFunction :
@@ -14516,19 +14516,19 @@ swiftDeclarationsToModuleString swiftDeclarations =
                         -- TODO also add Sendable conformance this way
                         if
                             swiftEnumDeclaration.cases
-                                |> fastDictAny
+                                |> fastDictAll
                                     (\_ enumCaseValues ->
-                                        enumCaseValues |> List.any swiftTypeIsNotEquatable
+                                        enumCaseValues |> List.all swiftTypeIsEquatable
                                     )
                         then
-                            []
-
-                        else
                             [ deriveProtocolConformanceToString "Equatable"
                                 { name = "Elm." ++ swiftEnumDeclaration.name
                                 , parameters = swiftEnumDeclaration.parameters
                                 }
                             ]
+
+                        else
+                            []
                     )
     in
     """import CoreFoundation
