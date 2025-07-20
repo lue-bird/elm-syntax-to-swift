@@ -8562,75 +8562,106 @@ expression context expressionTypedNode =
                 )
 
         ElmSyntaxTypeInfer.ExpressionRecordUpdate recordUpdate ->
-            Result.map
-                (\fields ->
-                    let
-                        originalRecordVariable : String
-                        originalRecordVariable =
-                            referenceToSwiftName
-                                { moduleOrigin = recordUpdate.recordVariable.value.moduleOrigin
-                                , name =
-                                    recordUpdate.recordVariable.value.name
-                                }
-                                |> variableNameDisambiguateFromSwiftKeywords
-
-                        generatedUpdatedRecordVarName : String
-                        generatedUpdatedRecordVarName =
-                            "generated_updated_"
-                                ++ originalRecordVariable
-                                ++ "_"
-                                ++ (context.path |> String.join "_")
-                    in
-                    { statements =
-                        (fields
-                            |> List.concatMap
-                                (\( _, fieldValue ) ->
-                                    fieldValue.statements
-                                )
-                        )
-                            ++ (SwiftStatementVarDeclaration
-                                    { name = generatedUpdatedRecordVarName
-                                    , value =
-                                        SwiftExpressionReference
-                                            { moduleOrigin = Nothing, name = originalRecordVariable }
-                                    }
-                                    :: (fields
-                                            |> List.map
-                                                (\( fieldName, fieldValue ) ->
-                                                    SwiftStatementRecordFieldAssignment
-                                                        { recordBindingName = generatedUpdatedRecordVarName
-                                                        , fieldName = fieldName
-                                                        , assignedValue = fieldValue.result
-                                                        }
-                                                )
-                                       )
-                               )
-                    , result =
-                        SwiftExpressionReference
-                            { moduleOrigin = Nothing, name = generatedUpdatedRecordVarName }
-                    }
-                )
-                ((recordUpdate.field0 :: recordUpdate.field1Up)
-                    |> listMapAndCombineOk
-                        (\field ->
-                            Result.map
-                                (\fieldValue ->
-                                    ( field.name |> variableNameDisambiguateFromSwiftKeywords
-                                    , fieldValue
-                                    )
-                                )
-                                (field.value
-                                    |> expression
-                                        { moduleInfo = context.moduleInfo
-                                        , variablesFromWithinDeclarationInScope =
-                                            context.variablesFromWithinDeclarationInScope
-                                        , declaredValuesToConstructLazily =
-                                            context.declaredValuesToConstructLazily
-                                        , path = field.name :: context.path
+            case expressionTypedNode.type_ of
+                ElmSyntaxTypeInfer.TypeNotVariable (ElmSyntaxTypeInfer.TypeRecord allFields) ->
+                    Result.map
+                        (\fieldsToSet ->
+                            let
+                                originalRecordVariable : String
+                                originalRecordVariable =
+                                    referenceToSwiftName
+                                        { moduleOrigin =
+                                            recordUpdate.recordVariable.value.moduleOrigin
+                                        , name =
+                                            recordUpdate.recordVariable.value.name
                                         }
+                                        |> variableNameDisambiguateFromSwiftKeywords
+
+                                swiftOriginalRecordVariableReferenceExpression : SwiftExpression
+                                swiftOriginalRecordVariableReferenceExpression =
+                                    SwiftExpressionReference
+                                        { moduleOrigin = Nothing, name = originalRecordVariable }
+
+                                fieldsToSetDict : FastDict.Dict String SwiftExpression
+                                fieldsToSetDict =
+                                    fieldsToSet
+                                        |> List.foldl
+                                            (\( fieldName, valueToSet ) soFar ->
+                                                soFar |> FastDict.insert fieldName valueToSet.result
+                                            )
+                                            FastDict.empty
+                            in
+                            { statements =
+                                fieldsToSet
+                                    |> List.concatMap
+                                        (\( _, fieldValue ) ->
+                                            fieldValue.statements
+                                        )
+                            , result =
+                                SwiftExpressionCall
+                                    { called =
+                                        SwiftExpressionVariant
+                                            { originTypeName =
+                                                generatedRecordTypeName
+                                                    (allFields
+                                                        |> FastDict.foldr
+                                                            (\fieldName _ soFar ->
+                                                                (fieldName |> variableNameDisambiguateFromSwiftKeywords)
+                                                                    :: soFar
+                                                            )
+                                                            []
+                                                    )
+                                            , name = "Record"
+                                            }
+                                    , arguments =
+                                        allFields
+                                            |> FastDict.foldr
+                                                (\fieldName _ soFar ->
+                                                    { label = Just fieldName
+                                                    , value =
+                                                        case fieldsToSetDict |> FastDict.get fieldName of
+                                                            Just valueToSet ->
+                                                                valueToSet
+
+                                                            Nothing ->
+                                                                SwiftExpressionRecordAccess
+                                                                    { record = swiftOriginalRecordVariableReferenceExpression
+                                                                    , field = fieldName
+                                                                    }
+                                                    }
+                                                        :: soFar
+                                                )
+                                                []
+                                    }
+                            }
+                        )
+                        ((recordUpdate.field0 :: recordUpdate.field1Up)
+                            |> listMapAndCombineOk
+                                (\field ->
+                                    Result.map
+                                        (\fieldValue ->
+                                            ( field.name |> variableNameDisambiguateFromSwiftKeywords
+                                            , fieldValue
+                                            )
+                                        )
+                                        (field.value
+                                            |> expression
+                                                { moduleInfo = context.moduleInfo
+                                                , variablesFromWithinDeclarationInScope =
+                                                    context.variablesFromWithinDeclarationInScope
+                                                , declaredValuesToConstructLazily =
+                                                    context.declaredValuesToConstructLazily
+                                                , path = field.name :: context.path
+                                                }
+                                        )
                                 )
                         )
-                )
+
+                _ ->
+                    Err
+                        ((expressionTypedNode.range |> rangeToInfoString)
+                            ++ ": I tried to transpile an elm record update but the inferred type is not a record so I am unable to construct a new record. This likely means you are using extensible records in a variant or let declaration"
+                        )
 
         ElmSyntaxTypeInfer.ExpressionLambda lambda ->
             let
@@ -8999,6 +9030,20 @@ expression context expressionTypedNode =
                         , path = "letResult" :: context.path
                         }
                 )
+
+
+rangeToInfoString : Elm.Syntax.Range.Range -> String
+rangeToInfoString range =
+    (range.start |> locationToInfoString)
+        ++ "-"
+        ++ (range.end |> locationToInfoString)
+
+
+locationToInfoString : Elm.Syntax.Range.Location -> String
+locationToInfoString location =
+    (location.row |> String.fromInt)
+        ++ ":"
+        ++ (location.column |> String.fromInt)
 
 
 {-| Rename declared and destructured variables including their uses and assignments
