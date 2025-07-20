@@ -1175,8 +1175,6 @@ swiftTypeExpandFunctionIntoReverse soFarReverse swiftType =
             }
 
 
-{-| TODO invert
--}
 swiftTypeIsEquatable : SwiftType -> Bool
 swiftTypeIsEquatable swiftType =
     -- IGNORE TCO
