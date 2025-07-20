@@ -29878,11 +29878,12 @@ private static func List_foldr<a, state>(
     { list in
         var remainingList: List_List<a> = list
         var filteredSoFar: [a] = []
-        var allElementsKeptSoFar = true
+        var allElementsKeptSoFar: Bool = true
         while case let .List_Cons(head, tail) = remainingList {
             remainingList = tail
             if keepElement(head) {
                 filteredSoFar.append(head)
+            } else {
                 allElementsKeptSoFar = false
             }
         }
