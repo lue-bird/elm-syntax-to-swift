@@ -29492,12 +29492,23 @@ static func Array_mapFromList<a, b>(_ elementChange: (a) -> b, _ fullList: List_
         }
     }
 }
+static func Array_foldr<a, state>(
+    _ reduce: (a, state) -> state,
+    _ initialState: state,
+    _ array: [a]
+) -> state {
+    var currentState: state = initialState
+    for indexFromTheEnd in array.indices {
+        currentState = reduce(array[array.count - 1 - indexFromTheEnd], currentState)
+    }
+    return currentState
+}
 @Sendable public static func Array_foldr<a, state>(_ reduce: @escaping (a) -> (state) -> state)
     -> (state) -> ([a]) -> state
 {
     { initialState in
         { array in
-            var currentState = initialState
+            var currentState: state = initialState
             for indexFromTheEnd in array.indices {
                 currentState = reduce(array[array.count - 1 - indexFromTheEnd])(currentState)
             }
@@ -29524,18 +29535,24 @@ static func Array_mapFromList<a, b>(_ elementChange: (a) -> b, _ fullList: List_
 @Sendable public static func List_head<a>(_ list: List_List<a>) -> Maybe_Maybe<a> {
     switch list {
     case .List_Empty: .Maybe_Nothing
-    case .List_Cons(let head, _): .Maybe_Just(head)
+    case let .List_Cons(head, _): .Maybe_Just(head)
     }
 }
 @Sendable public static func List_tail<a>(_ list: List_List<a>) -> Maybe_Maybe<List_List<a>> {
     switch list {
     case .List_Empty: .Maybe_Nothing
-    case .List_Cons(_, let tail): .Maybe_Just(tail)
+    case let .List_Cons(_, tail): .Maybe_Just(tail)
     }
 }
 
 @Sendable public static func List_length<a>(_ list: List_List<a>) -> Double {
-    Double(List_foldl({ (_, soFar) in soFar + 1 }, 0, list))
+    var lengthSoFar: Int = 0
+    var remainingList: List_List<a> = list
+    while case let .List_Cons(_, tail) = remainingList {
+        remainingList = tail
+        lengthSoFar = lengthSoFar + 1
+    }
+    return Double(lengthSoFar)
 }
 
 private static func List_foldl<a, state>(
@@ -29543,34 +29560,26 @@ private static func List_foldl<a, state>(
     _ initialState: state,
     _ list: List_List<a>
 ) -> state {
-    var stateSoFar: state = initialState
+    var currentState: state = initialState
     var remainingList: List_List<a> = list
-    while true {
-        switch remainingList {
-        case .List_Empty:
-            return stateSoFar
-        case .List_Cons(let head, let tail):
-            stateSoFar = reduce(head, stateSoFar)
-            remainingList = tail
-        }
+    while case let .List_Cons(head, tail) = remainingList {
+        remainingList = tail
+        currentState = reduce(head, currentState)
     }
+    return currentState
 }
 @Sendable public static func List_foldl<a, state>(
     _ reduce: @escaping (a) -> (state) -> state
 ) -> (state) -> (List_List<a>) -> state {
     { initialState in
         { list in
-            var stateSoFar: state = initialState
+            var currentState: state = initialState
             var remainingList: List_List<a> = list
-            while true {
-                switch remainingList {
-                case .List_Empty:
-                    return stateSoFar
-                case .List_Cons(let head, let tail):
-                    stateSoFar = reduce(head)(stateSoFar)
-                    remainingList = tail
-                }
+            while case let .List_Cons(head, tail) = remainingList {
+                remainingList = tail
+                currentState = reduce(head)(currentState)
             }
+            return currentState
         }
     }
 }
@@ -29580,14 +29589,14 @@ private static func List_foldr<a, state>(
     _ initialState: state,
     _ list: List_List<a>
 ) -> state {
-    List_foldl(reduce, initialState, List_reverse(list))
+    Array_foldr(reduce, initialState, Array_fromList(list))
 }
 @Sendable public static func List_foldr<a, state>(
     _ reduce: @escaping (a) -> (state) -> state,
 ) -> (state) -> (List_List<a>) -> state {
     { initialState in
         { list in
-            List_foldl(reduce)(initialState)(List_reverse(list))
+            Array_foldr(reduce)(initialState)(Array_fromList(list))
         }
     }
 }
@@ -29601,12 +29610,11 @@ private static func List_foldr<a, state>(
 {
     { list in
         var remainingList = list
-        while case .List_Cons(let head, let tail) = remainingList {
+        while case let .List_Cons(head, tail) = remainingList {
             if !isExpected(head) {
                 return false
-            } else {
-                remainingList = tail
             }
+            remainingList = tail
         }
         return true
     }
@@ -29616,13 +29624,12 @@ private static func List_foldr<a, state>(
     Bool
 {
     { list in
-        var remainingList = list
-        while case .List_Cons(let head, let tail) = remainingList {
+        var remainingList: List_List<a> = list
+        while case let .List_Cons(head, tail) = remainingList {
             if isOdd(head) {
                 return true
-            } else {
-                remainingList = tail
             }
+            remainingList = tail
         }
         return false
     }
@@ -29632,19 +29639,19 @@ private static func List_foldr<a, state>(
     List_any({ element in Basics_eq(element)(needle) })
 }
 
-@Sendable public static func List_drop<a>(_ countToSkip: Double) -> (List_List<a>) -> List_List<
-    a
-> {
+@Sendable public static func List_drop<a>(_ countToSkip: Double)
+    -> (List_List<a>) -> List_List<a>
+{
     { list in
-        var remainingCountToSkip = countToSkip
-        var remainingList = list
+        var remainingCountToSkip: Int = Int(countToSkip)
+        var remainingList: List_List<a> = list
         while remainingCountToSkip >= 1 {
             switch remainingList {
             case .List_Empty:
                 return remainingList
-            case .List_Cons(_, let tail):
+            case let .List_Cons(_, tail):
                 remainingList = tail
-                remainingCountToSkip -= 1
+                remainingCountToSkip = remainingCountToSkip - 1
             }
         }
         return remainingList
@@ -29655,56 +29662,54 @@ private static func List_foldr<a, state>(
     a
 > {
     { list in
-        var remainingCountToTake = countToTake
-        var remainingList = list
+        var remainingCountToTake: Int = Int(countToTake)
+        var remainingList: List_List<a> = list
         var takenElementsArraySoFar: [a] = []
         while remainingCountToTake >= 1 {
             switch remainingList {
             case .List_Empty:
                 return Array_toList(takenElementsArraySoFar)
-            case .List_Cons(let head, let tail):
+            case let .List_Cons(head, tail):
                 takenElementsArraySoFar.append(head)
                 remainingList = tail
-                remainingCountToTake -= 1
+                remainingCountToTake = remainingCountToTake - 1
             }
         }
         return Array_toList(takenElementsArraySoFar)
     }
 }
 
-@Sendable public static func List_intersperse<a>(_ inBetween: a) -> (List_List<a>) -> List_List<
-    a
-> {
+@Sendable public static func List_intersperse<a>(_ inBetween: a)
+    -> (List_List<a>) -> List_List<a>
+{
     { list in
         switch list {
-        case .List_Empty: .List_Empty
-        case .List_Cons(let head, let tail):
-            // can be optimized
-            List_foldr(
-                { (element, soFar) in
-                    .List_Cons(element, .List_Cons(inBetween, soFar))
-                },
-                List_singleton(head),
-                tail
-            )
+        case .List_Empty:
+            return .List_Empty
+        case let .List_Cons(head, tail):
+            var remainingList = tail
+            var interspersedSoFar: [a] = [head]
+            while case let .List_Cons(next, afterNext) = remainingList {
+                remainingList = afterNext
+                interspersedSoFar.append(inBetween)
+                interspersedSoFar.append(next)
+            }
+            return Array_toList(interspersedSoFar)
         }
     }
 }
 
-@Sendable public static func List_map<a, b>(_ elementChange: @escaping (a) -> b) -> (
-    List_List<a>
-)
-    -> List_List<b>
+@Sendable public static func List_map<a, b>(_ elementChange: @escaping (a) -> b)
+    -> (List_List<a>) -> List_List<b>
 {
     { list in
-        // can be optimized
-        List_foldr(
-            { (element, soFar) in
-                .List_Cons(elementChange(element), soFar)
-            },
-            .List_Empty,
-            list
-        )
+        var remainingList: List_List<a> = list
+        var mappedSoFar: [b] = []
+        while case let .List_Cons(head, tail) = remainingList {
+            remainingList = tail
+            mappedSoFar.append(elementChange(head))
+        }
+        return Array_toList(mappedSoFar)
     }
 }
 
@@ -29712,15 +29717,15 @@ private static func List_foldr<a, state>(
     _ indexedElementChange: @escaping (Double) -> (a) -> b,
 ) -> (List_List<a>) -> List_List<b> {
     { list in
-        var reversedResultList: [b] = []
+        var reversedSoFar: [b] = []
         var indexSoFar: Int = 0
         var remainingList: List_List<a> = list
         while case let .List_Cons(head, tail) = remainingList {
-            reversedResultList.append(indexedElementChange(Double(indexSoFar))(head))
             remainingList = tail
+            reversedSoFar.append(indexedElementChange(Double(indexSoFar))(head))
             indexSoFar = indexSoFar + 1
         }
-        return Array_toList(reversedResultList)
+        return Array_toList(reversedSoFar)
     }
 }
 
@@ -29853,56 +29858,55 @@ private static func List_foldr<a, state>(
 @Sendable public static func List_unzip<a, b>(_ abList: List_List<Tuple<a, b>>)
     -> Tuple<List_List<a>, List_List<b>>
 {
-    .Tuple(
-        List_map({ ab in
-            switch ab {
-            case let .Tuple(first, _): first
-            }
-        })(abList),
-        List_map({ ab in
-            switch ab {
-            case let .Tuple(_, second): second
-            }
-        })(abList)
-    )
+    var remainingList: List_List<Tuple<a, b>> = abList
+    var firstsSoFar: [a] = []
+    var secondsSoFar: [b] = []
+    while case let .List_Cons(head, tail) = remainingList {
+        remainingList = tail
+        switch head {
+        case let .Tuple(first, second):
+            firstsSoFar.append(first)
+            secondsSoFar.append(second)
+        }
+    }
+    return .Tuple(Array_toList(firstsSoFar), Array_toList(secondsSoFar))
 }
 
 @Sendable public static func List_filter<a>(_ keepElement: @escaping (a) -> Bool)
     -> (List_List<a>) -> List_List<a>
 {
     { list in
-        // can be optimized
-        List_foldr(
-            { (element, soFar) in
-                if keepElement(element) {
-                    soFar
-                } else {
-                    .List_Cons(element, soFar)
-                }
-            },
-            .List_Empty,
+        var remainingList: List_List<a> = list
+        var filteredSoFar: [a] = []
+        var allElementsKeptSoFar = true
+        while case let .List_Cons(head, tail) = remainingList {
+            remainingList = tail
+            if keepElement(head) {
+                filteredSoFar.append(head)
+                allElementsKeptSoFar = false
+            }
+        }
+        return if allElementsKeptSoFar {
             list
-        )
+        } else {
+            Array_toList(filteredSoFar)
+        }
     }
 }
 
 @Sendable public static func List_filterMap<a, b>(
-    _ element_toMaybe_Maybe: @escaping (a) -> Maybe_Maybe<b>,
+    _ elementToMaybe: @escaping (a) -> Maybe_Maybe<b>,
 ) -> (List_List<a>) -> List_List<b> {
     { list in
-        // can be optimized
-        List_foldr(
-            { (element, soFar) in
-                switch element_toMaybe_Maybe(element) {
-                case .Maybe_Nothing:
-                    soFar
-                case .Maybe_Just(let value):
-                    .List_Cons(value, soFar)
-                }
-            },
-            .List_Empty,
-            list
-        )
+        var remainingList: List_List<a> = list
+        var filterMappedSoFar: [b] = []
+        while case let .List_Cons(head, tail) = remainingList {
+            remainingList = tail
+            if case let .Maybe_Just(headValue) = elementToMaybe(head) {
+                filterMappedSoFar.append(headValue)
+            }
+        }
+        return Array_toList(filterMappedSoFar)
     }
 }
 
@@ -30000,7 +30004,7 @@ private static func List_foldr<a, state>(
     switch list {
     case .List_Empty:
         .Maybe_Nothing
-    case .List_Cons(let head, let tail):
+    case let .List_Cons(head, tail):
         .Maybe_Just(List_foldl(Basics_max)(head)(tail))
     }
 }
@@ -30010,7 +30014,7 @@ private static func List_foldr<a, state>(
     switch list {
     case .List_Empty:
         .Maybe_Nothing
-    case .List_Cons(let head, let tail):
+    case let .List_Cons(head, tail):
         .Maybe_Just(List_foldl(Basics_min)(head)(tail))
     }
 }
@@ -30021,16 +30025,15 @@ private static func List_foldr<a, state>(
     -> (List_List<a>) -> List_List<a>
 {
     { list in
-        var asArray = Array_fromList(list)
+        var asArray: [a] = Array_fromList(list)
         asArray.sort(by: { (a, b) in elementCompare(a)(b) == .Basics_LT })  // mutate
         return Array_toList(asArray)
     }
 }
 
-@Sendable public static func List_sortBy<element, comparable>(
+@Sendable public static func List_sortBy<element, comparable: Comparable>(
     _ elementToComparable: @escaping (element) -> comparable
-) -> (List_List<element>) -> List_List<element>
-where comparable: Comparable {
+) -> (List_List<element>) -> List_List<element> {
     { list in
         var asArray = Array_fromList(list)
         asArray.sort(by: { (a, b) in elementToComparable(a) < elementToComparable(b) })  // mutate
@@ -30038,10 +30041,10 @@ where comparable: Comparable {
     }
 }
 
-@Sendable public static func List_sort<comparable>(_ list: List_List<comparable>)
+@Sendable public static func List_sort<comparable: Comparable>(_ list: List_List<comparable>)
     -> List_List<comparable>
-where comparable: Comparable {
-    var asArray = Array_fromList(list)
+{
+    var asArray: [comparable] = Array_fromList(list)
     asArray.sort(by: { (a, b) in a < b })  // mutate
     return Array_toList(asArray)
 }
@@ -30114,9 +30117,9 @@ where comparable: Comparable {
 {
     { set in set.filter(keepElement) }
 }
-@Sendable public static func Set_partition<a>(_ isLeft: @escaping (a) -> Bool) -> (Set<a>) -> (
-    Set<a>, Set<a>
-) {
+@Sendable public static func Set_partition<a>(_ isLeft: @escaping (a) -> Bool)
+    -> (Set<a>) -> Tuple<Set<a>, Set<a>>
+{
     { set in
         var left: Set<a> = Set()
         var right: Set<a> = Set()
@@ -30127,7 +30130,7 @@ where comparable: Comparable {
                 right.insert(element)
             }
         }
-        return (left, right)
+        return .Tuple(left, right)
     }
 }
 @Sendable public static func Set_foldl<a, state>(_ reduce: @escaping (a) -> (state) -> state)
@@ -30349,7 +30352,7 @@ where comparable: Comparable {
     _ isLeft: @escaping (key) -> (value) -> Bool
 )
     -> ([key: value])
-    -> ([key: value], [key: value])
+    -> Tuple<[key: value], [key: value]>
 {
     { dictionary in
         var left: [key: value] = Dictionary()
@@ -30361,7 +30364,7 @@ where comparable: Comparable {
                 right[key] = value
             }
         }
-        return (left, right)
+        return .Tuple(left, right)
     }
 }
 @Sendable public static func Dict_foldl<key, value, state>(
