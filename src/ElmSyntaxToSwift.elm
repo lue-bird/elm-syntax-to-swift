@@ -69,7 +69,7 @@ type SwiftPattern
     | SwiftPatternVariant
         { originTypeName : String
         , name : String
-        , values : List SwiftPattern
+        , values : List { label : Maybe String, value : SwiftPattern }
         }
     | SwiftPatternTuple
         { part0 : SwiftPattern
@@ -108,7 +108,11 @@ type SwiftExpression
     | SwiftExpressionRecord (FastDict.Dict String SwiftExpression)
     | SwiftExpressionCall
         { called : SwiftExpression
-        , arguments : List SwiftExpression
+        , arguments :
+            List
+                { label : Maybe String
+                , value : SwiftExpression
+                }
         }
     | SwiftExpressionLambda
         { parameters :
@@ -552,7 +556,14 @@ printSwiftEnumDeclaration :
     { indirect : Bool
     , name : String
     , parameters : List String
-    , cases : FastDict.Dict String (List SwiftType)
+    , cases :
+        FastDict.Dict
+            String
+            (List
+                { label : Maybe String
+                , value : SwiftType
+                }
+            )
     , computedProperties :
         FastDict.Dict
             String
@@ -648,7 +659,15 @@ printSwiftEnumDeclaration swiftEnumType =
         |> Print.followedBy printExactlyCurlyClosing
 
 
-printSwiftEnumCaseDeclaration : { name : String, values : List SwiftType } -> Print
+printSwiftEnumCaseDeclaration :
+    { name : String
+    , values :
+        List
+            { label : Maybe String
+            , value : SwiftType
+            }
+    }
+    -> Print
 printSwiftEnumCaseDeclaration swiftVariant =
     case swiftVariant.values of
         [] ->
@@ -661,7 +680,26 @@ printSwiftEnumCaseDeclaration swiftVariant =
                     (value0 :: value1Up)
                         |> List.map
                             (\value ->
-                                value |> printSwiftTypeNotParenthesized Nothing
+                                let
+                                    valuePrint : Print
+                                    valuePrint =
+                                        value.value
+                                            |> printSwiftTypeNotParenthesized Nothing
+                                in
+                                case value.label of
+                                    Nothing ->
+                                        valuePrint
+
+                                    Just label ->
+                                        Print.exactly (label ++ ":")
+                                            |> Print.followedBy
+                                                (Print.withIndentAtNextMultipleOf4
+                                                    (Print.spaceOrLinebreakIndented
+                                                        (valuePrint |> Print.lineSpread)
+                                                        |> Print.followedBy
+                                                            valuePrint
+                                                    )
+                                                )
                             )
 
                 fullLineSpread : Print.LineSpread
@@ -1992,14 +2030,7 @@ inferredPatternUntilAsPatterns patternTypedNode =
                     parts.part1 |> inferredPatternUntilAsPatterns
             in
             { pattern =
-                SwiftPatternVariant
-                    { originTypeName = "Tuple"
-                    , name = "Tuple"
-                    , values =
-                        [ part0.pattern
-                        , part1.pattern
-                        ]
-                    }
+                swiftPatternVariantTuple part0.pattern part1.pattern
             , patternAliases =
                 part0.patternAliases
                     ++ part1.patternAliases
@@ -2024,9 +2055,9 @@ inferredPatternUntilAsPatterns patternTypedNode =
                     { originTypeName = "Triple"
                     , name = "Triple"
                     , values =
-                        [ part0.pattern
-                        , part1.pattern
-                        , part2.pattern
+                        [ { label = Nothing, value = part0.pattern }
+                        , { label = Nothing, value = part1.pattern }
+                        , { label = Nothing, value = part2.pattern }
                         ]
                     }
             , patternAliases =
@@ -2134,7 +2165,14 @@ inferredPatternUntilAsPatterns patternTypedNode =
                         generatedRecordTypeName
                             (combinedFieldNames.fields |> FastDict.keys)
                     , name = "Record"
-                    , values = combinedFieldNames.fields |> FastDict.values
+                    , values =
+                        combinedFieldNames.fields
+                            |> FastDict.foldr
+                                (\fieldName fieldValue soFar ->
+                                    { label = Just fieldName, value = fieldValue }
+                                        :: soFar
+                                )
+                                []
                     }
             , patternAliases = []
             }
@@ -2239,7 +2277,12 @@ inferredPatternUntilAsPatterns patternTypedNode =
                                     ++ "_"
                                     ++ variant.choiceTypeName
                             , name = reference.name
-                            , values = values |> List.map .pattern
+                            , values =
+                                values
+                                    |> List.map
+                                        (\value ->
+                                            { label = Nothing, value = value.pattern }
+                                        )
                             }
                     , patternAliases =
                         values
@@ -2276,8 +2319,8 @@ swiftPatternListCons head tail =
         { originTypeName = "List_List"
         , name = "List_Cons"
         , values =
-            [ head
-            , tail
+            [ { label = Nothing, value = head }
+            , { label = Nothing, value = tail }
             ]
         }
 
@@ -2464,7 +2507,10 @@ swiftPatternIntroducedVariables swiftPattern =
 
         SwiftPatternVariant patternVariant ->
             patternVariant.values
-                |> List.concatMap swiftPatternIntroducedVariables
+                |> List.concatMap
+                    (\value ->
+                        value.value |> swiftPatternIntroducedVariables
+                    )
 
         SwiftPatternRecord recordPatternInexhaustiveFieldNames ->
             recordPatternInexhaustiveFieldNames
@@ -2515,7 +2561,11 @@ swiftPatternAlterVariables variableNameChange swiftPattern =
                     variant.values
                         |> List.map
                             (\value ->
-                                value |> swiftPatternAlterVariables variableNameChange
+                                { label = value.label
+                                , value =
+                                    value.value
+                                        |> swiftPatternAlterVariables variableNameChange
+                                }
                             )
                 }
 
@@ -2680,14 +2730,7 @@ casePatternInPath path patternInferred =
                     parts.part1 |> casePatternInPath ("1" :: path)
             in
             { pattern =
-                SwiftPatternVariant
-                    { originTypeName = "Tuple"
-                    , name = "Tuple"
-                    , values =
-                        [ part0.pattern
-                        , part1.pattern
-                        ]
-                    }
+                swiftPatternVariantTuple part0.pattern part1.pattern
             , introducedVariables =
                 FastSet.union
                     part0.introducedVariables
@@ -2739,15 +2782,7 @@ casePatternInPath path patternInferred =
                     parts.part2 |> casePatternInPath ("2" :: path)
             in
             { pattern =
-                SwiftPatternVariant
-                    { originTypeName = "Triple"
-                    , name = "Triple"
-                    , values =
-                        [ part0.pattern
-                        , part1.pattern
-                        , part2.pattern
-                        ]
-                    }
+                swiftPatternVariantTriple part0.pattern part1.pattern part2.pattern
             , introducedVariables =
                 part0.introducedVariables
                     |> FastSet.union part1.introducedVariables
@@ -2857,7 +2892,14 @@ casePatternInPath path patternInferred =
                         generatedRecordTypeName
                             (combinedFieldNames.fields |> FastDict.keys)
                     , name = "Record"
-                    , values = combinedFieldNames.fields |> FastDict.values
+                    , values =
+                        combinedFieldNames.fields
+                            |> FastDict.foldr
+                                (\fieldName fieldValue soFar ->
+                                    { label = Just fieldName, value = fieldValue }
+                                        :: soFar
+                                )
+                                []
                     }
             , introducedVariables = combinedFieldNames.introducedVariables
             , variableAsPatternAliases = FastDict.empty
@@ -3012,7 +3054,12 @@ casePatternInPath path patternInferred =
                                     ++ "_"
                                     ++ variant.choiceTypeName
                             , name = reference.name
-                            , values = values |> List.map .pattern
+                            , values =
+                                values
+                                    |> List.map
+                                        (\value ->
+                                            { label = Nothing, value = value.pattern }
+                                        )
                             }
                     , introducedVariables =
                         values
@@ -3052,6 +3099,62 @@ casePatternInPath path patternInferred =
                         , type_ = patternAs.pattern.type_
                         }
             }
+
+
+swiftPatternVariantTuple : SwiftPattern -> SwiftPattern -> SwiftPattern
+swiftPatternVariantTuple part0 part1 =
+    SwiftPatternVariant
+        { originTypeName = "Tuple"
+        , name = "Tuple"
+        , values =
+            [ { label = Nothing, value = part0 }
+            , { label = Nothing, value = part1 }
+            ]
+        }
+
+
+swiftPatternVariantTriple : SwiftPattern -> SwiftPattern -> SwiftPattern -> SwiftPattern
+swiftPatternVariantTriple part0 part1 part2 =
+    SwiftPatternVariant
+        { originTypeName = "Triple"
+        , name = "Triple"
+        , values =
+            [ { label = Nothing, value = part0 }
+            , { label = Nothing, value = part1 }
+            , { label = Nothing, value = part2 }
+            ]
+        }
+
+
+swiftExpressionCallTuple : SwiftExpression -> SwiftExpression -> SwiftExpression
+swiftExpressionCallTuple part0 part1 =
+    SwiftExpressionCall
+        { called =
+            SwiftExpressionVariant
+                { originTypeName = "Tuple"
+                , name = "Tuple"
+                }
+        , arguments =
+            [ { label = Nothing, value = part0 }
+            , { label = Nothing, value = part1 }
+            ]
+        }
+
+
+swiftExpressionCallTriple : SwiftExpression -> SwiftExpression -> SwiftExpression -> SwiftExpression
+swiftExpressionCallTriple part0 part1 part2 =
+    SwiftExpressionCall
+        { called =
+            SwiftExpressionVariant
+                { originTypeName = "Triple"
+                , name = "Triple"
+                }
+        , arguments =
+            [ { label = Nothing, value = part0 }
+            , { label = Nothing, value = part1 }
+            , { label = Nothing, value = part2 }
+            ]
+        }
 
 
 generatedSwiftFillingOutVariableAtPath : List String -> String
@@ -3148,14 +3251,7 @@ patternFillingOutIgnoredPartsWithNewVariables path patternInferred =
                     parts.part1 |> patternFillingOutIgnoredPartsWithNewVariables ("1" :: path)
             in
             { pattern =
-                SwiftPatternVariant
-                    { originTypeName = "Tuple"
-                    , name = "Tuple"
-                    , values =
-                        [ part0.pattern
-                        , part1.pattern
-                        ]
-                    }
+                swiftPatternVariantTuple part0.pattern part1.pattern
             , introducedVariables =
                 FastSet.union
                     part0.introducedVariables
@@ -3207,15 +3303,7 @@ patternFillingOutIgnoredPartsWithNewVariables path patternInferred =
                     parts.part2 |> patternFillingOutIgnoredPartsWithNewVariables ("2" :: path)
             in
             { pattern =
-                SwiftPatternVariant
-                    { originTypeName = "Triple"
-                    , name = "Triple"
-                    , values =
-                        [ part0.pattern
-                        , part1.pattern
-                        , part2.pattern
-                        ]
-                    }
+                swiftPatternVariantTriple part0.pattern part1.pattern part2.pattern
             , introducedVariables =
                 part0.introducedVariables
                     |> FastSet.union part1.introducedVariables
@@ -3329,7 +3417,14 @@ patternFillingOutIgnoredPartsWithNewVariables path patternInferred =
                         generatedRecordTypeName
                             (combinedFieldNames.fields |> FastDict.keys)
                     , name = "Record"
-                    , values = combinedFieldNames.fields |> FastDict.values
+                    , values =
+                        combinedFieldNames.fields
+                            |> FastDict.foldr
+                                (\fieldName fieldValue soFar ->
+                                    { label = Just fieldName, value = fieldValue }
+                                        :: soFar
+                                )
+                                []
                     }
             , introducedVariables = combinedFieldNames.introducedVariables
             , variableAsPatternAliases = FastDict.empty
@@ -3484,7 +3579,12 @@ patternFillingOutIgnoredPartsWithNewVariables path patternInferred =
                                     ++ "_"
                                     ++ variant.choiceTypeName
                             , name = reference.name
-                            , values = values |> List.map .pattern
+                            , values =
+                                values
+                                    |> List.map
+                                        (\value ->
+                                            { label = Nothing, value = value.pattern }
+                                        )
                             }
                     , introducedVariables =
                         values
@@ -5399,7 +5499,27 @@ printSwiftPatternNotParenthesized swiftPattern =
                                 |> Print.followedBy
                                     ((variantValue0 :: variantValue1Up)
                                         |> Print.listMapAndIntersperseAndFlatten
-                                            printSwiftPatternParenthesizedIfSpaceSeparated
+                                            (\value ->
+                                                let
+                                                    valuePrint : Print
+                                                    valuePrint =
+                                                        value.value |> printSwiftPatternNotParenthesized
+                                                in
+                                                case value.label of
+                                                    Nothing ->
+                                                        valuePrint
+
+                                                    Just label ->
+                                                        Print.exactly (label ++ ":")
+                                                            |> Print.followedBy
+                                                                (Print.withIndentAtNextMultipleOf4
+                                                                    (Print.spaceOrLinebreakIndented
+                                                                        (valuePrint |> Print.lineSpread)
+                                                                        |> Print.followedBy
+                                                                            valuePrint
+                                                                    )
+                                                                )
+                                            )
                                             printExactlyCommaSpace
                                     )
                                 |> Print.followedBy printExactlyParenClosing
@@ -5569,7 +5689,14 @@ modules :
                 FastDict.Dict
                     String
                     { parameters : List String
-                    , cases : FastDict.Dict String (List SwiftType)
+                    , cases :
+                        FastDict.Dict
+                            String
+                            (List
+                                { label : Maybe String
+                                , value : SwiftType
+                                }
+                            )
                     , computedProperties :
                         FastDict.Dict
                             String
@@ -6699,9 +6826,18 @@ modules syntaxDeclarationsIncludingOverwrittenOnes =
                 , enumTypes =
                     transpiledSwiftDeclarations.declarations.enumTypes
                         |> FastDict.map
-                            (\_ typeAliasInfo ->
-                                { parameters = typeAliasInfo.parameters
-                                , cases = typeAliasInfo.cases
+                            (\_ enumDeclarationInfo ->
+                                { parameters = enumDeclarationInfo.parameters
+                                , cases =
+                                    enumDeclarationInfo.cases
+                                        |> FastDict.map
+                                            (\_ enumCase ->
+                                                enumCase
+                                                    |> List.map
+                                                        (\enumCaseValue ->
+                                                            { label = Nothing, value = enumCaseValue }
+                                                        )
+                                            )
                                 , computedProperties = FastDict.empty
                                 }
                             )
@@ -6732,8 +6868,9 @@ modules syntaxDeclarationsIncludingOverwrittenOnes =
                                                                 (swiftRecordFields
                                                                     |> List.map
                                                                         (\swiftRecordField ->
-                                                                            -- TODO add label
-                                                                            SwiftTypeVariable swiftRecordField
+                                                                            { label = Just swiftRecordField
+                                                                            , value = SwiftTypeVariable swiftRecordField
+                                                                            }
                                                                         )
                                                                 )
                                                         , computedProperties =
@@ -6755,11 +6892,14 @@ modules syntaxDeclarationsIncludingOverwrittenOnes =
                                                                                                         swiftRecordFields
                                                                                                             |> List.map
                                                                                                                 (\valueName ->
-                                                                                                                    if valueName == swiftRecordField then
-                                                                                                                        SwiftPatternVariable "result"
+                                                                                                                    { label = Just valueName
+                                                                                                                    , value =
+                                                                                                                        if valueName == swiftRecordField then
+                                                                                                                            SwiftPatternVariable "result"
 
-                                                                                                                    else
-                                                                                                                        SwiftPatternIgnore
+                                                                                                                        else
+                                                                                                                            SwiftPatternIgnore
+                                                                                                                    }
                                                                                                                 )
                                                                                                     }
                                                                                             , result =
@@ -7620,9 +7760,9 @@ expression context expressionTypedNode =
                                             { called =
                                                 SwiftExpressionCall
                                                     { called = swiftExpressionReferenceStringAppend
-                                                    , arguments = [ left.result ]
+                                                    , arguments = [ { label = Nothing, value = left.result } ]
                                                     }
-                                            , arguments = [ right.result ]
+                                            , arguments = [ { label = Nothing, value = right.result } ]
                                             }
 
                                 else
@@ -7630,9 +7770,9 @@ expression context expressionTypedNode =
                                         { called =
                                             SwiftExpressionCall
                                                 { called = swiftExpressionReferenceListAppend
-                                                , arguments = [ left.result ]
+                                                , arguments = [ { label = Nothing, value = left.result } ]
                                                 }
-                                        , arguments = [ right.result ]
+                                        , arguments = [ { label = Nothing, value = right.result } ]
                                         }
                             }
                         )
@@ -7668,9 +7808,9 @@ expression context expressionTypedNode =
                                     { called =
                                         SwiftExpressionCall
                                             { called = SwiftExpressionReference operationFunctionReference
-                                            , arguments = [ left.result ]
+                                            , arguments = [ { label = Nothing, value = left.result } ]
                                             }
-                                    , arguments = [ right.result ]
+                                    , arguments = [ { label = Nothing, value = right.result } ]
                                     }
                             }
                         )
@@ -7820,10 +7960,13 @@ expression context expressionTypedNode =
                                                     (valueType0 :: valueType1Up)
                                                         |> List.indexedMap
                                                             (\valueIndex _ ->
-                                                                SwiftExpressionReference
-                                                                    { moduleOrigin = Nothing
-                                                                    , name = generatedValueParameterName valueIndex
-                                                                    }
+                                                                { label = Nothing
+                                                                , value =
+                                                                    SwiftExpressionReference
+                                                                        { moduleOrigin = Nothing
+                                                                        , name = generatedValueParameterName valueIndex
+                                                                        }
+                                                                }
                                                             )
                                                 }
                                             )
@@ -7908,7 +8051,13 @@ expression context expressionTypedNode =
                                                         , name = "Record"
                                                         }
                                                 , arguments =
-                                                    resultRecordFields |> FastDict.values
+                                                    resultRecordFields
+                                                        |> FastDict.foldr
+                                                            (\fieldName fieldValue soFar ->
+                                                                { label = Just fieldName, value = fieldValue }
+                                                                    :: soFar
+                                                            )
+                                                            []
                                                 }
                                             )
                                 }
@@ -7987,7 +8136,10 @@ expression context expressionTypedNode =
                                                     , name = "PlatformCmd_portOutgoingWithName"
                                                     }
                                             , arguments =
-                                                [ SwiftExpressionStringLiteral reference.name
+                                                [ { label = Nothing
+                                                  , value =
+                                                        SwiftExpressionStringLiteral reference.name
+                                                  }
                                                 ]
                                             }
 
@@ -7999,7 +8151,10 @@ expression context expressionTypedNode =
                                                     , name = "PlatformSub_portIncomingWithName"
                                                     }
                                             , arguments =
-                                                [ SwiftExpressionStringLiteral reference.name
+                                                [ { label = Nothing
+                                                  , value =
+                                                        SwiftExpressionStringLiteral reference.name
+                                                  }
                                                 ]
                                             }
 
@@ -8221,17 +8376,7 @@ expression context expressionTypedNode =
                 (\part0 part1 ->
                     { statements = part0.statements ++ part1.statements
                     , result =
-                        SwiftExpressionCall
-                            { called =
-                                SwiftExpressionVariant
-                                    { originTypeName = "Tuple"
-                                    , name = "Tuple"
-                                    }
-                            , arguments =
-                                [ part0.result
-                                , part1.result
-                                ]
-                            }
+                        swiftExpressionCallTuple part0.result part1.result
                     }
                 )
                 (parts.part0
@@ -8263,18 +8408,10 @@ expression context expressionTypedNode =
                             ++ part1.statements
                             ++ part2.statements
                     , result =
-                        SwiftExpressionCall
-                            { called =
-                                SwiftExpressionVariant
-                                    { originTypeName = "Triple"
-                                    , name = "Triple"
-                                    }
-                            , arguments =
-                                [ part0.result
-                                , part1.result
-                                , part2.result
-                                ]
-                            }
+                        swiftExpressionCallTriple
+                            part0.result
+                            part1.result
+                            part2.result
                     }
                 )
                 (parts.part0
@@ -8321,8 +8458,11 @@ expression context expressionTypedNode =
                                 SwiftExpressionReference
                                     { moduleOrigin = Nothing, name = "Array_toList" }
                             , arguments =
-                                [ SwiftExpressionArrayLiteral
-                                    (elements |> List.map .result)
+                                [ { label = Nothing
+                                  , value =
+                                        SwiftExpressionArrayLiteral
+                                            (elements |> List.map .result)
+                                  }
                                 ]
                             }
                     }
@@ -8374,7 +8514,13 @@ expression context expressionTypedNode =
                                     , name = "Record"
                                     }
                             , arguments =
-                                fieldResults |> FastDict.values
+                                fieldResults
+                                    |> FastDict.foldr
+                                        (\fieldName fieldValue soFar ->
+                                            { label = Just fieldName, value = fieldValue }
+                                                :: soFar
+                                        )
+                                        []
                             }
                     }
                 )
@@ -9525,7 +9671,8 @@ swiftExpressionCallCondense call =
             , result =
                 SwiftExpressionCall
                     { called = call.called
-                    , arguments = [ call.argument ]
+                    , arguments =
+                        [ { label = Nothing, value = call.argument } ]
                     }
             }
 
@@ -9597,7 +9744,7 @@ swiftExpressionCallCondense call =
                         , result =
                             SwiftExpressionCall
                                 { called = call.called
-                                , arguments = [ call.argument ]
+                                , arguments = [ { label = Nothing, value = call.argument } ]
                                 }
                         }
 
@@ -9606,7 +9753,7 @@ swiftExpressionCallCondense call =
                     , result =
                         SwiftExpressionCall
                             { called = call.called
-                            , arguments = [ call.argument ]
+                            , arguments = [ { label = Nothing, value = call.argument } ]
                             }
                     }
 
@@ -9620,7 +9767,7 @@ swiftExpressionCallCondense call =
                                     SwiftExpressionReference argumentReference ->
                                         case argumentReference.name of
                                             "Array_toList" ->
-                                                case argumentCall.arguments of
+                                                case argumentCall.arguments |> List.map .value of
                                                     [ SwiftExpressionArrayLiteral elements ] ->
                                                         Just elements
 
@@ -9649,7 +9796,7 @@ swiftExpressionCallCondense call =
                     , result =
                         SwiftExpressionCall
                             { called = call.called
-                            , arguments = [ call.argument ]
+                            , arguments = [ { label = Nothing, value = call.argument } ]
                             }
                     }
 
@@ -9658,7 +9805,7 @@ swiftExpressionCallCondense call =
             , result =
                 SwiftExpressionCall
                     { called = call.called
-                    , arguments = [ call.argument ]
+                    , arguments = [ { label = Nothing, value = call.argument } ]
                     }
             }
 
@@ -9667,7 +9814,7 @@ swiftExpressionCallCondense call =
             , result =
                 SwiftExpressionCall
                     { called = call.called
-                    , arguments = [ call.argument ]
+                    , arguments = [ { label = Nothing, value = call.argument } ]
                     }
             }
 
@@ -9676,7 +9823,7 @@ swiftExpressionCallCondense call =
             , result =
                 SwiftExpressionCall
                     { called = call.called
-                    , arguments = [ call.argument ]
+                    , arguments = [ { label = Nothing, value = call.argument } ]
                     }
             }
 
@@ -9685,7 +9832,7 @@ swiftExpressionCallCondense call =
             , result =
                 SwiftExpressionCall
                     { called = call.called
-                    , arguments = [ call.argument ]
+                    , arguments = [ { label = Nothing, value = call.argument } ]
                     }
             }
 
@@ -9694,7 +9841,7 @@ swiftExpressionCallCondense call =
             , result =
                 SwiftExpressionCall
                     { called = call.called
-                    , arguments = [ call.argument ]
+                    , arguments = [ { label = Nothing, value = call.argument } ]
                     }
             }
 
@@ -9703,7 +9850,7 @@ swiftExpressionCallCondense call =
             , result =
                 SwiftExpressionCall
                     { called = call.called
-                    , arguments = [ call.argument ]
+                    , arguments = [ { label = Nothing, value = call.argument } ]
                     }
             }
 
@@ -9712,7 +9859,7 @@ swiftExpressionCallCondense call =
             , result =
                 SwiftExpressionCall
                     { called = call.called
-                    , arguments = [ call.argument ]
+                    , arguments = [ { label = Nothing, value = call.argument } ]
                     }
             }
 
@@ -9721,7 +9868,7 @@ swiftExpressionCallCondense call =
             , result =
                 SwiftExpressionCall
                     { called = call.called
-                    , arguments = [ call.argument ]
+                    , arguments = [ { label = Nothing, value = call.argument } ]
                     }
             }
 
@@ -9730,7 +9877,7 @@ swiftExpressionCallCondense call =
             , result =
                 SwiftExpressionCall
                     { called = call.called
-                    , arguments = [ call.argument ]
+                    , arguments = [ { label = Nothing, value = call.argument } ]
                     }
             }
 
@@ -9739,7 +9886,7 @@ swiftExpressionCallCondense call =
             , result =
                 SwiftExpressionCall
                     { called = call.called
-                    , arguments = [ call.argument ]
+                    , arguments = [ { label = Nothing, value = call.argument } ]
                     }
             }
 
@@ -9748,7 +9895,7 @@ swiftExpressionCallCondense call =
             , result =
                 SwiftExpressionCall
                     { called = call.called
-                    , arguments = [ call.argument ]
+                    , arguments = [ { label = Nothing, value = call.argument } ]
                     }
             }
 
@@ -9757,7 +9904,7 @@ swiftExpressionCallCondense call =
             , result =
                 SwiftExpressionCall
                     { called = call.called
-                    , arguments = [ call.argument ]
+                    , arguments = [ { label = Nothing, value = call.argument } ]
                     }
             }
 
@@ -9805,7 +9952,12 @@ swiftExpressionContainsDelayedExecution swiftExpression =
 
         SwiftExpressionCall call ->
             (call.called |> swiftExpressionContainsDelayedExecution)
-                || (call.arguments |> List.any swiftExpressionContainsDelayedExecution)
+                || (call.arguments
+                        |> List.any
+                            (\argument ->
+                                argument.value |> swiftExpressionContainsDelayedExecution
+                            )
+                   )
 
         SwiftExpressionLambda _ ->
             True
@@ -10027,7 +10179,8 @@ swiftExpressionCountUsesOfReference referenceToCountUsesOf swiftExpression =
                 + (call.arguments
                     |> listMapAndSum
                         (\argument ->
-                            argument |> swiftExpressionCountUsesOfReference referenceToCountUsesOf
+                            argument.value
+                                |> swiftExpressionCountUsesOfReference referenceToCountUsesOf
                         )
                   )
 
@@ -10274,7 +10427,11 @@ swiftExpressionSubstituteReferences referenceToExpression swiftExpression =
                     call.arguments
                         |> List.map
                             (\argument ->
-                                argument |> swiftExpressionSubstituteReferences referenceToExpression
+                                { label = argument.label
+                                , value =
+                                    argument.value
+                                        |> swiftExpressionSubstituteReferences referenceToExpression
+                                }
                             )
                 }
 
@@ -11565,7 +11722,14 @@ type SwiftEnumTypeOrTypeAliasDeclaration
     = SwiftEnumTypeDeclaration
         { name : String
         , parameters : List String
-        , cases : FastDict.Dict String (List SwiftType)
+        , cases :
+            FastDict.Dict
+                String
+                (List
+                    { label : Maybe String
+                    , value : SwiftType
+                    }
+                )
         , computedProperties :
             FastDict.Dict
                 String
@@ -11591,7 +11755,14 @@ swiftTypeDeclarationsGroupByDependencies :
         List
             { name : String
             , parameters : List String
-            , cases : FastDict.Dict String (List SwiftType)
+            , cases :
+                FastDict.Dict
+                    String
+                    (List
+                        { label : Maybe String
+                        , value : SwiftType
+                        }
+                    )
             , computedProperties :
                 FastDict.Dict
                     String
@@ -11631,7 +11802,10 @@ swiftTypeDeclarationsGroupByDependencies swiftTypeDeclarations =
                                         FastSet.union soFar
                                             (variantValues
                                                 |> listMapToFastSetsAndUnify
-                                                    swiftTypeContainedLocalReferences
+                                                    (\variantValue ->
+                                                        variantValue.value
+                                                            |> swiftTypeContainedLocalReferences
+                                                    )
                                             )
                                     )
                                     FastSet.empty
@@ -13564,7 +13738,11 @@ printSwiftExpressionTuple parts =
 
 printSwiftExpressionCall :
     { called : SwiftExpression
-    , arguments : List SwiftExpression
+    , arguments :
+        List
+            { label : Maybe String
+            , value : SwiftExpression
+            }
     }
     -> Print
 printSwiftExpressionCall call =
@@ -13585,7 +13763,28 @@ printSwiftExpressionCall call =
                 argumentPrints =
                     (argument0 :: argument1Up)
                         |> List.map
-                            printSwiftExpressionNotParenthesized
+                            (\argument ->
+                                let
+                                    valuePrint : Print
+                                    valuePrint =
+                                        argument.value
+                                            |> printSwiftExpressionNotParenthesized
+                                in
+                                case argument.label of
+                                    Nothing ->
+                                        valuePrint
+
+                                    Just label ->
+                                        Print.exactly (label ++ ":")
+                                            |> Print.followedBy
+                                                (Print.withIndentAtNextMultipleOf4
+                                                    (Print.spaceOrLinebreakIndented
+                                                        (valuePrint |> Print.lineSpread)
+                                                        |> Print.followedBy
+                                                            valuePrint
+                                                    )
+                                                )
+                            )
 
                 argumentSpread : Print.LineSpread
                 argumentSpread =
@@ -14145,7 +14344,10 @@ swiftPatternContainsBindings swiftPattern =
 
         SwiftPatternVariant patternVariant ->
             patternVariant.values
-                |> List.any swiftPatternContainsBindings
+                |> List.any
+                    (\value ->
+                        value.value |> swiftPatternContainsBindings
+                    )
 
         SwiftPatternRecord recordPatternInexhaustiveFieldNames ->
             recordPatternInexhaustiveFieldNames
@@ -14332,7 +14534,12 @@ swiftPatternAsExpression swiftPattern =
                                 }
                         , arguments =
                             (value0 :: value1Up)
-                                |> List.map swiftPatternAsExpression
+                                |> List.map
+                                    (\value ->
+                                        { label = value.label
+                                        , value = value.value |> swiftPatternAsExpression
+                                        }
+                                    )
                         }
 
         SwiftPatternRecord fields ->
@@ -14448,7 +14655,14 @@ swiftDeclarationsToModuleString :
         FastDict.Dict
             String
             { parameters : List String
-            , cases : FastDict.Dict String (List SwiftType)
+            , cases :
+                FastDict.Dict
+                    String
+                    (List
+                        { label : Maybe String
+                        , value : SwiftType
+                        }
+                    )
             , computedProperties :
                 FastDict.Dict
                     String
@@ -14464,7 +14678,14 @@ swiftDeclarationsToModuleString swiftDeclarations =
             List
                 { name : String
                 , parameters : List String
-                , cases : FastDict.Dict String (List SwiftType)
+                , cases :
+                    FastDict.Dict
+                        String
+                        (List
+                            { label : Maybe String
+                            , value : SwiftType
+                            }
+                        )
                 , computedProperties :
                     FastDict.Dict
                         String
@@ -14492,7 +14713,6 @@ swiftDeclarationsToModuleString swiftDeclarations =
                     )
             }
         typeDeclarationsOrdered =
-            -- TODO not necessary
             swiftTypeDeclarationsGroupByDependencies
                 { typeAliases =
                     swiftDeclarations.typeAliases
@@ -14509,24 +14729,28 @@ swiftDeclarationsToModuleString swiftDeclarations =
         deriveProtocolConformances : List String
         deriveProtocolConformances =
             swiftEnumDeclarationList
-                |> List.concatMap
+                |> List.filterMap
                     (\swiftEnumDeclaration ->
-                        -- TODO also add Sendable conformance this way
                         if
                             swiftEnumDeclaration.cases
                                 |> fastDictAll
                                     (\_ enumCaseValues ->
-                                        enumCaseValues |> List.all swiftTypeIsEquatable
+                                        enumCaseValues
+                                            |> List.all
+                                                (\value ->
+                                                    value.value |> swiftTypeIsEquatable
+                                                )
                                     )
                         then
-                            [ deriveProtocolConformanceToString "Equatable"
-                                { name = "Elm." ++ swiftEnumDeclaration.name
-                                , parameters = swiftEnumDeclaration.parameters
-                                }
-                            ]
+                            Just
+                                (deriveProtocolConformanceToString "Equatable"
+                                    { name = "Elm." ++ swiftEnumDeclaration.name
+                                    , parameters = swiftEnumDeclaration.parameters
+                                    }
+                                )
 
                         else
-                            []
+                            Nothing
                     )
     in
     """import CoreFoundation
