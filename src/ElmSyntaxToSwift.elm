@@ -7093,6 +7093,17 @@ valueOrFunctionDeclaration moduleContext syntaxDeclarationValueOrFunction =
                                 inputParameterName : String
                                 inputParameterName =
                                     generatedParameterNameForIndex 0
+
+                                condensedResult : { statements : List SwiftStatement, result : SwiftExpression }
+                                condensedResult =
+                                    swiftExpressionCallCondense
+                                        { called = result.result
+                                        , argument =
+                                            SwiftExpressionReference
+                                                { moduleOrigin = Nothing
+                                                , name = inputParameterName
+                                                }
+                                        }
                             in
                             { parameters =
                                 Just
@@ -7102,19 +7113,13 @@ valueOrFunctionDeclaration moduleContext syntaxDeclarationValueOrFunction =
                                                 |> type_ typeAliasesInModule
                                       }
                                     ]
-                            , statements = result.statements
+                            , statements =
+                                result.statements
+                                    ++ condensedResult.statements
                             , resultType =
                                 resultTypeFunction.output
                                     |> type_ typeAliasesInModule
-                            , result =
-                                swiftExpressionCallCondense
-                                    { called = result.result
-                                    , argument =
-                                        SwiftExpressionReference
-                                            { moduleOrigin = Nothing
-                                            , name = inputParameterName
-                                            }
-                                    }
+                            , result = condensedResult.result
                             }
                 )
                 (syntaxDeclarationValueOrFunction.result
@@ -7451,25 +7456,25 @@ expression context expressionTypedNode =
         ElmSyntaxTypeInfer.ExpressionCall call ->
             Result.map3
                 (\called argument0 argument1Up ->
-                    { statements =
-                        called.statements
-                            ++ argument0.statements
-                            ++ (argument1Up |> List.concatMap .statements)
-                    , result =
-                        argument1Up
-                            |> List.foldl
-                                (\argument condensedSoFar ->
-                                    swiftExpressionCallCondense
-                                        { called = condensedSoFar
-                                        , argument = argument.result
-                                        }
-                                )
-                                (swiftExpressionCallCondense
-                                    { called = called.result
-                                    , argument = argument0.result
-                                    }
-                                )
-                    }
+                    (argument0 :: argument1Up)
+                        |> List.foldl
+                            (\argument condensedSoFar ->
+                                let
+                                    afterCondensingArgument : { statements : List SwiftStatement, result : SwiftExpression }
+                                    afterCondensingArgument =
+                                        swiftExpressionCallCondense
+                                            { called = condensedSoFar.result
+                                            , argument = argument.result
+                                            }
+                                in
+                                { statements =
+                                    condensedSoFar.statements
+                                        ++ argument.statements
+                                        ++ afterCondensingArgument.statements
+                                , result = afterCondensingArgument.result
+                                }
+                            )
+                            called
                 )
                 (call.called
                     |> expression
@@ -7514,14 +7519,19 @@ expression context expressionTypedNode =
                 "|>" ->
                     Result.map2
                         (\argument called ->
+                            let
+                                callCondensed : { statements : List SwiftStatement, result : SwiftExpression }
+                                callCondensed =
+                                    swiftExpressionCallCondense
+                                        { called = called.result
+                                        , argument = argument.result
+                                        }
+                            in
                             { statements =
                                 called.statements
                                     ++ argument.statements
-                            , result =
-                                swiftExpressionCallCondense
-                                    { called = called.result
-                                    , argument = argument.result
-                                    }
+                                    ++ callCondensed.statements
+                            , result = callCondensed.result
                             }
                         )
                         (infixOperation.left
@@ -7548,14 +7558,19 @@ expression context expressionTypedNode =
                 "<|" ->
                     Result.map2
                         (\called argument ->
+                            let
+                                callCondensed : { statements : List SwiftStatement, result : SwiftExpression }
+                                callCondensed =
+                                    swiftExpressionCallCondense
+                                        { called = called.result
+                                        , argument = argument.result
+                                        }
+                            in
                             { statements =
                                 called.statements
                                     ++ argument.statements
-                            , result =
-                                swiftExpressionCallCondense
-                                    { called = called.result
-                                    , argument = argument.result
-                                    }
+                                    ++ callCondensed.statements
+                            , result = callCondensed.result
                             }
                         )
                         (infixOperation.left
@@ -9466,14 +9481,20 @@ swiftExpressionCallCondense :
     { called : SwiftExpression
     , argument : SwiftExpression
     }
-    -> SwiftExpression
+    ->
+        { statements : List SwiftStatement
+        , result : SwiftExpression
+        }
 swiftExpressionCallCondense call =
     case call.called of
-        SwiftExpressionCall calledCall ->
-            SwiftExpressionCall
-                { called = SwiftExpressionCall calledCall
-                , arguments = [ call.argument ]
-                }
+        SwiftExpressionCall _ ->
+            { statements = []
+            , result =
+                SwiftExpressionCall
+                    { called = call.called
+                    , arguments = [ call.argument ]
+                    }
+            }
 
         SwiftExpressionLambda calledLambda ->
             case calledLambda.parameters of
@@ -9510,34 +9531,51 @@ swiftExpressionCallCondense call =
                                         )
                                )
                     then
-                        calledLambda.result
-                            |> swiftExpressionSubstituteReferences
-                                (\existingReference ->
-                                    if
-                                        case existingReference.moduleOrigin of
-                                            Nothing ->
-                                                existingReference.name == parameter.name
+                        let
+                            substituteReferences : { moduleOrigin : Maybe String, name : String } -> SwiftExpression
+                            substituteReferences existingReference =
+                                if
+                                    case existingReference.moduleOrigin of
+                                        Just _ ->
+                                            False
 
-                                            _ ->
-                                                False
-                                    then
-                                        call.argument
+                                        Nothing ->
+                                            existingReference.name == parameter.name
+                                then
+                                    call.argument
 
-                                    else
-                                        SwiftExpressionReference existingReference
-                                )
+                                else
+                                    SwiftExpressionReference existingReference
+                        in
+                        { statements =
+                            calledLambda.statements
+                                |> List.map
+                                    (\statement ->
+                                        statement
+                                            |> swiftStatementSubstituteReferences substituteReferences
+                                    )
+                        , result =
+                            calledLambda.result
+                                |> swiftExpressionSubstituteReferences substituteReferences
+                        }
 
                     else
-                        SwiftExpressionCall
-                            { called = SwiftExpressionLambda calledLambda
-                            , arguments = [ call.argument ]
-                            }
+                        { statements = []
+                        , result =
+                            SwiftExpressionCall
+                                { called = call.called
+                                , arguments = [ call.argument ]
+                                }
+                        }
 
                 _ ->
-                    SwiftExpressionCall
-                        { called = SwiftExpressionLambda calledLambda
-                        , arguments = [ call.argument ]
-                        }
+                    { statements = []
+                    , result =
+                        SwiftExpressionCall
+                            { called = call.called
+                            , arguments = [ call.argument ]
+                            }
+                    }
 
         SwiftExpressionReference reference ->
             case
@@ -9569,79 +9607,117 @@ swiftExpressionCallCondense call =
                         Nothing
             of
                 Just elements ->
-                    SwiftExpressionArrayLiteral elements
+                    { statements = []
+                    , result = SwiftExpressionArrayLiteral elements
+                    }
 
                 Nothing ->
-                    SwiftExpressionCall
-                        { called = SwiftExpressionReference reference
-                        , arguments = [ call.argument ]
-                        }
+                    { statements = []
+                    , result =
+                        SwiftExpressionCall
+                            { called = call.called
+                            , arguments = [ call.argument ]
+                            }
+                    }
 
         SwiftExpressionVariant reference ->
-            SwiftExpressionCall
-                { called = SwiftExpressionVariant reference
-                , arguments = [ call.argument ]
-                }
+            { statements = []
+            , result =
+                SwiftExpressionCall
+                    { called = call.called
+                    , arguments = [ call.argument ]
+                    }
+            }
 
         SwiftExpressionDouble _ ->
-            SwiftExpressionCall
-                { called = call.called
-                , arguments = [ call.argument ]
-                }
+            { statements = []
+            , result =
+                SwiftExpressionCall
+                    { called = call.called
+                    , arguments = [ call.argument ]
+                    }
+            }
 
         SwiftExpressionUnicodeScalar _ ->
-            SwiftExpressionCall
-                { called = call.called
-                , arguments = [ call.argument ]
-                }
+            { statements = []
+            , result =
+                SwiftExpressionCall
+                    { called = call.called
+                    , arguments = [ call.argument ]
+                    }
+            }
 
         SwiftExpressionStringLiteral _ ->
-            SwiftExpressionCall
-                { called = call.called
-                , arguments = [ call.argument ]
-                }
+            { statements = []
+            , result =
+                SwiftExpressionCall
+                    { called = call.called
+                    , arguments = [ call.argument ]
+                    }
+            }
 
         SwiftExpressionNegateOperation _ ->
-            SwiftExpressionCall
-                { called = call.called
-                , arguments = [ call.argument ]
-                }
+            { statements = []
+            , result =
+                SwiftExpressionCall
+                    { called = call.called
+                    , arguments = [ call.argument ]
+                    }
+            }
 
         SwiftExpressionRecordAccess _ ->
-            SwiftExpressionCall
-                { called = call.called
-                , arguments = [ call.argument ]
-                }
+            { statements = []
+            , result =
+                SwiftExpressionCall
+                    { called = call.called
+                    , arguments = [ call.argument ]
+                    }
+            }
 
         SwiftExpressionTuple _ ->
-            SwiftExpressionCall
-                { called = call.called
-                , arguments = [ call.argument ]
-                }
+            { statements = []
+            , result =
+                SwiftExpressionCall
+                    { called = call.called
+                    , arguments = [ call.argument ]
+                    }
+            }
 
         SwiftExpressionIfElse _ ->
-            SwiftExpressionCall
-                { called = call.called
-                , arguments = [ call.argument ]
-                }
+            { statements = []
+            , result =
+                SwiftExpressionCall
+                    { called = call.called
+                    , arguments = [ call.argument ]
+                    }
+            }
 
         SwiftExpressionArrayLiteral _ ->
-            SwiftExpressionCall
-                { called = call.called
-                , arguments = [ call.argument ]
-                }
+            { statements = []
+            , result =
+                SwiftExpressionCall
+                    { called = call.called
+                    , arguments = [ call.argument ]
+                    }
+            }
 
         SwiftExpressionRecord _ ->
-            SwiftExpressionCall
-                { called = call.called
-                , arguments = [ call.argument ]
-                }
+            { statements = []
+            , result =
+                SwiftExpressionCall
+                    { called = call.called
+                    , arguments = [ call.argument ]
+                    }
+            }
 
         SwiftExpressionSwitch _ ->
-            SwiftExpressionCall
-                { called = call.called
-                , arguments = [ call.argument ]
-                }
+            { statements = []
+            , result =
+                SwiftExpressionCall
+                    { called = call.called
+                    , arguments = [ call.argument ]
+                    }
+            }
 
 
 swiftExpressionContainsDelayedExecution : SwiftExpression -> Bool
@@ -14337,6 +14413,18 @@ swiftDeclarationsToModuleString :
     -> String
 swiftDeclarationsToModuleString swiftDeclarations =
     let
+        swiftEnumDeclarationsList :
+            List
+                { name : String
+                , parameters : List String
+                , cases : FastDict.Dict String (List SwiftType)
+                , computedProperties :
+                    FastDict.Dict
+                        String
+                        { type_ : SwiftType
+                        , value : SwiftExpression
+                        }
+                }
         swiftEnumDeclarationsList =
             swiftDeclarations.enumTypes
                 |> fastDictMapAndToList
@@ -31962,9 +32050,9 @@ private static func surrogatePairToUnicodeScalar(
 }
 
 @Sendable public static func ElmKernelParser_isSubChar(
-    _ predicate: @escaping (UnicodeScalar) -> Bool
+    _ predicate: @escaping @Sendable (UnicodeScalar) -> Bool
 )
-    -> @Sendable @Sendable (Double) -> (String) -> Double
+    -> @Sendable (Double) -> (String) -> Double
 {
     { offset in
         { string in
