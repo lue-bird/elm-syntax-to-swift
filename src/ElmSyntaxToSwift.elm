@@ -635,7 +635,8 @@ printSwiftEnumDeclaration swiftEnumType =
                                                 (Print.spaceOrLinebreakIndented
                                                     (resultTypePrint |> Print.lineSpread)
                                                     |> Print.followedBy resultTypePrint
-                                                    |> Print.followedBy (Print.exactly " {")
+                                                    |> Print.followedBy
+                                                        printExactlySpaceCurlyOpening
                                                     |> Print.followedBy
                                                         (Print.spaceOrLinebreakIndented
                                                             (assignedValuePrint |> Print.lineSpread)
@@ -648,7 +649,8 @@ printSwiftEnumDeclaration swiftEnumType =
                                             (Print.spaceOrLinebreakIndented
                                                 (assignedValuePrint |> Print.lineSpread)
                                             )
-                                        |> Print.followedBy (Print.exactly "}")
+                                        |> Print.followedBy
+                                            printExactlyCurlyClosing
                                 )
                                 Print.linebreakIndented
                         )
@@ -717,7 +719,7 @@ printSwiftEnumCaseDeclaration swiftVariant =
                                             Print.withIndentAtNextMultipleOf4
                                                 valuePrint
                                         )
-                                        (Print.exactly ","
+                                        (printExactlyComma
                                             |> Print.followedBy
                                                 (Print.spaceOrLinebreakIndented fullLineSpread)
                                         )
@@ -726,7 +728,7 @@ printSwiftEnumCaseDeclaration swiftVariant =
                     )
                 |> Print.followedBy
                     (Print.emptyOrLinebreakIndented fullLineSpread)
-                |> Print.followedBy (Print.exactly ")")
+                |> Print.followedBy printExactlyParenClosing
 
 
 typeAliasDeclaration :
@@ -1010,13 +1012,18 @@ printSwiftTypeNotParenthesized position swiftType =
             printSwiftTypeFunction position typeFunction
 
 
+printSwiftTypeRecordEmpty : Print
+printSwiftTypeRecordEmpty =
+    Print.exactly "()"
+
+
 printSwiftTypeRecord : FastDict.Dict String SwiftType -> Print
 printSwiftTypeRecord fields =
     if fields |> FastDict.isEmpty then
-        Print.exactly "()"
+        printSwiftTypeRecordEmpty
 
     else
-        Print.exactly "("
+        printExactlyParenOpening
             |> Print.followedBy
                 (Print.withIndentIncreasedBy 1
                     (fields
@@ -1037,13 +1044,13 @@ printSwiftTypeRecord fields =
                                             )
                                         )
                             )
-                            (Print.exactly ","
+                            (printExactlyComma
                                 |> Print.followedBy Print.linebreakIndented
                             )
                     )
                 )
             |> Print.followedBy Print.linebreakIndented
-            |> Print.followedBy (Print.exactly ")")
+            |> Print.followedBy printExactlyParenClosing
 
 
 printSwiftTypeFunctionInput : { escaping : Bool } -> List SwiftType -> Print
@@ -1072,10 +1079,8 @@ printSwiftTypeFunctionInput config input =
     printParenthesized
         (input0PartPrints
             |> Print.listMapAndIntersperseAndFlatten
-                (\inputPart ->
-                    inputPart
-                )
-                (Print.exactly ","
+                (\inputPart -> inputPart)
+                (printExactlyComma
                     |> Print.followedBy
                         (Print.spaceOrLinebreakIndented input0LineSpread)
                 )
@@ -1454,15 +1459,13 @@ printSwiftTypeTuple parts =
                             |> Print.lineSpreadListMapAndCombine Print.lineSpread
                     )
     in
-    Print.exactly "("
+    printExactlyParenOpening
         |> Print.followedBy
             (Print.withIndentIncreasedBy 3
                 ((part0Print :: part1Print :: part2UpPrints)
                     |> Print.listMapAndIntersperseAndFlatten
-                        (\partPrint ->
-                            partPrint
-                        )
-                        (Print.exactly ","
+                        (\partPrint -> partPrint)
+                        (printExactlyComma
                             |> Print.followedBy
                                 (Print.spaceOrLinebreakIndented lineSpread)
                         )
@@ -1471,7 +1474,7 @@ printSwiftTypeTuple parts =
         |> Print.followedBy
             (Print.emptyOrLinebreakIndented lineSpread)
         |> Print.followedBy
-            (Print.exactly ")")
+            printExactlyParenClosing
 
 
 printSwiftTypeConstruct :
@@ -5461,10 +5464,10 @@ printSwiftPatternNotParenthesized swiftPattern =
 
         SwiftPatternBool bool ->
             if bool then
-                Print.exactly "false"
+                printSwiftPatternTrue
 
             else
-                Print.exactly "true"
+                printSwiftPatternFalse
 
         SwiftPatternInteger int64 ->
             -- NUMBER currently represented as Double
@@ -5533,6 +5536,16 @@ printSwiftPatternNotParenthesized swiftPattern =
                             printExactlyCommaSpace
                     )
                 |> Print.followedBy printExactlyParenClosing
+
+
+printSwiftPatternTrue : Print
+printSwiftPatternTrue =
+    Print.exactly "true"
+
+
+printSwiftPatternFalse : Print
+printSwiftPatternFalse =
+    Print.exactly "false"
 
 
 printSwiftPatternRecord : FastDict.Dict String SwiftPattern -> Print
@@ -11380,7 +11393,7 @@ printSwiftFuncDeclaration swiftValueOrFunctionDeclaration =
                             (parameterPrints
                                 |> Print.listMapAndIntersperseAndFlatten
                                     (\parameterPrint -> parameterPrint)
-                                    (Print.exactly ","
+                                    (printExactlyComma
                                         |> Print.followedBy
                                             (Print.spaceOrLinebreakIndented parametersLineSpread)
                                     )
@@ -11465,8 +11478,7 @@ printSwiftReturn swiftResultExpression =
             printSwiftExpressionNotParenthesized
                 swiftResultExpression
     in
-    Print.linebreakIndented
-        |> Print.followedBy (Print.exactly "return")
+    printExactlyReturn
         |> Print.followedBy
             (Print.withIndentAtNextMultipleOf4
                 (Print.spaceOrLinebreakIndented
@@ -11475,6 +11487,11 @@ printSwiftReturn swiftResultExpression =
                         swiftResultExpressionPrint
                 )
             )
+
+
+printExactlyReturn : Print
+printExactlyReturn =
+    Print.exactly "return"
 
 
 listFilledMapAndStringJoinWith : String -> (a -> String) -> a -> List a -> String
@@ -11631,7 +11648,7 @@ printSwiftLocalFuncDeclaration swiftValueOrFunctionDeclaration =
                             (parameterPrints
                                 |> Print.listMapAndIntersperseAndFlatten
                                     (\parameterPrint -> parameterPrint)
-                                    (Print.exactly ","
+                                    (printExactlyComma
                                         |> Print.followedBy
                                             (Print.spaceOrLinebreakIndented parametersLineSpread)
                                     )
@@ -13733,6 +13750,11 @@ printSwiftExpressionTuple parts =
             printExactlyParenClosing
 
 
+printExactlyParenOpeningParenClosing : Print
+printExactlyParenOpeningParenClosing =
+    Print.exactly "()"
+
+
 printSwiftExpressionCall :
     { called : SwiftExpression
     , arguments :
@@ -13752,7 +13774,8 @@ printSwiftExpressionCall call =
     case call.arguments of
         [] ->
             calledPrint
-                |> Print.followedBy (Print.exactly "()")
+                |> Print.followedBy
+                    printExactlyParenOpeningParenClosing
 
         argument0 :: argument1Up ->
             let
@@ -13796,15 +13819,16 @@ printSwiftExpressionCall call =
                             |> Print.followedBy
                                 (argumentPrints
                                     |> Print.listIntersperseAndFlatten
-                                        (Print.exactly ","
+                                        (printExactlyComma
                                             |> Print.followedBy
                                                 (Print.spaceOrLinebreakIndented argumentSpread)
                                         )
                                 )
                         )
                     )
-                |> Print.followedBy (Print.emptyOrLinebreakIndented argumentSpread)
-                |> Print.followedBy (Print.exactly ")")
+                |> Print.followedBy
+                    (Print.emptyOrLinebreakIndented argumentSpread)
+                |> Print.followedBy printExactlyParenClosing
 
 
 printExactlyCommaLinebreakIndented : Print
@@ -14007,17 +14031,16 @@ printSwiftExpressionLambda lambda =
             printExactlyCurlyOpeningSpace
                 |> Print.followedBy
                     (Print.withIndentIncreasedBy 2
-                        ((parameterPrints
+                        (parameterPrints
                             |> Print.listMapAndIntersperseAndFlatten
                                 (\lambdaParameter -> lambdaParameter)
-                                (Print.exactly ","
+                                (printExactlyComma
                                     |> Print.followedBy
                                         (Print.spaceOrLinebreakIndented
                                             parametersLineSpread
                                         )
                                 )
-                         )
-                            |> Print.followedBy (Print.exactly " in")
+                            |> Print.followedBy printExactlySpaceIn
                         )
                     )
                 |> Print.followedBy
@@ -14030,6 +14053,11 @@ printSwiftExpressionLambda lambda =
                 |> Print.followedBy
                     (Print.spaceOrLinebreakIndented fullLineSpread)
                 |> Print.followedBy printExactlyCurlyClosing
+
+
+printExactlySpaceIn : Print
+printExactlySpaceIn =
+    Print.exactly " in"
 
 
 printSwiftExpressionIfElse :
@@ -14058,7 +14086,7 @@ printSwiftExpressionIfElse syntaxIfElse =
             )
         |> Print.followedBy
             (Print.spaceOrLinebreakIndented conditionLineSpread)
-        |> Print.followedBy (Print.exactly "{")
+        |> Print.followedBy printExactlyCurlyOpening
         |> Print.followedBy
             (Print.withIndentAtNextMultipleOf4
                 (Print.linebreakIndented
@@ -14067,7 +14095,7 @@ printSwiftExpressionIfElse syntaxIfElse =
                 )
             )
         |> Print.followedBy Print.linebreakIndented
-        |> Print.followedBy (Print.exactly "} else {")
+        |> Print.followedBy printExactlyCurlyClosingSpaceElseSpaceCurlyOpening
         |> Print.followedBy
             (Print.withIndentAtNextMultipleOf4
                 (Print.linebreakIndented
@@ -14110,7 +14138,7 @@ printSwiftStatementIfElse ifElse =
             )
         |> Print.followedBy
             (Print.spaceOrLinebreakIndented conditionLineSpread)
-        |> Print.followedBy (Print.exactly "{")
+        |> Print.followedBy printExactlyCurlyOpening
         |> Print.followedBy
             (Print.withIndentAtNextMultipleOf4
                 (Print.linebreakIndented
@@ -14119,8 +14147,7 @@ printSwiftStatementIfElse ifElse =
                     |> Print.followedBy Print.linebreak
                 )
             )
-        |> Print.followedBy Print.linebreakIndented
-        |> Print.followedBy (Print.exactly "} else {")
+        |> Print.followedBy printExactlyCurlyClosingSpaceElseSpaceCurlyOpening
         |> Print.followedBy
             (Print.withIndentAtNextMultipleOf4
                 (Print.linebreakIndented
@@ -14130,6 +14157,11 @@ printSwiftStatementIfElse ifElse =
             )
         |> Print.followedBy Print.linebreakIndented
         |> Print.followedBy printExactlyCurlyClosing
+
+
+printExactlyCurlyClosingSpaceElseSpaceCurlyOpening : Print
+printExactlyCurlyClosingSpaceElseSpaceCurlyOpening =
+    Print.exactly "} else {"
 
 
 printSwiftStatementSwitch :
@@ -14165,14 +14197,14 @@ printSwiftStatementSwitch swiftSwitch =
             )
         |> Print.followedBy
             (Print.spaceOrLinebreakIndented matchedPrintLineSpread)
-        |> Print.followedBy (Print.exactly "{")
+        |> Print.followedBy printExactlyCurlyOpening
         |> Print.followedBy
             (Print.linebreakIndented
                 |> Print.followedBy
                     ((swiftSwitch.case0 :: swiftSwitch.case1Up)
                         |> Print.listMapAndIntersperseAndFlatten
                             printSwiftStatementSwitchCase
-                            printLinebreakLinebreakIndented
+                            Print.linebreakIndented
                     )
             )
         |> Print.followedBy Print.linebreakIndented
@@ -14205,7 +14237,7 @@ printSwiftStatementSwitchCase branch =
             (Print.withIndentIncreasedBy 2
                 patternPrint
             )
-        |> Print.followedBy (Print.exactly ":")
+        |> Print.followedBy printExactlyColon
         |> Print.followedBy
             (Print.withIndentAtNextMultipleOf4
                 (Print.linebreakIndented
@@ -14258,7 +14290,7 @@ printSwiftExpressionSwitch swiftSwitch =
             )
         |> Print.followedBy
             (Print.spaceOrLinebreakIndented matchedPrintLineSpread)
-        |> Print.followedBy (Print.exactly "{")
+        |> Print.followedBy printExactlyCurlyOpening
         |> Print.followedBy
             (Print.linebreakIndented
                 |> Print.followedBy
@@ -14297,7 +14329,7 @@ printSwiftExpressionSwitchCase branch =
             (Print.spaceOrLinebreakIndented
                 (patternPrint |> Print.lineSpread)
             )
-        |> Print.followedBy (Print.exactly ":")
+        |> Print.followedBy printExactlyColon
         |> Print.followedBy
             (Print.withIndentAtNextMultipleOf4
                 (Print.linebreakIndented
@@ -14553,7 +14585,7 @@ printSwiftLetDestructuring :
     }
     -> Print
 printSwiftLetDestructuring letDestructuring =
-    Print.exactly "let "
+    printExactlyLetSpace
         |> Print.followedBy
             (Print.withIndentAtNextMultipleOf4
                 (printParenthesized
@@ -14570,6 +14602,11 @@ printSwiftLetDestructuring letDestructuring =
                         )
                 )
             )
+
+
+printExactlyLetSpace : Print
+printExactlyLetSpace =
+    Print.exactly "let "
 
 
 printExactlyColon : Print
