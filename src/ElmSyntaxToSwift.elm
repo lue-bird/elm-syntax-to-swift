@@ -557,6 +557,12 @@ printSwiftEnumDeclaration :
     , name : String
     , parameters : List String
     , cases : FastDict.Dict String (List SwiftType)
+    , computedProperties :
+        FastDict.Dict
+            String
+            { type_ : SwiftType
+            , value : SwiftExpression
+            }
     }
     -> Print
 printSwiftEnumDeclaration swiftEnumType =
@@ -594,6 +600,49 @@ printSwiftEnumDeclaration swiftEnumType =
                                         { name = name
                                         , values = values
                                         }
+                                )
+                                Print.linebreakIndented
+                        )
+                    |> Print.followedBy
+                        Print.linebreakIndented
+                    |> Print.followedBy
+                        (swiftEnumType.computedProperties
+                            |> FastDict.toList
+                            |> Print.listMapAndIntersperseAndFlatten
+                                (\( name, computedProperty ) ->
+                                    let
+                                        assignedValuePrint : Print
+                                        assignedValuePrint =
+                                            printSwiftExpressionNotParenthesized
+                                                computedProperty.value
+
+                                        resultTypePrint : Print
+                                        resultTypePrint =
+                                            printSwiftTypeNotParenthesized
+                                                -- TODO check if not Just TypeOutgoing
+                                                Nothing
+                                                computedProperty.type_
+                                    in
+                                    Print.exactly ("var " ++ name ++ ":")
+                                        |> Print.followedBy
+                                            (Print.withIndentAtNextMultipleOf4
+                                                (Print.spaceOrLinebreakIndented
+                                                    (resultTypePrint |> Print.lineSpread)
+                                                    |> Print.followedBy resultTypePrint
+                                                    |> Print.followedBy (Print.exactly " {")
+                                                    |> Print.followedBy
+                                                        (Print.spaceOrLinebreakIndented
+                                                            (assignedValuePrint |> Print.lineSpread)
+                                                        )
+                                                    |> Print.followedBy
+                                                        assignedValuePrint
+                                                )
+                                            )
+                                        |> Print.followedBy
+                                            (Print.spaceOrLinebreakIndented
+                                                (assignedValuePrint |> Print.lineSpread)
+                                            )
+                                        |> Print.followedBy (Print.exactly "}")
                                 )
                                 Print.linebreakIndented
                         )
@@ -673,8 +722,7 @@ typeAliasDeclaration typeAliasesInModule inferredTypeAlias =
     { name = inferredTypeAlias.name
     , parameters =
         inferredTypeAlias.parameters
-            |> List.map
-                variableNameDisambiguateFromSwiftKeywords
+            |> List.map variableNameDisambiguateFromSwiftKeywords
     , type_ =
         inferredTypeAlias.type_
             |> type_ typeAliasesInModule
@@ -811,17 +859,26 @@ typeNotVariable typeAliasesInModule inferredTypeNotVariable =
                         }
 
         ElmSyntaxTypeInfer.TypeTuple typeTuple ->
-            SwiftTypeTuple
-                { part0 = typeTuple.part0 |> type_ typeAliasesInModule
-                , part1 = typeTuple.part1 |> type_ typeAliasesInModule
-                , part2Up = []
+            SwiftTypeConstruct
+                { moduleOrigin = Nothing
+                , name = "Tuple"
+                , isFunction = False
+                , arguments =
+                    [ typeTuple.part0 |> type_ typeAliasesInModule
+                    , typeTuple.part1 |> type_ typeAliasesInModule
+                    ]
                 }
 
         ElmSyntaxTypeInfer.TypeTriple typeTriple ->
-            SwiftTypeTuple
-                { part0 = typeTriple.part0 |> type_ typeAliasesInModule
-                , part1 = typeTriple.part1 |> type_ typeAliasesInModule
-                , part2Up = [ typeTriple.part2 |> type_ typeAliasesInModule ]
+            SwiftTypeConstruct
+                { moduleOrigin = Nothing
+                , name = "Triple"
+                , isFunction = False
+                , arguments =
+                    [ typeTriple.part0 |> type_ typeAliasesInModule
+                    , typeTriple.part1 |> type_ typeAliasesInModule
+                    , typeTriple.part2 |> type_ typeAliasesInModule
+                    ]
                 }
 
         ElmSyntaxTypeInfer.TypeRecord recordFields ->
@@ -838,15 +895,15 @@ typeNotVariable typeAliasesInModule inferredTypeNotVariable =
                             )
                             FastDict.empty
             in
-            SwiftTypeRecord
-                (if (swiftFields |> FastDict.size) == 1 then
-                    swiftFields
-                        |> FastDict.insert unusedDummyFieldNameBecauseSwiftDoesNotSupportSingleFieldRecord
-                            swiftTypeUnit
-
-                 else
-                    swiftFields
-                )
+            SwiftTypeConstruct
+                { moduleOrigin = Nothing
+                , name =
+                    generatedRecordTypeName
+                        (swiftFields |> FastDict.keys)
+                , isFunction = False
+                , arguments =
+                    swiftFields |> FastDict.values
+                }
 
         ElmSyntaxTypeInfer.TypeFunction typeFunction ->
             SwiftTypeFunction
@@ -872,15 +929,15 @@ typeNotVariable typeAliasesInModule inferredTypeNotVariable =
                             )
                             FastDict.empty
             in
-            SwiftTypeRecord
-                (if (swiftFields |> FastDict.size) == 1 then
-                    swiftFields
-                        |> FastDict.insert unusedDummyFieldNameBecauseSwiftDoesNotSupportSingleFieldRecord
-                            swiftTypeUnit
-
-                 else
-                    swiftFields
-                )
+            SwiftTypeConstruct
+                { moduleOrigin = Nothing
+                , name =
+                    generatedRecordTypeName
+                        (swiftFields |> FastDict.keys)
+                , isFunction = False
+                , arguments =
+                    swiftFields |> FastDict.values
+                }
 
 
 {-| Type position:
@@ -1120,6 +1177,33 @@ swiftTypeExpandFunctionIntoReverse soFarReverse swiftType =
             { inputs = soFarReverse |> List.reverse
             , output = SwiftTypeVariable variable
             }
+
+
+swiftTypeContainsFunction : SwiftType -> Bool
+swiftTypeContainsFunction swiftType =
+    -- IGNORE TCO
+    case swiftType of
+        SwiftTypeFunction _ ->
+            True
+
+        SwiftTypeConstruct construct ->
+            construct.arguments
+                |> List.any swiftTypeContainsFunction
+
+        SwiftTypeTuple parts ->
+            (parts.part0 |> swiftTypeContainsFunction)
+                || (parts.part1 |> swiftTypeContainsFunction)
+                || (parts.part2Up |> List.any swiftTypeContainsFunction)
+
+        SwiftTypeRecord fields ->
+            fields
+                |> fastDictAny
+                    (\_ fieldValue ->
+                        fieldValue |> swiftTypeContainsFunction
+                    )
+
+        SwiftTypeVariable _ ->
+            False
 
 
 inferredTypeToFunction :
@@ -1896,10 +1980,13 @@ inferredPatternUntilAsPatterns patternTypedNode =
                     parts.part1 |> inferredPatternUntilAsPatterns
             in
             { pattern =
-                SwiftPatternTuple
-                    { part0 = part0.pattern
-                    , part1 = part1.pattern
-                    , part2Up = []
+                SwiftPatternVariant
+                    { originTypeName = "Tuple"
+                    , name = "Tuple"
+                    , values =
+                        [ part0.pattern
+                        , part1.pattern
+                        ]
                     }
             , patternAliases =
                 part0.patternAliases
@@ -1921,10 +2008,14 @@ inferredPatternUntilAsPatterns patternTypedNode =
                     parts.part2 |> inferredPatternUntilAsPatterns
             in
             { pattern =
-                SwiftPatternTuple
-                    { part0 = part0.pattern
-                    , part1 = part1.pattern
-                    , part2Up = [ part2.pattern ]
+                SwiftPatternVariant
+                    { originTypeName = "Triple"
+                    , name = "Triple"
+                    , values =
+                        [ part0.pattern
+                        , part1.pattern
+                        , part2.pattern
+                        ]
                     }
             , patternAliases =
                 part0.patternAliases
@@ -2026,15 +2117,13 @@ inferredPatternUntilAsPatterns patternTypedNode =
                         fieldsDictEmptyIntroducedVariablesDictEmpty
             in
             { pattern =
-                SwiftPatternRecord
-                    (if (combinedFieldNames.fields |> FastDict.size) == 1 then
-                        combinedFieldNames.fields
-                            |> FastDict.insert unusedDummyFieldNameBecauseSwiftDoesNotSupportSingleFieldRecord
-                                SwiftPatternIgnore
-
-                     else
-                        combinedFieldNames.fields
-                    )
+                SwiftPatternVariant
+                    { originTypeName =
+                        generatedRecordTypeName
+                            (combinedFieldNames.fields |> FastDict.keys)
+                    , name = "Record"
+                    , values = combinedFieldNames.fields |> FastDict.values
+                    }
             , patternAliases = []
             }
 
@@ -2579,10 +2668,13 @@ casePatternInPath path patternInferred =
                     parts.part1 |> casePatternInPath ("1" :: path)
             in
             { pattern =
-                SwiftPatternTuple
-                    { part0 = part0.pattern
-                    , part1 = part1.pattern
-                    , part2Up = []
+                SwiftPatternVariant
+                    { originTypeName = "Tuple"
+                    , name = "Tuple"
+                    , values =
+                        [ part0.pattern
+                        , part1.pattern
+                        ]
                     }
             , introducedVariables =
                 FastSet.union
@@ -2635,10 +2727,14 @@ casePatternInPath path patternInferred =
                     parts.part2 |> casePatternInPath ("2" :: path)
             in
             { pattern =
-                SwiftPatternTuple
-                    { part0 = part0.pattern
-                    , part1 = part1.pattern
-                    , part2Up = [ part2.pattern ]
+                SwiftPatternVariant
+                    { originTypeName = "Triple"
+                    , name = "Triple"
+                    , values =
+                        [ part0.pattern
+                        , part1.pattern
+                        , part2.pattern
+                        ]
                     }
             , introducedVariables =
                 part0.introducedVariables
@@ -2744,15 +2840,13 @@ casePatternInPath path patternInferred =
                         fieldsDictEmptyIntroducedVariablesDictEmpty
             in
             { pattern =
-                SwiftPatternRecord
-                    (if (combinedFieldNames.fields |> FastDict.size) == 1 then
-                        combinedFieldNames.fields
-                            |> FastDict.insert unusedDummyFieldNameBecauseSwiftDoesNotSupportSingleFieldRecord
-                                SwiftPatternIgnore
-
-                     else
-                        combinedFieldNames.fields
-                    )
+                SwiftPatternVariant
+                    { originTypeName =
+                        generatedRecordTypeName
+                            (combinedFieldNames.fields |> FastDict.keys)
+                    , name = "Record"
+                    , values = combinedFieldNames.fields |> FastDict.values
+                    }
             , introducedVariables = combinedFieldNames.introducedVariables
             , variableAsPatternAliases = FastDict.empty
             }
@@ -3042,10 +3136,13 @@ patternFillingOutIgnoredPartsWithNewVariables path patternInferred =
                     parts.part1 |> patternFillingOutIgnoredPartsWithNewVariables ("1" :: path)
             in
             { pattern =
-                SwiftPatternTuple
-                    { part0 = part0.pattern
-                    , part1 = part1.pattern
-                    , part2Up = []
+                SwiftPatternVariant
+                    { originTypeName = "Tuple"
+                    , name = "Tuple"
+                    , values =
+                        [ part0.pattern
+                        , part1.pattern
+                        ]
                     }
             , introducedVariables =
                 FastSet.union
@@ -3098,10 +3195,14 @@ patternFillingOutIgnoredPartsWithNewVariables path patternInferred =
                     parts.part2 |> patternFillingOutIgnoredPartsWithNewVariables ("2" :: path)
             in
             { pattern =
-                SwiftPatternTuple
-                    { part0 = part0.pattern
-                    , part1 = part1.pattern
-                    , part2Up = [ part2.pattern ]
+                SwiftPatternVariant
+                    { originTypeName = "Triple"
+                    , name = "Triple"
+                    , values =
+                        [ part0.pattern
+                        , part1.pattern
+                        , part2.pattern
+                        ]
                     }
             , introducedVariables =
                 part0.introducedVariables
@@ -3211,15 +3312,13 @@ patternFillingOutIgnoredPartsWithNewVariables path patternInferred =
                         fieldsDictEmptyIntroducedVariablesDictEmpty
             in
             { pattern =
-                SwiftPatternRecord
-                    (if (combinedFieldNames.fields |> FastDict.size) == 1 then
-                        combinedFieldNames.fields
-                            |> FastDict.insert unusedDummyFieldNameBecauseSwiftDoesNotSupportSingleFieldRecord
-                                SwiftPatternIgnore
-
-                     else
-                        combinedFieldNames.fields
-                    )
+                SwiftPatternVariant
+                    { originTypeName =
+                        generatedRecordTypeName
+                            (combinedFieldNames.fields |> FastDict.keys)
+                    , name = "Record"
+                    , values = combinedFieldNames.fields |> FastDict.values
+                    }
             , introducedVariables = combinedFieldNames.introducedVariables
             , variableAsPatternAliases = FastDict.empty
             }
@@ -5335,11 +5434,6 @@ printExactlyComma =
     Print.exactly ","
 
 
-unusedDummyFieldNameBecauseSwiftDoesNotSupportSingleFieldRecord : String
-unusedDummyFieldNameBecauseSwiftDoesNotSupportSingleFieldRecord =
-    "unusedDummyFieldBecauseSwiftDoesNotSupportSingleFieldRecord"
-
-
 printSwiftExpressionRecord : FastDict.Dict String SwiftExpression -> Print
 printSwiftExpressionRecord swiftRecordFields =
     if swiftRecordFields |> FastDict.isEmpty then
@@ -5464,6 +5558,12 @@ modules :
                     String
                     { parameters : List String
                     , cases : FastDict.Dict String (List SwiftType)
+                    , computedProperties :
+                        FastDict.Dict
+                            String
+                            { type_ : SwiftType
+                            , value : SwiftExpression
+                            }
                     }
             }
         }
@@ -6274,7 +6374,8 @@ modules syntaxDeclarationsIncludingOverwrittenOnes =
                             FastDict.Dict
                                 String
                                 { parameters : List String
-                                , variants : FastDict.Dict String (List SwiftType)
+                                , -- TODO rename to cases
+                                  variants : FastDict.Dict String (List SwiftType)
                                 }
                         }
                     }
@@ -6590,7 +6691,85 @@ modules syntaxDeclarationsIncludingOverwrittenOnes =
                             (\_ typeAliasInfo ->
                                 { parameters = typeAliasInfo.parameters
                                 , cases = typeAliasInfo.variants
+                                , computedProperties = FastDict.empty
                                 }
+                            )
+                        |> FastDict.union
+                            (allElmRecords
+                                |> FastSet.foldl
+                                    (\elmRecordFields soFar ->
+                                        case elmRecordFields of
+                                            [ "init", "subscriptions", "update" ] ->
+                                                soFar
+
+                                            elmRecordFieldsNotAlreadyInDefaultDeclarations ->
+                                                let
+                                                    swiftRecordFields : List String
+                                                    swiftRecordFields =
+                                                        elmRecordFieldsNotAlreadyInDefaultDeclarations
+                                                            |> List.map variableNameDisambiguateFromSwiftKeywords
+
+                                                    swiftTypeName : String
+                                                    swiftTypeName =
+                                                        generatedRecordTypeName swiftRecordFields
+                                                in
+                                                soFar
+                                                    |> FastDict.insert swiftTypeName
+                                                        { parameters = swiftRecordFields
+                                                        , cases =
+                                                            FastDict.singleton "Record"
+                                                                (swiftRecordFields
+                                                                    |> List.map
+                                                                        (\swiftRecordField ->
+                                                                            -- TODO add label
+                                                                            SwiftTypeVariable swiftRecordField
+                                                                        )
+                                                                )
+                                                        , computedProperties =
+                                                            swiftRecordFields
+                                                                |> List.foldl
+                                                                    (\swiftRecordField computedPropertiesSoFar ->
+                                                                        computedPropertiesSoFar
+                                                                            |> FastDict.insert swiftRecordField
+                                                                                { type_ = SwiftTypeVariable swiftRecordField
+                                                                                , value =
+                                                                                    SwiftExpressionSwitch
+                                                                                        { matched =
+                                                                                            -- TODO convert to its own variant
+                                                                                            SwiftExpressionReference
+                                                                                                { moduleOrigin = Nothing
+                                                                                                , name = "self"
+                                                                                                }
+                                                                                        , case0 =
+                                                                                            { pattern =
+                                                                                                SwiftPatternVariant
+                                                                                                    { originTypeName = swiftTypeName
+                                                                                                    , name = "Record"
+                                                                                                    , values =
+                                                                                                        swiftRecordFields
+                                                                                                            |> List.map
+                                                                                                                (\valueName ->
+                                                                                                                    if valueName == swiftRecordField then
+                                                                                                                        SwiftPatternVariable "result"
+
+                                                                                                                    else
+                                                                                                                        SwiftPatternIgnore
+                                                                                                                )
+                                                                                                    }
+                                                                                            , result =
+                                                                                                SwiftExpressionReference
+                                                                                                    { moduleOrigin = Nothing
+                                                                                                    , name = "result"
+                                                                                                    }
+                                                                                            }
+                                                                                        , case1Up = []
+                                                                                        }
+                                                                                }
+                                                                    )
+                                                                    FastDict.empty
+                                                        }
+                                    )
+                                    FastDict.empty
                             )
                 , typeAliases =
                     transpiledSwiftDeclarations.declarations.typeAliases
@@ -6607,6 +6786,11 @@ modules syntaxDeclarationsIncludingOverwrittenOnes =
                             |> List.reverse
                        )
             }
+
+
+generatedRecordTypeName : List String -> String
+generatedRecordTypeName swiftFieldNames =
+    "Generated_" ++ (swiftFieldNames |> String.join "_")
 
 
 portsOutgoingDictEmptyPortsIncomingDictEmpty : { portsOutgoing : FastSet.Set a, portsIncoming : FastSet.Set a }
@@ -7653,7 +7837,8 @@ expression context expressionTypedNode =
                                         |> List.foldl
                                             (\fieldName soFar ->
                                                 soFar
-                                                    |> FastDict.insert fieldName
+                                                    |> FastDict.insert
+                                                        (fieldName |> variableNameDisambiguateFromSwiftKeywords)
                                                         (SwiftExpressionReference
                                                             { moduleOrigin = Nothing
                                                             , name = generatedFieldValueParameterName fieldName
@@ -7692,15 +7877,17 @@ expression context expressionTypedNode =
                                                     , result = resultSoFar
                                                     }
                                             )
-                                            (SwiftExpressionRecord
-                                                (if (resultRecordFields |> FastDict.size) == 1 then
-                                                    resultRecordFields
-                                                        |> FastDict.insert unusedDummyFieldNameBecauseSwiftDoesNotSupportSingleFieldRecord
-                                                            swiftExpressionUnit
-
-                                                 else
-                                                    resultRecordFields
-                                                )
+                                            (SwiftExpressionCall
+                                                { called =
+                                                    SwiftExpressionVariant
+                                                        { originTypeName =
+                                                            generatedRecordTypeName
+                                                                (resultRecordFields |> FastDict.keys)
+                                                        , name = "Record"
+                                                        }
+                                                , arguments =
+                                                    resultRecordFields |> FastDict.values
+                                                }
                                             )
                                 }
 
@@ -8012,10 +8199,16 @@ expression context expressionTypedNode =
                 (\part0 part1 ->
                     { statements = part0.statements ++ part1.statements
                     , result =
-                        SwiftExpressionTuple
-                            { part0 = part0.result
-                            , part1 = part1.result
-                            , part2Up = []
+                        SwiftExpressionCall
+                            { called =
+                                SwiftExpressionVariant
+                                    { originTypeName = "Tuple"
+                                    , name = "Tuple"
+                                    }
+                            , arguments =
+                                [ part0.result
+                                , part1.result
+                                ]
                             }
                     }
                 )
@@ -8048,10 +8241,17 @@ expression context expressionTypedNode =
                             ++ part1.statements
                             ++ part2.statements
                     , result =
-                        SwiftExpressionTuple
-                            { part0 = part0.result
-                            , part1 = part1.result
-                            , part2Up = [ part2.result ]
+                        SwiftExpressionCall
+                            { called =
+                                SwiftExpressionVariant
+                                    { originTypeName = "Triple"
+                                    , name = "Triple"
+                                    }
+                            , arguments =
+                                [ part0.result
+                                , part1.result
+                                , part2.result
+                                ]
                             }
                     }
                 )
@@ -8130,7 +8330,9 @@ expression context expressionTypedNode =
                             fields
                                 |> List.foldl
                                     (\( fieldName, fieldValue ) soFar ->
-                                        soFar |> FastDict.insert fieldName fieldValue.result
+                                        soFar
+                                            |> FastDict.insert fieldName
+                                                fieldValue.result
                                     )
                                     FastDict.empty
                     in
@@ -8141,16 +8343,17 @@ expression context expressionTypedNode =
                                     fieldValue.statements
                                 )
                     , result =
-                        SwiftExpressionRecord
-                            (if (fieldResults |> FastDict.size) == 1 then
-                                fieldResults
-                                    |> FastDict.insert
-                                        unusedDummyFieldNameBecauseSwiftDoesNotSupportSingleFieldRecord
-                                        swiftExpressionUnit
-
-                             else
-                                fieldResults
-                            )
+                        SwiftExpressionCall
+                            { called =
+                                SwiftExpressionVariant
+                                    { originTypeName =
+                                        generatedRecordTypeName
+                                            (fieldResults |> FastDict.keys)
+                                    , name = "Record"
+                                    }
+                            , arguments =
+                                fieldResults |> FastDict.values
+                            }
                     }
                 )
                 (fieldNodes
@@ -9077,7 +9280,10 @@ okResultSwiftExpressionUnitStatementsEmpty =
 
 swiftExpressionUnit : SwiftExpression
 swiftExpressionUnit =
-    SwiftExpressionRecord FastDict.empty
+    SwiftExpressionVariant
+        { originTypeName = "Unit"
+        , name = "Unit"
+        }
 
 
 okResultSwiftExpressionRecordEmptyStatementsEmpty :
@@ -11192,18 +11398,14 @@ printSwiftLocalLetDeclaration swiftLetDeclaration =
                 swiftLetDeclaration.resultType
     in
     Print.exactly
-        ("let " ++ swiftLetDeclaration.name)
+        ("let " ++ swiftLetDeclaration.name ++ ":")
         |> Print.followedBy
             (Print.withIndentAtNextMultipleOf4
-                ((printExactlyColon
-                    |> Print.followedBy
-                        (Print.withIndentAtNextMultipleOf4
-                            (Print.spaceOrLinebreakIndented
-                                (resultTypePrint |> Print.lineSpread)
-                                |> Print.followedBy resultTypePrint
-                            )
-                        )
-                 )
+                (Print.withIndentAtNextMultipleOf4
+                    (Print.spaceOrLinebreakIndented
+                        (resultTypePrint |> Print.lineSpread)
+                        |> Print.followedBy resultTypePrint
+                    )
                     |> Print.followedBy printExactlySpaceEqualsLinebreakIndented
                     |> Print.followedBy
                         (printSwiftExpressionNotParenthesized
@@ -11234,6 +11436,12 @@ type SwiftEnumTypeOrTypeAliasDeclaration
         { name : String
         , parameters : List String
         , cases : FastDict.Dict String (List SwiftType)
+        , computedProperties :
+            FastDict.Dict
+                String
+                { type_ : SwiftType
+                , value : SwiftExpression
+                }
         }
     | SwiftTypeAliasDeclaration
         { name : String
@@ -11254,6 +11462,12 @@ swiftTypeDeclarationsGroupByDependencies :
             { name : String
             , parameters : List String
             , cases : FastDict.Dict String (List SwiftType)
+            , computedProperties :
+                FastDict.Dict
+                    String
+                    { type_ : SwiftType
+                    , value : SwiftExpression
+                    }
             }
     }
     ->
@@ -13907,12 +14121,6 @@ printSwiftStatementLetDeclarationUninitialized letDeclarationUnassigned =
             )
 
 
-printLinebreakIndentedLinebreakIndented : Print
-printLinebreakIndentedLinebreakIndented =
-    Print.linebreakIndented
-        |> Print.followedBy Print.linebreakIndented
-
-
 swiftExpressionReferenceTrue : SwiftExpression
 swiftExpressionReferenceTrue =
     SwiftExpressionReference
@@ -14056,7 +14264,36 @@ printExactlySpaceCurlyOpening =
 
 swiftTypeUnit : SwiftType
 swiftTypeUnit =
-    SwiftTypeRecord FastDict.empty
+    SwiftTypeConstruct
+        { moduleOrigin = Nothing
+        , name = "Unit"
+        , isFunction = False
+        , arguments = []
+        }
+
+
+deriveProtocolConformanceToString :
+    String
+    -> { name : String, parameters : List String }
+    -> String
+deriveProtocolConformanceToString protocol targetType =
+    "extension "
+        ++ targetType.name
+        ++ ": "
+        ++ protocol
+        ++ ""
+        ++ (case targetType.parameters of
+                [] ->
+                    ""
+
+                parameter0 :: parameter1Up ->
+                    " where "
+                        ++ listFilledMapAndStringJoinWith ", "
+                            (\parameter -> parameter ++ ": " ++ protocol)
+                            parameter0
+                            parameter1Up
+           )
+        ++ " {}"
 
 
 {-| Print value/function declarations into
@@ -14089,11 +14326,29 @@ swiftDeclarationsToModuleString :
             String
             { parameters : List String
             , cases : FastDict.Dict String (List SwiftType)
+            , computedProperties :
+                FastDict.Dict
+                    String
+                    { type_ : SwiftType
+                    , value : SwiftExpression
+                    }
             }
     }
     -> String
 swiftDeclarationsToModuleString swiftDeclarations =
     let
+        swiftEnumDeclarationsList =
+            swiftDeclarations.enumTypes
+                |> fastDictMapAndToList
+                    (\name info ->
+                        { name = name
+                        , parameters = info.parameters
+                        , cases = info.cases
+                        , computedProperties =
+                            info.computedProperties
+                        }
+                    )
+
         typeDeclarationsOrdered :
             { mostToLeastDependedOn :
                 List
@@ -14102,6 +14357,7 @@ swiftDeclarationsToModuleString swiftDeclarations =
                     )
             }
         typeDeclarationsOrdered =
+            -- TODO not necessary
             swiftTypeDeclarationsGroupByDependencies
                 { typeAliases =
                     swiftDeclarations.typeAliases
@@ -14112,22 +14368,48 @@ swiftDeclarationsToModuleString swiftDeclarations =
                                 , type_ = info.type_
                                 }
                             )
-                , enums =
-                    swiftDeclarations.enumTypes
-                        |> fastDictMapAndToList
-                            (\name info ->
-                                { name = name
-                                , parameters = info.parameters
-                                , cases = info.cases
-                                }
-                            )
+                , enums = swiftEnumDeclarationsList
                 }
+
+        deriveProtocolConformances : List String
+        deriveProtocolConformances =
+            swiftEnumDeclarationsList
+                |> List.concatMap
+                    (\swiftEnumDeclaration ->
+                        -- TODO also add Sendable conformance this way
+                        -- TODO don't generate if contains function type alias or json**code.Value
+                        if
+                            swiftEnumDeclaration.cases
+                                |> fastDictAny
+                                    (\_ enumCaseValues ->
+                                        enumCaseValues |> List.any swiftTypeContainsFunction
+                                    )
+                        then
+                            []
+
+                        else
+                            [ deriveProtocolConformanceToString "Equatable"
+                                { name = "Elm." ++ swiftEnumDeclaration.name
+                                , parameters = swiftEnumDeclaration.parameters
+                                }
+                            ]
+                    )
     in
     """import CoreFoundation
 import Foundation
 
+extension Elm.Maybe_Maybe: Equatable where a: Equatable {}
+extension Elm.Result_Result: Equatable where error: Equatable, success: Equatable {}
 extension Elm.List_List: Equatable where a: Equatable {}
 extension Elm.List_List: Hashable where a: Hashable {}
+extension Elm.PlatformCmd_CmdSingle: Equatable where event: Equatable {}
+extension Elm.Tuple: Equatable where first: Equatable, second: Equatable {}
+extension Elm.Tuple: Hashable where first: Hashable, second: Hashable {}
+extension Elm.Triple: Equatable where first: Equatable, second: Equatable, third: Equatable {}
+extension Elm.Triple: Hashable where first: Hashable, second: Hashable, third: Hashable {}
+"""
+        ++ (deriveProtocolConformances |> String.join "\n")
+        ++ """
 
 // using enum to create a namespace can't be instantiated
 public enum Elm {
@@ -14148,6 +14430,7 @@ public enum Elm {
                                             , name = swiftEnumTypeDeclaration.name
                                             , parameters = swiftEnumTypeDeclaration.parameters
                                             , cases = swiftEnumTypeDeclaration.cases
+                                            , computedProperties = swiftEnumTypeDeclaration.computedProperties
                                             }
 
                                     SwiftTypeAliasDeclaration aliasDeclaration ->
@@ -14166,6 +14449,8 @@ public enum Elm {
                                                     , name = swiftEnumTypeDeclaration.name
                                                     , parameters = swiftEnumTypeDeclaration.parameters
                                                     , cases = swiftEnumTypeDeclaration.cases
+                                                    , computedProperties =
+                                                        swiftEnumTypeDeclaration.computedProperties
                                                     }
 
                                             SwiftTypeAliasDeclaration aliasDeclaration ->
@@ -14184,6 +14469,8 @@ public enum Elm {
                                                                                 , name = swiftEnumTypeDeclaration.name
                                                                                 , parameters = swiftEnumTypeDeclaration.parameters
                                                                                 , cases = swiftEnumTypeDeclaration.cases
+                                                                                , computedProperties =
+                                                                                    swiftEnumTypeDeclaration.computedProperties
                                                                                 }
 
                                                                         SwiftTypeAliasDeclaration aliasDeclaration ->
@@ -27734,7 +28021,14 @@ elmRegexTypes =
 defaultDeclarations : String
 defaultDeclarations =
     """
-public enum Basics_Order: Sendable {
+public enum Unit: Sendable, Equatable { case Unit }
+public enum Tuple<first: Sendable, second: Sendable>: Sendable {
+    case Tuple(first, second)
+}
+public enum Triple<first: Sendable, second: Sendable, third: Sendable>: Sendable {
+    case Triple(first, second, third)
+}
+public enum Basics_Order: Sendable, Equatable {
     case Basics_LT
     case Basics_EQ
     case Basics_GT
@@ -28010,14 +28304,21 @@ public static let Basics_e: Double = exp(1.0)
 @Sendable public static func Basics_turns(_ angleInTurns: Double) -> Double {
     angleInTurns * Double.pi * 2
 }
-@Sendable public static func Basics_fromPolar(_ polar: (Double, Double)) -> (Double, Double) {
-    let (radius, theta) = polar
-    return (radius * (cos(theta)), radius * (sin(theta)))
-}
-@Sendable public static func Basics_toPolar(_ coordinates: (Double, Double)) -> (Double, Double)
+@Sendable public static func Basics_fromPolar(_ polar: Tuple<Double, Double>)
+    -> Tuple<Double, Double>
 {
-    let (x, y) = coordinates
-    return (sqrt((x * x) + (y * y)), atan2(y, x))
+    switch polar {
+    case let .Tuple(radius, theta):
+        .Tuple(radius * (cos(theta)), radius * (sin(theta)))
+    }
+}
+@Sendable public static func Basics_toPolar(_ coordinates: Tuple<Double, Double>)
+    -> Tuple<Double, Double>
+{
+    switch coordinates {
+    case let .Tuple(x, y):
+        .Tuple(sqrt((x * x) + (y * y)), atan2(y, x))
+    }
 }
 
 @Sendable public static func Basics_atan2(_ y: Double) -> (Double) -> Double {
@@ -28141,16 +28442,16 @@ public static let Basics_e: Double = exp(1.0)
     Maybe_fromOptional(Double(string))
 }
 
-@Sendable public static func String_uncons(_ string: String) -> Maybe_Maybe<
-    (UnicodeScalar, String)
-> {
+@Sendable public static func String_uncons(_ string: String)
+    -> Maybe_Maybe<Tuple<UnicodeScalar, String>>
+{
     if string.isEmpty {
         return .Maybe_Nothing
     } else {
         // is there something more performant?
-        var stringMutable = string
-        let poppedChar = stringMutable.unicodeScalars.removeFirst()
-        return .Maybe_Just((poppedChar, stringMutable))
+        var stringMutable: String = string
+        let poppedChar: Unicode.Scalar = stringMutable.unicodeScalars.removeFirst()
+        return .Maybe_Just(.Tuple(poppedChar, stringMutable))
     }
 }
 
@@ -28163,8 +28464,8 @@ public static let Basics_e: Double = exp(1.0)
 }
 
 @Sendable public static func String_fromList(_ chars: List_List<UnicodeScalar>) -> String {
-    var remainingChars = chars
-    var stringBuffer = String()
+    var remainingChars: List_List<UnicodeScalar> = chars
+    var stringBuffer: String = String()
     while case .List_Cons(let head, let tail) = remainingChars {
         stringBuffer.append(Character(head))
         remainingChars = tail
@@ -28202,7 +28503,7 @@ public static let Basics_e: Double = exp(1.0)
 
 @Sendable public static func String_concat(_ segments: List_List<String>) -> String {
     var remainingSegments = segments
-    var stringBuffer = String()
+    var stringBuffer: String = String()
     while case .List_Cons(let head, let tail) = remainingSegments {
         stringBuffer.append(contentsOf: head)
         remainingSegments = tail
@@ -28217,7 +28518,7 @@ public static let Basics_e: Double = exp(1.0)
             return ""
         case .List_Cons(let headSegment, let tailSegments):
             var remainingSegments = tailSegments
-            var stringBuffer = String()
+            var stringBuffer: String = String()
             stringBuffer.append(contentsOf: headSegment)
             while case .List_Cons(let head, let tail) = remainingSegments {
                 stringBuffer.append(contentsOf: inBetween)
@@ -28934,11 +29235,12 @@ static func arrayReversedToList<a>(_ array: [a]) -> List_List<a> {
     }
     return soFar
 }
-@Sendable public static func Array_toIndexedList<a>(_ array: [a]) -> List_List<(Double, a)> {
-    var soFar: List_List<(Double, a)> = .List_Empty
+@Sendable public static func Array_toIndexedList<a>(_ array: [a]) -> List_List<Tuple<Double, a>>
+{
+    var soFar: List_List<Tuple<Double, a>> = .List_Empty
     var index: Int = array.count - 1
     for element in array.reversed() {
-        soFar = .List_Cons((Double(index), element), soFar)
+        soFar = .List_Cons(.Tuple(Double(index), element), soFar)
         index = index - 1
     }
     return soFar
@@ -28948,16 +29250,12 @@ static func Array_mapFromList<a, b>(_ elementChange: (a) -> b, _ fullList: List_
     -> [b]
 {
     var soFar: [b] = Array()
-    var remainingList = fullList
-    while true {
-        switch remainingList {
-        case .List_Empty:
-            return soFar
-        case let .List_Cons(remainingHead, remainingTail):
-            soFar.append(elementChange(remainingHead))
-            remainingList = remainingTail
-        }
+    var remainingList: List_List<a> = fullList
+    while case let .List_Cons(remainingHead, remainingTail) = remainingList {
+        soFar.append(elementChange(remainingHead))
+        remainingList = remainingTail
     }
+    return soFar
 }
 
 @Sendable public static func Array_fromList<a>(_ fullList: List_List<a>) -> [a] {
@@ -29457,17 +29755,27 @@ private static func List_foldr<a, state>(
 }
 
 @Sendable public static func List_zip<a, b>(_ aList: List_List<a>) -> (List_List<b>)
-    -> List_List<(a, b)>
+    -> List_List<Tuple<a, b>>
 {
-    { bList in List_map2({ a in { b in (a, b) } })(aList)(bList) }
+    { bList in
+        List_map2({ a in { b in .Tuple(a, b) } })(aList)(bList)
+    }
 }
 
-@Sendable public static func List_unzip<a, b>(_ abList: List_List<(a, b)>)
-    -> (List_List<a>, List_List<b>)
+@Sendable public static func List_unzip<a, b>(_ abList: List_List<Tuple<a, b>>)
+    -> Tuple<List_List<a>, List_List<b>>
 {
-    (
-        List_map({ ab in ab.0 })(abList),
-        List_map({ ab in ab.1 })(abList)
+    .Tuple(
+        List_map({ ab in
+            switch ab {
+            case let .Tuple(first, _): first
+            }
+        })(abList),
+        List_map({ ab in
+            switch ab {
+            case let .Tuple(_, second): second
+            }
+        })(abList)
     )
 }
 
@@ -29661,7 +29969,7 @@ where comparable: Comparable {
 }
 @Sendable public static func Set_fromList<a>(_ list: List_List<a>) -> Set<a> {
     var set: Set<a> = Set()
-    var remainingList = list
+    var remainingList: List_List<a> = list
     while case let .List_Cons(element, afterElement) = remainingList {
         set.insert(element)
         remainingList = afterElement
@@ -29768,23 +30076,23 @@ where comparable: Comparable {
 @Sendable public static func Dict_singleton<key, value>(_ key: key) -> (value) -> [key: value] {
     { value in [key: value] }
 }
-@Sendable public static func Dict_fromList<key, value>(_ list: List_List<(key, value)>)
+@Sendable public static func Dict_fromList<key, value>(_ list: List_List<Tuple<key, value>>)
     -> [key: value]
 {
     var dictionary: [key: value] = Dictionary()
     var remainingList = list
-    while case let .List_Cons((key, value), afterElement) = remainingList {
+    while case let .List_Cons(.Tuple(key, value), afterElement) = remainingList {
         dictionary[key] = value
         remainingList = afterElement
     }
     return dictionary
 }
 @Sendable public static func Dict_toList<key, value>(_ dictionary: [key: value])
-    -> List_List<(key, value)>
+    -> List_List<Tuple<key, value>>
 {
-    var list: List_List<(key, value)> = .List_Empty
+    var list: List_List<Tuple<key, value>> = .List_Empty
     for element in dictionary.reversed() {
-        list = .List_Cons((element.key, element.value), list)
+        list = .List_Cons(.Tuple(element.key, element.value), list)
     }
     return list
 }
@@ -29998,7 +30306,7 @@ where comparable: Comparable {
 }
 
 // not alias for Regex<Substring> because Regex is not Sendable
-public enum Regex_Regex: Sendable { case Regex_Regex(String) }
+public enum Regex_Regex: Sendable, Equatable { case Regex_Regex(String) }
 
 public typealias Regex_Options = (caseInsensitive: Bool, multiline: Bool)
 public typealias Regex_Match = (
@@ -30071,13 +30379,20 @@ public static let Regex_never: Regex_Regex = .Regex_Regex("/.^/")
     }
 }
 
-public enum Time_Posix: Sendable { case Time_Posix(Double) }
+public enum Time_Posix: Sendable, Equatable, Hashable {
+    case Time_Posix(Double)
+}
 
-public typealias Time_Era = (offset: Double, start: Double)
+public struct Time_Era: Sendable, Equatable {
+    let offset: Double
+    let start: Double
+}
 
-public enum Time_Zone: Sendable { case Time_Zone(Double, List_List<Time_Era>) }
+public enum Time_Zone: Sendable, Equatable {
+    case Time_Zone(Double, List_List<Time_Era>)
+}
 
-public enum Time_Weekday: Sendable {
+public enum Time_Weekday: Sendable, Equatable {
     case Time_Mon
     case Time_Tue
     case Time_Wed
@@ -30087,7 +30402,7 @@ public enum Time_Weekday: Sendable {
     case Time_Sun
 }
 
-public enum Time_Month: Sendable {
+public enum Time_Month: Sendable, Equatable {
     case Time_Jan
     case Time_Feb
     case Time_Mar
@@ -30102,7 +30417,7 @@ public enum Time_Month: Sendable {
     case Time_Dec
 }
 
-public enum Time_ZoneName: Sendable {
+public enum Time_ZoneName: Sendable, Equatable {
     case Time_Name(String)
     case Time_Offset(Double)
 }
@@ -30249,7 +30564,7 @@ static func Time_toAdjustedMinutes(_ timeZone: Time_Zone, _ time: Time_Posix) ->
 
 public typealias Bytes_Bytes = [UInt8]
 
-public enum Bytes_Endianness: Sendable {
+public enum Bytes_Endianness: Sendable, Equatable {
     case Bytes_LE
     case Bytes_BE
 }
@@ -30312,11 +30627,30 @@ public typealias PlatformSub_Sub<event> = [PlatformSub_SubSingle<event>]
     }
 }
 
-public typealias Platform_Program<flags, state, event> = (
-    init: (flags) -> (state, PlatformCmd_Cmd<event>),
-    update: (event) -> (state) -> (state, PlatformCmd_Cmd<event>),
-    subscriptions: (state) -> PlatformSub_Sub<event>
-)
+public enum Generated_init_update_subscriptions<init_, update, subscriptions> {
+    case Record(init_: init_, update: update, subscriptions: subscriptions)
+    var init_: init_ {
+        switch self {
+        case let .Record(result, _, _): result
+        }
+    }
+    var update: update {
+        switch self {
+        case let .Record(_, result, _): result
+        }
+    }
+    var subscriptions: subscriptions {
+        switch self {
+        case let .Record(_, _, result): result
+        }
+    }
+}
+public typealias Platform_Program<flags, state, event> =
+    Generated_init_update_subscriptions<
+        (flags) -> Tuple<state, PlatformCmd_Cmd<event>>,
+        (event) -> (state) -> Tuple<state, PlatformCmd_Cmd<event>>,
+        (state) -> PlatformSub_Sub<event>
+    >
 
 @Sendable public static func Platform_worker<flags, state, event>(
     _ config: Platform_Program<flags, state, event>
@@ -30385,13 +30719,15 @@ public static let JsonEncode_null: JsonEncode_Value =
         )
     }
 }
-@Sendable public static func JsonEncode_object(_ fields: List_List<(String, JsonEncode_Value)>)
+@Sendable public static func JsonEncode_object(
+    _ fields: List_List<Tuple<String, JsonEncode_Value>>
+)
     -> JsonEncode_Value
 {
-    var fieldsRemaining: List_List<(String, JsonEncode_Value)> = fields
+    var fieldsRemaining: List_List<Tuple<String, JsonEncode_Value>> = fields
     var fieldsDictionary: [String: JsonEncode_Value] = Dictionary()
-    while case let .List_Cons(head, tail) = fieldsRemaining {
-        fieldsDictionary[head.0] = head.1
+    while case let .List_Cons(.Tuple(headFieldName, headFieldValue), tail) = fieldsRemaining {
+        fieldsDictionary[headFieldName] = headFieldValue
         fieldsRemaining = tail
     }
     return JsonDecode_Value(value: NSDictionary(dictionary: fieldsDictionary))
@@ -30494,12 +30830,12 @@ public static let JsonDecode_value: JsonDecode_Decoder<JsonDecode_Value> =
     })
 }
 @Sendable public static func JsonDecode_lazy<a: Sendable>(
-    _ buildDecoder: @escaping @Sendable (()) -> JsonDecode_Decoder<a>
+    _ buildDecoder: @escaping @Sendable (Unit) -> JsonDecode_Decoder<a>
 )
     -> JsonDecode_Decoder<a>
 {
     JsonDecode_Decoder(decode: { toDecode in
-        buildDecoder(()).decode(toDecode)
+        buildDecoder(.Unit).decode(toDecode)
     })
 }
 @Sendable public static func JsonDecode_andThen<a: Sendable, b: Sendable>(
@@ -31139,7 +31475,7 @@ static func JsonDecode_errorToStringHelp(
         let isSimple: Bool =
             switch String_uncons(f) {
             case .Maybe_Nothing: false
-            case let .Maybe_Just((head, rest)):
+            case let .Maybe_Just(.Tuple(head, rest)):
                 Char_isAlpha(head) && String_all(Char_isAlphaNum)(rest)
             }
 
@@ -31577,7 +31913,7 @@ private static func surrogatePairToUnicodeScalar(
     -> (Double)
     -> (Double)
     -> (String)
-    -> (Double, Double, Double)
+    -> Triple<Double, Double, Double>
 {
     { offsetOriginal in
         { rowOriginal in
@@ -31615,9 +31951,9 @@ private static func surrogatePairToUnicodeScalar(
                         }
                     }
                     return if isGood {
-                        (Double(offset), Double(row), Double(col))
+                        .Triple(Double(offset), Double(row), Double(col))
                     } else {
-                        (-1, Double(row), Double(col))
+                        .Triple(-1, Double(row), Double(col))
                     }
                 }
             }
@@ -31628,7 +31964,7 @@ private static func surrogatePairToUnicodeScalar(
 @Sendable public static func ElmKernelParser_isSubChar(
     _ predicate: @escaping (UnicodeScalar) -> Bool
 )
-    -> @Sendable (Double) -> (String) -> Double
+    -> @Sendable @Sendable (Double) -> (String) -> Double
 {
     { offset in
         { string in
@@ -31687,7 +32023,7 @@ private static func surrogatePairToUnicodeScalar(
 }
 
 @Sendable public static func ElmKernelParser_consumeBase(_ baseAsDouble: Double)
-    -> @Sendable (Double) -> (String) -> (Double, Double)
+    -> @Sendable (Double) -> (String) -> Tuple<Double, Double>
 {
     { offsetOriginal in
         { string in
@@ -31704,13 +32040,13 @@ private static func surrogatePairToUnicodeScalar(
                     offset = offset + 1
                 }
             }
-            return (Double(offset), Double(total))
+            return .Tuple(Double(offset), Double(total))
         }
     }
 }
 
 @Sendable public static func ElmKernelParser_consumeBase16(_ offsetOriginal: Double)
-    -> @Sendable (String) -> (Double, Double)
+    -> @Sendable (String) -> Tuple<Double, Double>
 {
     { string in
         var offset: Int = Int(offsetOriginal)
@@ -31731,7 +32067,7 @@ private static func surrogatePairToUnicodeScalar(
                 foundNonBase16 = true
             }
         }
-        return (Double(offset), Double(total))
+        return .Tuple(Double(offset), Double(total))
     }
 }
 
@@ -31740,7 +32076,7 @@ private static func surrogatePairToUnicodeScalar(
     -> (Double)
     -> (Double)
     -> (String)
-    -> (Double, Double, Double)
+    -> Triple<Double, Double, Double>
 {
     { offsetOriginalAsDouble in
         { rowOriginal in
@@ -31793,7 +32129,7 @@ private static func surrogatePairToUnicodeScalar(
                                 }
                         }
                     }
-                    return (
+                    return .Triple(
                         Double(foundStartOffset ?? -1), Double(row), Double(col)
                     )
                 }

@@ -10,23 +10,19 @@ const defaultDeclarationsSwiftFile =
         path.join(import.meta.dirname, "defaultDeclarations.swift"),
         { encoding: "utf-8" }
     )
+function indexAfterFirst(needle, full) {
+    return full.indexOf(needle) + needle.length
+}
 const elmString =
     "\"\"\"\n"
     + defaultDeclarationsSwiftFile
-        .replaceAll(
-            `import CoreFoundation
-import Foundation
-
-extension Elm.List_List: Equatable where a: Equatable {}
-extension Elm.List_List: Hashable where a: Hashable {}
-
-// using enum to create a namespace can't be instantiated
-public enum Elm {
-`,
-            "\n"
-        ).replaceAll("\\", "\\\\")
+        .slice(
+            indexAfterFirst("public enum Elm {", defaultDeclarationsSwiftFile),
+            //  drop the enum-closing }\n
+            -2
+        )
+        .replaceAll("\\", "\\\\")
         .replaceAll("\n    ", "\n")
-        .slice(0, -2) //  drop the enum-closing }\n
         .trim()
     + "\n\"\"\""
 fs.writeFileSync(

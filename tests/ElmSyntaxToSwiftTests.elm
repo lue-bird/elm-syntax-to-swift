@@ -117,6 +117,12 @@ elmModuleSourceTranspileToSwift source =
                                 String
                                 { parameters : List String
                                 , cases : FastDict.Dict String (List ElmSyntaxToSwift.SwiftType)
+                                , computedProperties :
+                                    FastDict.Dict
+                                        String
+                                        { type_ : ElmSyntaxToSwift.SwiftType
+                                        , value : ElmSyntaxToSwift.SwiftExpression
+                                        }
                                 }
                         }
                     }

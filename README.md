@@ -37,13 +37,6 @@ public enum Elm {
 ### be aware
 
 -   not supported are
-    -   🚧 calling `==`, `/=` etc on records, tuples or types that include either of them will crash.
-        This functionality was supported once in swift and likely will be again with 6.2. I don't want to wait for that, so an alternative would be for example to transpile `{ a = "hello", b = "you" }` to
-        ```swift
-        enum Generated_a_b<a, b> { case Record(a: a, b: b) }
-        let someRecord: Generated_a_b<String, String> = .Record(a: "hello", b: "you")
-        ```
-        and similarly for tuples (must be a single-case enum instead of a struct to allow pattern matching). The user experience is bad but equality etc will be implicitly supported.
     -   ports that use non-json values like `port sendMessage : String -> Cmd msg`, glsl
     -   `elm/file`, `elm/http`, `elm/browser`, `elm-explorations/markdown`, `elm-explorations/webgl`, `elm-explorations/benchmark`
     -   `Task`, `Process`, `Platform.Task`, `Platform.ProcessId`, `Platform.Router`, `Platform.sendToApp`, `Platform.sendToSelf`, `Random.generate`, `Time.now`, `Time.every`, `Time.here`, `Time.getZoneName`, `Bytes.getHostEndianness`, `Math.Matrix4` (due to swift's standard library not exposing many [simd types and operations available in apple's SDK](https://developer.apple.com/documentation/simd/simd_double4x4))
@@ -80,13 +73,13 @@ print(Elm.Hello_greet("visitor"))
 where `Elm.YourModule_yourFunction(firstArgument)(secondArgument)` is the transpiled elm function `Your.Module.yourFunction firstArgument secondArgument`. (If the value/function contains extensible records, search for `Elm.YourModule_yourFunction__` to see the different specialized options)
 
 You will find these types:
-  - elm `Bool` (`True` or `False`) → swift `Bool` (`true` or `false`), `String` → `String`, `()` → `()`, `Array Float` → `Array<Double>`, `Set Float` -> `Set<Double>`, `Dict Float Char` → `Map<Double, char>`, `Never` → [`Never`](https://developer.apple.com/documentation/swift/never)
+  - elm `Bool` (`True` or `False`) → swift `Bool` (`true` or `false`), `String` → `String`, `Array Float` → `Array<Double>`, `Set Float` -> `Set<Double>`, `Dict Float Char` → `Map<Double, char>`, `Never` → [`Never`](https://developer.apple.com/documentation/swift/never)
   - elm `Float`s, `Int`s and `number-` variable typed values will be of type [`Double`](https://developer.apple.com/documentation/swift/double)
   - elm `Char`s will be of type [`UnicodeScalar`](https://developer.apple.com/documentation/swift/unicode/scalar)
-  - elm tuples/triples like `( Float, Float )`
-    will be of type `( Double, Double )`
-  - elm records like `{ y : Float, x : Float }` will be of type `( x: Double, y: Double )` with the fields sorted. Single-field records like `{ min : Float }` will have an extra field because swift does not support single-field anonymous records/tuples: `( min: Double, unusedDummyFieldBecauseSwiftDoesNotSupportSingleFieldRecord: () )`.
-    If you'd like a shorter name or an alternative solution, please open an issue
+  - elm unit `()` will be of type `Elm.Unit` and can be constructed and matched with `.Unit`
+  - elm tuples like `( Float, Float )` will be of type `Elm.Tuple<Double, Double>` and can be constructed and matched with `.Tuple(_, _)`
+  - elm triples like `( Float, Float, Float )` will be of type `Elm.Triple<Double, Double, Double>` and can be constructed and matched with `.Triple(_, _, _)`
+  - elm records like `{ y : Float, x : Float }` will be of type `Elm.Generated_x_y<Double, Double>` with the fields sorted and can be constructed and matched with `Elm.Generated_x_y.Record(_, _)`. `record.field` access also works
   - a transpiled elm app does not run itself.
     An elm main `Platform.worker` program type will literally just consist of fields `Init`, `Update` and `Subscriptions` where
     subscriptions/commands are returned as a list of `Elm.PlatformSub_SubSingle`/`Elm.PlatformCmd_CmdSingle` with possible elm subscriptions/commands in a choice type.

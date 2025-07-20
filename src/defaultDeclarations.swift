@@ -1,12 +1,26 @@
 import CoreFoundation
 import Foundation
 
+extension Elm.Maybe_Maybe: Equatable where a: Equatable {}
+extension Elm.Result_Result: Equatable where error: Equatable, success: Equatable {}
 extension Elm.List_List: Equatable where a: Equatable {}
 extension Elm.List_List: Hashable where a: Hashable {}
+extension Elm.PlatformCmd_CmdSingle: Equatable where event: Equatable {}
+extension Elm.Tuple: Equatable where first: Equatable, second: Equatable {}
+extension Elm.Tuple: Hashable where first: Hashable, second: Hashable {}
+extension Elm.Triple: Equatable where first: Equatable, second: Equatable, third: Equatable {}
+extension Elm.Triple: Hashable where first: Hashable, second: Hashable, third: Hashable {}
 
 // using enum to create a namespace can't be instantiated
 public enum Elm {
-    public enum Basics_Order: Sendable {
+    public enum Unit: Sendable, Equatable { case Unit }
+    public enum Tuple<first: Sendable, second: Sendable>: Sendable {
+        case Tuple(first, second)
+    }
+    public enum Triple<first: Sendable, second: Sendable, third: Sendable>: Sendable {
+        case Triple(first, second, third)
+    }
+    public enum Basics_Order: Sendable, Equatable {
         case Basics_LT
         case Basics_EQ
         case Basics_GT
@@ -282,14 +296,21 @@ public enum Elm {
     @Sendable public static func Basics_turns(_ angleInTurns: Double) -> Double {
         angleInTurns * Double.pi * 2
     }
-    @Sendable public static func Basics_fromPolar(_ polar: (Double, Double)) -> (Double, Double) {
-        let (radius, theta) = polar
-        return (radius * (cos(theta)), radius * (sin(theta)))
-    }
-    @Sendable public static func Basics_toPolar(_ coordinates: (Double, Double)) -> (Double, Double)
+    @Sendable public static func Basics_fromPolar(_ polar: Tuple<Double, Double>)
+        -> Tuple<Double, Double>
     {
-        let (x, y) = coordinates
-        return (sqrt((x * x) + (y * y)), atan2(y, x))
+        switch polar {
+        case let .Tuple(radius, theta):
+            .Tuple(radius * (cos(theta)), radius * (sin(theta)))
+        }
+    }
+    @Sendable public static func Basics_toPolar(_ coordinates: Tuple<Double, Double>)
+        -> Tuple<Double, Double>
+    {
+        switch coordinates {
+        case let .Tuple(x, y):
+            .Tuple(sqrt((x * x) + (y * y)), atan2(y, x))
+        }
     }
 
     @Sendable public static func Basics_atan2(_ y: Double) -> (Double) -> Double {
@@ -413,16 +434,16 @@ public enum Elm {
         Maybe_fromOptional(Double(string))
     }
 
-    @Sendable public static func String_uncons(_ string: String) -> Maybe_Maybe<
-        (UnicodeScalar, String)
-    > {
+    @Sendable public static func String_uncons(_ string: String)
+        -> Maybe_Maybe<Tuple<UnicodeScalar, String>>
+    {
         if string.isEmpty {
             return .Maybe_Nothing
         } else {
             // is there something more performant?
-            var stringMutable = string
-            let poppedChar = stringMutable.unicodeScalars.removeFirst()
-            return .Maybe_Just((poppedChar, stringMutable))
+            var stringMutable: String = string
+            let poppedChar: Unicode.Scalar = stringMutable.unicodeScalars.removeFirst()
+            return .Maybe_Just(.Tuple(poppedChar, stringMutable))
         }
     }
 
@@ -435,8 +456,8 @@ public enum Elm {
     }
 
     @Sendable public static func String_fromList(_ chars: List_List<UnicodeScalar>) -> String {
-        var remainingChars = chars
-        var stringBuffer = String()
+        var remainingChars: List_List<UnicodeScalar> = chars
+        var stringBuffer: String = String()
         while case .List_Cons(let head, let tail) = remainingChars {
             stringBuffer.append(Character(head))
             remainingChars = tail
@@ -474,7 +495,7 @@ public enum Elm {
 
     @Sendable public static func String_concat(_ segments: List_List<String>) -> String {
         var remainingSegments = segments
-        var stringBuffer = String()
+        var stringBuffer: String = String()
         while case .List_Cons(let head, let tail) = remainingSegments {
             stringBuffer.append(contentsOf: head)
             remainingSegments = tail
@@ -489,7 +510,7 @@ public enum Elm {
                 return ""
             case .List_Cons(let headSegment, let tailSegments):
                 var remainingSegments = tailSegments
-                var stringBuffer = String()
+                var stringBuffer: String = String()
                 stringBuffer.append(contentsOf: headSegment)
                 while case .List_Cons(let head, let tail) = remainingSegments {
                     stringBuffer.append(contentsOf: inBetween)
@@ -1206,11 +1227,12 @@ public enum Elm {
         }
         return soFar
     }
-    @Sendable public static func Array_toIndexedList<a>(_ array: [a]) -> List_List<(Double, a)> {
-        var soFar: List_List<(Double, a)> = .List_Empty
+    @Sendable public static func Array_toIndexedList<a>(_ array: [a]) -> List_List<Tuple<Double, a>>
+    {
+        var soFar: List_List<Tuple<Double, a>> = .List_Empty
         var index: Int = array.count - 1
         for element in array.reversed() {
-            soFar = .List_Cons((Double(index), element), soFar)
+            soFar = .List_Cons(.Tuple(Double(index), element), soFar)
             index = index - 1
         }
         return soFar
@@ -1220,16 +1242,12 @@ public enum Elm {
         -> [b]
     {
         var soFar: [b] = Array()
-        var remainingList = fullList
-        while true {
-            switch remainingList {
-            case .List_Empty:
-                return soFar
-            case let .List_Cons(remainingHead, remainingTail):
-                soFar.append(elementChange(remainingHead))
-                remainingList = remainingTail
-            }
+        var remainingList: List_List<a> = fullList
+        while case let .List_Cons(remainingHead, remainingTail) = remainingList {
+            soFar.append(elementChange(remainingHead))
+            remainingList = remainingTail
         }
+        return soFar
     }
 
     @Sendable public static func Array_fromList<a>(_ fullList: List_List<a>) -> [a] {
@@ -1729,17 +1747,27 @@ public enum Elm {
     }
 
     @Sendable public static func List_zip<a, b>(_ aList: List_List<a>) -> (List_List<b>)
-        -> List_List<(a, b)>
+        -> List_List<Tuple<a, b>>
     {
-        { bList in List_map2({ a in { b in (a, b) } })(aList)(bList) }
+        { bList in
+            List_map2({ a in { b in .Tuple(a, b) } })(aList)(bList)
+        }
     }
 
-    @Sendable public static func List_unzip<a, b>(_ abList: List_List<(a, b)>)
-        -> (List_List<a>, List_List<b>)
+    @Sendable public static func List_unzip<a, b>(_ abList: List_List<Tuple<a, b>>)
+        -> Tuple<List_List<a>, List_List<b>>
     {
-        (
-            List_map({ ab in ab.0 })(abList),
-            List_map({ ab in ab.1 })(abList)
+        .Tuple(
+            List_map({ ab in
+                switch ab {
+                case let .Tuple(first, _): first
+                }
+            })(abList),
+            List_map({ ab in
+                switch ab {
+                case let .Tuple(_, second): second
+                }
+            })(abList)
         )
     }
 
@@ -1933,7 +1961,7 @@ public enum Elm {
     }
     @Sendable public static func Set_fromList<a>(_ list: List_List<a>) -> Set<a> {
         var set: Set<a> = Set()
-        var remainingList = list
+        var remainingList: List_List<a> = list
         while case let .List_Cons(element, afterElement) = remainingList {
             set.insert(element)
             remainingList = afterElement
@@ -2040,23 +2068,23 @@ public enum Elm {
     @Sendable public static func Dict_singleton<key, value>(_ key: key) -> (value) -> [key: value] {
         { value in [key: value] }
     }
-    @Sendable public static func Dict_fromList<key, value>(_ list: List_List<(key, value)>)
+    @Sendable public static func Dict_fromList<key, value>(_ list: List_List<Tuple<key, value>>)
         -> [key: value]
     {
         var dictionary: [key: value] = Dictionary()
         var remainingList = list
-        while case let .List_Cons((key, value), afterElement) = remainingList {
+        while case let .List_Cons(.Tuple(key, value), afterElement) = remainingList {
             dictionary[key] = value
             remainingList = afterElement
         }
         return dictionary
     }
     @Sendable public static func Dict_toList<key, value>(_ dictionary: [key: value])
-        -> List_List<(key, value)>
+        -> List_List<Tuple<key, value>>
     {
-        var list: List_List<(key, value)> = .List_Empty
+        var list: List_List<Tuple<key, value>> = .List_Empty
         for element in dictionary.reversed() {
-            list = .List_Cons((element.key, element.value), list)
+            list = .List_Cons(.Tuple(element.key, element.value), list)
         }
         return list
     }
@@ -2270,7 +2298,7 @@ public enum Elm {
     }
 
     // not alias for Regex<Substring> because Regex is not Sendable
-    public enum Regex_Regex: Sendable { case Regex_Regex(String) }
+    public enum Regex_Regex: Sendable, Equatable { case Regex_Regex(String) }
 
     public typealias Regex_Options = (caseInsensitive: Bool, multiline: Bool)
     public typealias Regex_Match = (
@@ -2343,13 +2371,20 @@ public enum Elm {
         }
     }
 
-    public enum Time_Posix: Sendable { case Time_Posix(Double) }
+    public enum Time_Posix: Sendable, Equatable, Hashable {
+        case Time_Posix(Double)
+    }
 
-    public typealias Time_Era = (offset: Double, start: Double)
+    public struct Time_Era: Sendable, Equatable {
+        let offset: Double
+        let start: Double
+    }
 
-    public enum Time_Zone: Sendable { case Time_Zone(Double, List_List<Time_Era>) }
+    public enum Time_Zone: Sendable, Equatable {
+        case Time_Zone(Double, List_List<Time_Era>)
+    }
 
-    public enum Time_Weekday: Sendable {
+    public enum Time_Weekday: Sendable, Equatable {
         case Time_Mon
         case Time_Tue
         case Time_Wed
@@ -2359,7 +2394,7 @@ public enum Elm {
         case Time_Sun
     }
 
-    public enum Time_Month: Sendable {
+    public enum Time_Month: Sendable, Equatable {
         case Time_Jan
         case Time_Feb
         case Time_Mar
@@ -2374,7 +2409,7 @@ public enum Elm {
         case Time_Dec
     }
 
-    public enum Time_ZoneName: Sendable {
+    public enum Time_ZoneName: Sendable, Equatable {
         case Time_Name(String)
         case Time_Offset(Double)
     }
@@ -2521,7 +2556,7 @@ public enum Elm {
 
     public typealias Bytes_Bytes = [UInt8]
 
-    public enum Bytes_Endianness: Sendable {
+    public enum Bytes_Endianness: Sendable, Equatable {
         case Bytes_LE
         case Bytes_BE
     }
@@ -2584,11 +2619,30 @@ public enum Elm {
         }
     }
 
-    public typealias Platform_Program<flags, state, event> = (
-        init: (flags) -> (state, PlatformCmd_Cmd<event>),
-        update: (event) -> (state) -> (state, PlatformCmd_Cmd<event>),
-        subscriptions: (state) -> PlatformSub_Sub<event>
-    )
+    public enum Generated_init_update_subscriptions<init_, update, subscriptions> {
+        case Record(init_: init_, update: update, subscriptions: subscriptions)
+        var init_: init_ {
+            switch self {
+            case let .Record(result, _, _): result
+            }
+        }
+        var update: update {
+            switch self {
+            case let .Record(_, result, _): result
+            }
+        }
+        var subscriptions: subscriptions {
+            switch self {
+            case let .Record(_, _, result): result
+            }
+        }
+    }
+    public typealias Platform_Program<flags, state, event> =
+        Generated_init_update_subscriptions<
+            (flags) -> Tuple<state, PlatformCmd_Cmd<event>>,
+            (event) -> (state) -> Tuple<state, PlatformCmd_Cmd<event>>,
+            (state) -> PlatformSub_Sub<event>
+        >
 
     @Sendable public static func Platform_worker<flags, state, event>(
         _ config: Platform_Program<flags, state, event>
@@ -2657,13 +2711,15 @@ public enum Elm {
             )
         }
     }
-    @Sendable public static func JsonEncode_object(_ fields: List_List<(String, JsonEncode_Value)>)
+    @Sendable public static func JsonEncode_object(
+        _ fields: List_List<Tuple<String, JsonEncode_Value>>
+    )
         -> JsonEncode_Value
     {
-        var fieldsRemaining: List_List<(String, JsonEncode_Value)> = fields
+        var fieldsRemaining: List_List<Tuple<String, JsonEncode_Value>> = fields
         var fieldsDictionary: [String: JsonEncode_Value] = Dictionary()
-        while case let .List_Cons(head, tail) = fieldsRemaining {
-            fieldsDictionary[head.0] = head.1
+        while case let .List_Cons(.Tuple(headFieldName, headFieldValue), tail) = fieldsRemaining {
+            fieldsDictionary[headFieldName] = headFieldValue
             fieldsRemaining = tail
         }
         return JsonDecode_Value(value: NSDictionary(dictionary: fieldsDictionary))
@@ -2766,12 +2822,12 @@ public enum Elm {
         })
     }
     @Sendable public static func JsonDecode_lazy<a: Sendable>(
-        _ buildDecoder: @escaping @Sendable (()) -> JsonDecode_Decoder<a>
+        _ buildDecoder: @escaping @Sendable (Unit) -> JsonDecode_Decoder<a>
     )
         -> JsonDecode_Decoder<a>
     {
         JsonDecode_Decoder(decode: { toDecode in
-            buildDecoder(()).decode(toDecode)
+            buildDecoder(.Unit).decode(toDecode)
         })
     }
     @Sendable public static func JsonDecode_andThen<a: Sendable, b: Sendable>(
@@ -3411,7 +3467,7 @@ public enum Elm {
             let isSimple: Bool =
                 switch String_uncons(f) {
                 case .Maybe_Nothing: false
-                case let .Maybe_Just((head, rest)):
+                case let .Maybe_Just(.Tuple(head, rest)):
                     Char_isAlpha(head) && String_all(Char_isAlphaNum)(rest)
                 }
 
@@ -3849,7 +3905,7 @@ public enum Elm {
         -> (Double)
         -> (Double)
         -> (String)
-        -> (Double, Double, Double)
+        -> Triple<Double, Double, Double>
     {
         { offsetOriginal in
             { rowOriginal in
@@ -3887,9 +3943,9 @@ public enum Elm {
                             }
                         }
                         return if isGood {
-                            (Double(offset), Double(row), Double(col))
+                            .Triple(Double(offset), Double(row), Double(col))
                         } else {
-                            (-1, Double(row), Double(col))
+                            .Triple(-1, Double(row), Double(col))
                         }
                     }
                 }
@@ -3898,7 +3954,7 @@ public enum Elm {
     }
 
     @Sendable public static func ElmKernelParser_isSubChar(
-        _ predicate: @escaping (UnicodeScalar) -> Bool
+        _ predicate: @escaping @Sendable (UnicodeScalar) -> Bool
     )
         -> @Sendable (Double) -> (String) -> Double
     {
@@ -3959,7 +4015,7 @@ public enum Elm {
     }
 
     @Sendable public static func ElmKernelParser_consumeBase(_ baseAsDouble: Double)
-        -> @Sendable (Double) -> (String) -> (Double, Double)
+        -> @Sendable (Double) -> (String) -> Tuple<Double, Double>
     {
         { offsetOriginal in
             { string in
@@ -3976,13 +4032,13 @@ public enum Elm {
                         offset = offset + 1
                     }
                 }
-                return (Double(offset), Double(total))
+                return .Tuple(Double(offset), Double(total))
             }
         }
     }
 
     @Sendable public static func ElmKernelParser_consumeBase16(_ offsetOriginal: Double)
-        -> @Sendable (String) -> (Double, Double)
+        -> @Sendable (String) -> Tuple<Double, Double>
     {
         { string in
             var offset: Int = Int(offsetOriginal)
@@ -4003,7 +4059,7 @@ public enum Elm {
                     foundNonBase16 = true
                 }
             }
-            return (Double(offset), Double(total))
+            return .Tuple(Double(offset), Double(total))
         }
     }
 
@@ -4012,7 +4068,7 @@ public enum Elm {
         -> (Double)
         -> (Double)
         -> (String)
-        -> (Double, Double, Double)
+        -> Triple<Double, Double, Double>
     {
         { offsetOriginalAsDouble in
             { rowOriginal in
@@ -4065,7 +4121,7 @@ public enum Elm {
                                     }
                             }
                         }
-                        return (
+                        return .Triple(
                             Double(foundStartOffset ?? -1), Double(row), Double(col)
                         )
                     }
