@@ -4,7 +4,7 @@ module ElmSyntaxToSwift exposing
     )
 
 {-| Transpiling [`elm-syntax`](https://dark.elm.dmy.fr/packages/stil4m/elm-syntax/latest/)
-declarations to swift (tested to be compatible with .net8.0 and .net9.0).
+declarations to swift.
 
 @docs modules, swiftDeclarationsToModuleString
 @docs SwiftStatement, SwiftExpression, SwiftPattern, SwiftType
@@ -129,14 +129,12 @@ type SwiftExpression
         { matched : SwiftExpression
         , case0 :
             { pattern : SwiftPattern
-            , --, patternType : SwiftType
-              result : SwiftExpression
+            , result : SwiftExpression
             }
         , case1Up :
             List
                 { pattern : SwiftPattern
-                , --, patternType : SwiftType
-                  result : SwiftExpression
+                , result : SwiftExpression
                 }
         }
 
@@ -187,14 +185,12 @@ type SwiftStatement
         { matched : SwiftExpression
         , case0 :
             { pattern : SwiftPattern
-            , --  , patternType : SwiftType
-              statements : List SwiftStatement
+            , statements : List SwiftStatement
             }
         , case1Up :
             List
                 { pattern : SwiftPattern
-                , --, patternType : SwiftType
-                  statements : List SwiftStatement
+                , statements : List SwiftStatement
                 }
         }
 
@@ -314,8 +310,7 @@ typeContainedRecords :
     Elm.Syntax.Node.Node Elm.Syntax.TypeAnnotation.TypeAnnotation
     ->
         FastSet.Set
-            -- sorted field names
-            (List String)
+            {- sorted field names -} (List String)
 typeContainedRecords (Elm.Syntax.Node.Node _ syntaxType) =
     -- IGNORE TCO
     case syntaxType of
@@ -7374,6 +7369,7 @@ expression context expressionTypedNode =
             okResultSwiftExpressionUnitStatementsEmpty
 
         ElmSyntaxTypeInfer.ExpressionInteger intValue ->
+            -- NUMBER
             -- case expressionTypedNode.type_ |> inferredTypeCheckOrGuessIntOrFloat of
             --     IntNotFloat ->
             --         Ok (SwiftExpressionInt64 intValue.value)
@@ -9224,7 +9220,7 @@ inferredTypeIsConcreteSwiftType inferredType =
     case inferredType of
         ElmSyntaxTypeInfer.TypeVariable variable ->
             -- number... gets turned into Double
-            -- (or in the future specialized away to Int64/Double)
+            -- (or NUMBER specialized away to Int64/Double)
             String.startsWith "number" variable.name
 
         ElmSyntaxTypeInfer.TypeNotVariable inferredTypNotVariable ->
@@ -12018,6 +12014,7 @@ inferredTypeWithExpandedInnerAliasesSplitIntoSpecializedSwiftTypes :
 inferredTypeWithExpandedInnerAliasesSplitIntoSpecializedSwiftTypes context inferredType =
     case inferredType of
         ElmSyntaxTypeInfer.TypeVariable _ ->
+            -- NUMBER
             -- if variable.name |> String.startsWith "number" then
             --     FastDict.singleton variable.name
             --         swiftTypeVariableSpecializationsToIntAndFloat
@@ -13968,14 +13965,12 @@ printSwiftExpressionSwitch :
     { matched : SwiftExpression
     , case0 :
         { pattern : SwiftPattern
-        , --, patternType : SwiftType
-          result : SwiftExpression
+        , result : SwiftExpression
         }
     , case1Up :
         List
             { pattern : SwiftPattern
-            , --, patternType : SwiftType
-              result : SwiftExpression
+            , result : SwiftExpression
             }
     }
     -> Print
@@ -14015,8 +14010,7 @@ printSwiftExpressionSwitch swiftSwitch =
 
 printSwiftExpressionSwitchCase :
     { pattern : SwiftPattern
-    , --, patternType : SwiftType
-      result : SwiftExpression
+    , result : SwiftExpression
     }
     -> Print
 printSwiftExpressionSwitchCase branch =
@@ -14284,32 +14278,16 @@ swiftPatternAsExpression swiftPattern =
 
 printSwiftLetDestructuring :
     { pattern : SwiftPattern
-    , --, patternType : SwiftType
-      expression : SwiftExpression
+    , expression : SwiftExpression
     }
     -> Print
 printSwiftLetDestructuring letDestructuring =
-    -- let
-    --     patternTypePrint : Print
-    --     patternTypePrint =
-    --         letDestructuring.patternType
-    --             |> printSwiftTypeParenthesizedIfSpaceSeparated
-    -- in
     Print.exactly "let "
         |> Print.followedBy
             (Print.withIndentAtNextMultipleOf4
                 (printParenthesized
                     (letDestructuring.pattern
                         |> printSwiftPatternParenthesizedIfSpaceSeparated
-                     -- |> Print.followedBy
-                     --     printExactlyColon
-                     -- |> Print.followedBy
-                     --     (Print.withIndentAtNextMultipleOf4
-                     --         (Print.spaceOrLinebreakIndented
-                     --             (patternTypePrint |> Print.lineSpread)
-                     --             |> Print.followedBy patternTypePrint
-                     --         )
-                     --     )
                     )
                     |> Print.followedBy printExactlySpaceEquals
                     |> Print.followedBy
