@@ -626,7 +626,6 @@ printSwiftEnumDeclaration swiftEnumType =
                                         resultTypePrint : Print
                                         resultTypePrint =
                                             printSwiftTypeNotParenthesized
-                                                -- TODO check if not Just TypeOutgoing
                                                 Nothing
                                                 computedProperty.type_
                                     in
@@ -11428,7 +11427,6 @@ printSwiftLetDeclaration swiftLetDeclaration =
         resultTypePrint : Print
         resultTypePrint =
             printSwiftTypeNotParenthesized
-                -- TODO check if it's Just TypeOutgoing
                 Nothing
                 swiftLetDeclaration.resultType
 
@@ -11680,7 +11678,6 @@ printSwiftLocalLetDeclaration swiftLetDeclaration =
         resultTypePrint : Print
         resultTypePrint =
             printSwiftTypeNotParenthesized
-                -- TODO check if not Just TypeOutgoing
                 Nothing
                 swiftLetDeclaration.resultType
     in
@@ -13980,7 +13977,6 @@ printSwiftExpressionLambda lambda =
                                     parameterTypePrint : Print
                                     parameterTypePrint =
                                         printSwiftTypeNotParenthesized
-                                            -- TODO check if not Nothing
                                             (Just TypeIncoming)
                                             lambdaParameter.type_
                                 in
@@ -14444,7 +14440,6 @@ printSwiftStatementLetDeclarationUninitialized letDeclarationUnassigned =
         typePrint : Print
         typePrint =
             printSwiftTypeNotParenthesized
-                -- TODO check if not Just TypeOutgoing
                 Nothing
                 letDeclarationUnassigned.type_
     in
