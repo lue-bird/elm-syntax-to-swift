@@ -37,6 +37,8 @@ public enum Elm {
 ### be aware
 
 -   not supported are
+    -   🚧 tail call elimination for functions with more than one parameter.
+        Solution: don't generate curried functions, always list all parameters and wrap in lambda on call site whenever necessary, including fully expanding lambdas (TODO figure out how/if that is possible for lambdas)
     -   ports that use non-json values like `port sendMessage : String -> Cmd msg`, glsl
     -   `elm/file`, `elm/http`, `elm/browser`, `elm-explorations/markdown`, `elm-explorations/webgl`, `elm-explorations/benchmark`
     -   `Task`, `Process`, `Platform.Task`, `Platform.ProcessId`, `Platform.Router`, `Platform.sendToApp`, `Platform.sendToSelf`, `Random.generate`, `Time.now`, `Time.every`, `Time.here`, `Time.getZoneName`, `Bytes.getHostEndianness`, `Math.Matrix4` (due to swift's standard library not exposing many [simd types and operations available in apple's SDK](https://developer.apple.com/documentation/simd/simd_double4x4))
