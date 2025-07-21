@@ -28,7 +28,7 @@ public enum Elm {
     ..some default declarations..
 
     @Sendable public static func Sample_plus2(_ n: Double) -> Double {
-        Basics_add(n)(List_sum(Array_toList([ 2.0 ])))
+        Basics_add(n, List_sum(Array_toList([ 2.0 ])))
     }
 }
 """
