@@ -9,8 +9,10 @@ extension Elm.List_List: Comparable where a: Comparable {}
 extension Elm.PlatformCmd_CmdSingle: Equatable where event: Equatable {}
 extension Elm.Tuple: Equatable where first: Equatable, second: Equatable {}
 extension Elm.Tuple: Hashable where first: Hashable, second: Hashable {}
+extension Elm.Tuple: Comparable where first: Comparable, second: Comparable {}
 extension Elm.Triple: Equatable where first: Equatable, second: Equatable, third: Equatable {}
 extension Elm.Triple: Hashable where first: Hashable, second: Hashable, third: Hashable {}
+extension Elm.Triple: Comparable where first: Comparable, second: Comparable, third: Comparable {}
 extension Elm.Generated_caseInsensitive_multiline: Equatable
 where caseInsensitive: Equatable, multiline: Equatable {}
 extension Elm.Generated_index_match_number_submatches
@@ -126,28 +128,44 @@ public enum Elm {
     @Sendable public static func Basics_eq<a: Equatable>(_ a: a, _ b: a) -> Bool {
         a == b
     }
-    // TODO is this overload necessary?
+    // necessary because elm type variables do not have information about being equatable
     @Sendable public static func Basics_eq<a>(_ a: a, _ b: a) -> Bool {
-        if let a = a as? AnyHashable,
-            let b = b as? AnyHashable
+        if let a = a as? any Equatable,
+            let b = b as? any Equatable
         {
-            a == b
+            typeErasedEq(a, b)
         } else {
-            fatalError("== on non-AnyHashable types")
+            fatalError("== on non-Equatable types")
         }
     }
 
     @Sendable public static func Basics_neq<a: Equatable>(_ a: a, _ b: a) -> Bool {
         a != b
     }
-    // TODO is this overload necessary?
+    // necessary because elm type variables do not have information about being equatable
     @Sendable public static func Basics_neq<a>(_ a: a, _ b: a) -> Bool {
-        if let a = a as? AnyHashable,
-            let b = b as? AnyHashable
+        if let a = a as? any Equatable,
+            let b = b as? any Equatable
         {
+            typeErasedNeq(a, b)
+        } else {
+            fatalError("/= on non-Equatable types")
+        }
+    }
+
+    // https://swiftunwrap.com/article/comparing-equatable-using-opened-existentials/
+    static func typeErasedEq<A: Equatable, B: Equatable>(_ a: A, _ b: B) -> Bool {
+        if let b = b as? A {
+            a == b
+        } else {
+            fatalError("/= on non-Equatable types")
+        }
+    }
+    static func typeErasedNeq<A: Equatable, B: Equatable>(_ a: A, _ b: B) -> Bool {
+        if let b = b as? A {
             a != b
         } else {
-            fatalError("/= on non-AnyHashable types")
+            fatalError("/= on non-Equatable types")
         }
     }
 
@@ -171,20 +189,6 @@ public enum Elm {
         if a < b {
             .Basics_LT
         } else if a > b {
-            .Basics_GT
-        } else {
-            .Basics_EQ
-        }
-    }
-
-    // TODO is this overload necessary?
-    @Sendable public static func Basics_compare<comparable: RawRepresentable>(
-        _ a: comparable, _ b: comparable
-    ) -> Basics_Order
-    where comparable.RawValue: Comparable {
-        if a.rawValue < b.rawValue {
-            .Basics_LT
-        } else if a.rawValue > b.rawValue {
             .Basics_GT
         } else {
             .Basics_EQ
@@ -1439,6 +1443,12 @@ public enum Elm {
         return false
     }
 
+    // necessary because elm type variables do not have information about being equatable
+    @Sendable public static func List_member<a: Equatable>(_ needle: (a), _ list: List_List<a>)
+        -> Bool
+    {
+        List_any({ element in Basics_eq(element, needle) }, list)
+    }
     @Sendable public static func List_member<a>(_ needle: (a), _ list: List_List<a>) -> Bool {
         List_any({ element in Basics_eq(element, needle) }, list)
     }
