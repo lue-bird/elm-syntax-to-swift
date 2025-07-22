@@ -30321,7 +30321,7 @@ static func arrayReversedToList<a>(_ array: [a]) -> List_List<a> {
 static func Array_mapFromList<a, b>(_ elementChange: (a) -> b, _ fullList: List_List<a>)
     -> [b]
 {
-    var soFar: [b] = Array()
+    var soFar: [b] = []
     var remainingList: List_List<a> = fullList
     while case let .List_Cons(remainingHead, remainingTail) = remainingList {
         soFar.append(elementChange(remainingHead))
@@ -30331,7 +30331,7 @@ static func Array_mapFromList<a, b>(_ elementChange: (a) -> b, _ fullList: List_
 }
 
 @Sendable public static func Array_fromList<a>(_ fullList: List_List<a>) -> [a] {
-    var soFar: [a] = Array()
+    var soFar: [a] = []
     var remainingList: List_List<a> = fullList
     while case let .List_Cons(remainingHead, remainingTail) = remainingList {
         soFar.append(remainingHead)
@@ -30364,7 +30364,7 @@ static func Array_mapFromList<a, b>(_ elementChange: (a) -> b, _ fullList: List_
     _ elementToRepeat: a
 ) -> [a] {
     let finalLength: Int = Int(finalLengthAsDouble)
-    return if finalLength < 0 {
+    return if finalLength <= 0 {
         []
     } else {
         Array(repeating: elementToRepeat, count: finalLength)
@@ -30375,7 +30375,7 @@ static func Array_mapFromList<a, b>(_ elementChange: (a) -> b, _ fullList: List_
     _ indexToElement: (Double) -> a
 ) -> [a] {
     let finalLength: Int = Int(finalLengthAsDouble)
-    if finalLength < 0 {
+    if finalLength <= 0 {
         return []
     } else {
         // can't do ↓ because indexToElement would be escaping
@@ -30399,7 +30399,7 @@ static func Array_mapFromList<a, b>(_ elementChange: (a) -> b, _ fullList: List_
 ) -> [a] {
     let index: Int = Int(indexAsDouble)
     if (index >= 0) && (index < array.count) {
-        var arrayMutable = array
+        var arrayMutable: [a] = array
         arrayMutable[index] = newElement
         return arrayMutable
     } else {
@@ -30674,15 +30674,15 @@ private static func List_foldr<a, state>(
     _ indexedElementChange: (Double) -> (a) -> b,
     _ list: List_List<a>
 ) -> List_List<b> {
-    var reversedSoFar: [b] = []
+    var changedElementsSoFar: [b] = []
     var indexSoFar: Int = 0
     var remainingList: List_List<a> = list
     while case let .List_Cons(head, tail) = remainingList {
         remainingList = tail
-        reversedSoFar.append(indexedElementChange(Double(indexSoFar))(head))
+        changedElementsSoFar.append(indexedElementChange(Double(indexSoFar))(head))
         indexSoFar = indexSoFar + 1
     }
-    return Array_toList(reversedSoFar)
+    return Array_toList(changedElementsSoFar)
 }
 
 @Sendable public static func List_map2<a, b, c>(
@@ -30795,18 +30795,13 @@ private static func List_foldr<a, state>(
 @Sendable public static func List_unzip<a, b>(_ abList: List_List<Tuple<a, b>>)
     -> Tuple<List_List<a>, List_List<b>>
 {
-    var remainingList: List_List<Tuple<a, b>> = abList
-    var firstsSoFar: [a] = []
-    var secondsSoFar: [b] = []
-    while case let .List_Cons(head, tail) = remainingList {
-        remainingList = tail
-        switch head {
-        case let .Tuple(first, second):
-            firstsSoFar.append(first)
-            secondsSoFar.append(second)
-        }
+    var firstsSoFar: List_List<a> = .List_Empty
+    var secondsSoFar: List_List<b> = .List_Empty
+    for tuple in Array_fromList(abList).reversed() {
+        firstsSoFar = .List_Cons(tuple.first, firstsSoFar)
+        secondsSoFar = .List_Cons(tuple.second, secondsSoFar)
     }
-    return .Tuple(Array_toList(firstsSoFar), Array_toList(secondsSoFar))
+    return .Tuple(firstsSoFar, secondsSoFar)
 }
 
 @Sendable public static func List_filter<a>(
@@ -30994,12 +30989,7 @@ private static func List_foldr<a, state>(
     return set
 }
 @Sendable public static func Set_toList<a: Comparable>(_ set: Set<a>) -> List_List<a> {
-    var keyArray: [a] = []
-    for key in set {
-        keyArray.append(key)
-    }
-    keyArray.sort()
-    return Array_toList(keyArray)
+    return Array_toList(set.sorted())
 }
 @Sendable public static func Set_isEmpty<a>(_ set: Set<a>) -> Bool {
     set.isEmpty
@@ -31037,11 +31027,13 @@ private static func List_foldr<a, state>(
 @Sendable public static func Set_filter<a>(_ keepElement: (a) -> Bool, set: Set<a>) -> Set<a> {
     set.filter(keepElement)
 }
-@Sendable public static func Set_partition<a>(_ isLeft: (a) -> Bool, _ set: Set<a>) -> Tuple<
-    Set<a>, Set<a>
-> {
+@Sendable public static func Set_partition<a>(_ isLeft: (a) -> Bool, _ set: Set<a>)
+    -> Tuple<Set<a>, Set<a>>
+{
     var left: Set<a> = Set()
+    left.reserveCapacity(set.count)
     var right: Set<a> = Set()
+    right.reserveCapacity(set.count)
     for element in set {
         if isLeft(element) {
             left.insert(element)
@@ -31056,12 +31048,7 @@ private static func List_foldr<a, state>(
     _ initialState: state,
     _ set: Set<a>
 ) -> (state) {
-    var keyArray: [a] = []
-    for key in set {
-        keyArray.append(key)
-    }
-    keyArray.sort()
-    return keyArray.reduce(
+    set.sorted().reduce(
         initialState,
         { soFar, element in reduce(element)(soFar) }
     )
@@ -31071,16 +31058,13 @@ private static func List_foldr<a, state>(
     _ initialState: state,
     _ set: Set<a>
 ) -> (state) {
-    var keyArray: [a] = []
-    for key in set {
-        keyArray.append(key)
-    }
-    // notice that we sort by > instead of < !
-    keyArray.sort(by: { a, b in a > b })
-    return keyArray.reduce(
-        initialState,
-        { soFar, element in reduce(element)(soFar) }
-    )
+    set
+        // notice that we sort by > instead of < !
+        .sorted(by: { a, b in a > b })
+        .reduce(
+            initialState,
+            { soFar, element in reduce(element)(soFar) }
+        )
 }
 
 @Sendable public static func Dict_size<key, value>(_ dictionary: [key: value]) -> Double {
@@ -31108,32 +31092,24 @@ private static func List_foldr<a, state>(
 @Sendable public static func Dict_toList<key: Comparable, value>(_ dictionary: [key: value])
     -> List_List<Tuple<key, value>>
 {
-    var entryArray: [Tuple<key, value>] = []
-    for element in dictionary {
-        entryArray.append(.Tuple(element.key, element.value))
-    }
-    entryArray.sort(by: { a, b in a.first < b.first })
-    return Array_toList(entryArray)
+    Array_mapToList(
+        { entry in .Tuple(entry.key, entry.value) },
+        dictionary.sorted(by: { a, b in a.key < b.key })
+    )
 }
 @Sendable public static func Dict_keys<key: Comparable, value>(_ dictionary: [key: value])
     -> List_List<key>
 {
-    var keyArray: [key] = []
-    for key in dictionary.keys {
-        keyArray.append(key)
-    }
-    keyArray.sort()
-    return Array_toList(keyArray)
+    return Array_toList(dictionary.keys.sorted())
 }
 @Sendable public static func Dict_values<key: Comparable, value>(_ dictionary: [key: value])
     -> List_List<value>
 {
-    var entryArray: [(key: key, value: value)] = []
-    for entry in dictionary {
-        entryArray.append(entry)
-    }
-    entryArray.sort(by: { a, b in a.key < b.key })
-    return Array_mapToList({ entry in entry.value }, entryArray)
+    Array_mapToList(
+        { entry in entry.value },
+        dictionary
+            .sorted(by: { a, b in a.key < b.key })
+    )
 }
 @Sendable public static func Dict_isEmpty<key, value>(_ dictionary: [key: value]) -> Bool {
     dictionary.isEmpty
@@ -31222,6 +31198,7 @@ private static func List_foldr<a, state>(
     -> state
 {
     var combinedKeyArray: [key] = []
+    combinedKeyArray.reserveCapacity(aDictionary.count + bDictionary.count)
     for aKey in aDictionary.keys {
         combinedKeyArray.append(aKey)
     }
@@ -31277,7 +31254,9 @@ private static func List_foldr<a, state>(
     -> Tuple<[key: value], [key: value]>
 {
     var left: [key: value] = Dictionary()
+    left.reserveCapacity(dictionary.capacity)
     var right: [key: value] = Dictionary()
+    right.reserveCapacity(dictionary.capacity)
     for (key, value) in dictionary {
         if isLeft(key)(value) {
             left[key] = value
@@ -31292,31 +31271,25 @@ private static func List_foldr<a, state>(
     _ initialState: state,
     _ dictionary: [key: value]
 ) -> state {
-    var entryArray: [(key: key, value: value)] = []
-    for entry in dictionary {
-        entryArray.append(entry)
-    }
-    entryArray.sort(by: { a, b in a.key < b.key })
-    return entryArray.reduce(
-        initialState,
-        { soFar, entry in reduce(entry.key)(entry.value)(soFar) }
-    )
+    dictionary
+        .sorted(by: { a, b in a.key < b.key })
+        .reduce(
+            initialState,
+            { soFar, entry in reduce(entry.key)(entry.value)(soFar) }
+        )
 }
 @Sendable public static func Dict_foldr<key: Comparable, value, state>(
     _ reduce: (key) -> (value) -> (state) -> state,
     _ initialState: state,
     _ dictionary: [key: value]
 ) -> state {
-    var entryArray: [(key: key, value: value)] = []
-    for entry in dictionary {
-        entryArray.append(entry)
-    }
-    // notice that we sort by > instead of < !
-    entryArray.sort(by: { a, b in a.key > b.key })
-    return entryArray.reduce(
-        initialState,
-        { soFar, entry in reduce(entry.key)(entry.value)(soFar) }
-    )
+    dictionary
+        // notice that we sort by > instead of < !
+        .sorted(by: { a, b in a.key > b.key })
+        .reduce(
+            initialState,
+            { soFar, entry in reduce(entry.key)(entry.value)(soFar) }
+        )
 }
 
 // not alias for Regex<Substring> because Regex is not Sendable
@@ -31552,7 +31525,7 @@ static func toRegexMatch(
     case .none: List_singleton(string)
     case let .some(regex):
         Array_mapToList(
-            { sub in String(sub) },
+            String.init,
             string.split(separator: regex)
         )
     }
@@ -31789,7 +31762,9 @@ public enum PlatformCmd_CmdSingle<event: Sendable>: Sendable {
 public typealias PlatformCmd_Cmd<event> =
     [PlatformCmd_CmdSingle<event>]
 
-@Sendable public static func PlatformCmd_none<event>() -> PlatformCmd_Cmd<event> { [] }
+@Sendable public static func PlatformCmd_none<event>() -> PlatformCmd_Cmd<event> {
+    []
+}
 @Sendable public static func PlatformCmd_batch<event: Sendable>(
     _ cmds: List_List<PlatformCmd_Cmd<event>>
 )
@@ -31815,7 +31790,9 @@ public enum PlatformSub_SubSingle<event: Sendable>: Sendable {
 }
 public typealias PlatformSub_Sub<event> = [PlatformSub_SubSingle<event>]
 
-@Sendable public static func PlatformSub_none<event>() -> PlatformSub_Sub<event> { [] }
+@Sendable public static func PlatformSub_none<event>() -> PlatformSub_Sub<event> {
+    []
+}
 @Sendable public static func PlatformSub_batch<event: Sendable>(
     _ subs: List_List<PlatformSub_Sub<event>>
 )
@@ -32482,7 +32459,8 @@ static func JsonDecode_fieldValue(_ fieldName: String)
     JsonDecode_Decoder(decode: { toDecode in
         switch toDecode.value {
         case let arrayToDecode as NSArray:
-            var decodedArray: [a] = Array()
+            var decodedArray: [a] = []
+            decodedArray.reserveCapacity(arrayToDecode.count)
             for (index, elementToDecode) in arrayToDecode.enumerated() {
                 switch elementDecoder.decode(JsonDecode_Value(value: elementToDecode)) {
                 case let .Result_Err(error):
