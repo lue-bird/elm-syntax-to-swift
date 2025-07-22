@@ -31580,13 +31580,15 @@ public typealias PlatformCmd_Cmd<event> =
     [PlatformCmd_CmdSingle<event>]
 
 @Sendable public static func PlatformCmd_none<event>() -> PlatformCmd_Cmd<event> { [] }
-@Sendable public static func PlatformCmd_batch<event>(_ cmds: List_List<PlatformCmd_Cmd<event>>)
+@Sendable public static func PlatformCmd_batch<event: Sendable>(
+    _ cmds: List_List<PlatformCmd_Cmd<event>>
+)
     -> PlatformCmd_Cmd<event>
 {
     // can be optimized
     Array_fromList(cmds).flatMap({ cmd in cmd })
 }
-@Sendable public static func PlatformCmd_map<event, eventMapped>(
+@Sendable public static func PlatformCmd_map<event: Sendable, eventMapped: Sendable>(
     _: (event) -> eventMapped,
     _ cmd: PlatformCmd_Cmd<event>
 ) -> PlatformCmd_Cmd<eventMapped> {
@@ -31604,13 +31606,15 @@ public enum PlatformSub_SubSingle<event: Sendable>: Sendable {
 public typealias PlatformSub_Sub<event> = [PlatformSub_SubSingle<event>]
 
 @Sendable public static func PlatformSub_none<event>() -> PlatformSub_Sub<event> { [] }
-@Sendable public static func PlatformSub_batch<event>(_ subs: List_List<PlatformSub_Sub<event>>)
+@Sendable public static func PlatformSub_batch<event: Sendable>(
+    _ subs: List_List<PlatformSub_Sub<event>>
+)
     -> PlatformSub_Sub<event>
 {
     // can be optimized
     Array_fromList(subs).flatMap({ sub in sub })
 }
-@Sendable public static func PlatformSub_map<event, eventMapped>(
+@Sendable public static func PlatformSub_map<event: Sendable, eventMapped: Sendable>(
     // TODO check if @escaping is necessary
     _ eventChange: @escaping @Sendable (event) -> eventMapped,
     _ sub: PlatformSub_Sub<event>
@@ -31646,11 +31650,11 @@ public enum Generated_init__update_subscriptions<
         }
     }
 }
-public typealias Platform_Program<flags, state, event> =
+public typealias Platform_Program<flags: Sendable, state: Sendable, event: Sendable> =
     Generated_init__update_subscriptions<
-        (flags) -> Tuple<state, PlatformCmd_Cmd<event>>,
-        (event) -> (state) -> Tuple<state, PlatformCmd_Cmd<event>>,
-        (state) -> PlatformSub_Sub<event>
+        @Sendable (flags) -> Tuple<state, PlatformCmd_Cmd<event>>,
+        @Sendable (event) -> (state) -> Tuple<state, PlatformCmd_Cmd<event>>,
+        @Sendable (state) -> PlatformSub_Sub<event>
     >
 
 @Sendable public static func Platform_worker<flags, state, event>(
