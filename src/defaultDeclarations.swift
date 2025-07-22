@@ -2406,9 +2406,10 @@ public enum Elm {
         case .none: .List_Empty
         case let .some(regex):
             Array_toList(
-                // TODO optimize (as in really only match up until that point)
-                string.matches(of: regex).prefix(Int(maxOccurrences)).enumerated()
-                    .map({ (matchIndex0Based, match: Regex.Match) in
+                // can be optimized by only matching up until that point
+                string.matches(of: regex)
+                    .prefix(Int(maxOccurrences)).enumerated()
+                    .map({ (matchIndex0Based: Int, match: Regex.Match) in
                         toRegexMatch(
                             match,
                             matchIndex1Based: 1 + matchIndex0Based,
@@ -2652,6 +2653,10 @@ public enum Elm {
         case Bytes_BE
     }
 
+    @Sendable public static func Bytes_width(_ bytes: Bytes_Bytes) -> Double {
+        Double(bytes.count)
+    }
+
     public enum PlatformCmd_CmdSingle<event: Sendable>: Sendable {
         case PlatformCmd_PortOutgoing(name: String, value: JsonEncode_Value)
     }
@@ -2694,7 +2699,6 @@ public enum Elm {
         Array_fromList(subs).flatMap({ sub in sub })
     }
     @Sendable public static func PlatformSub_map<event: Sendable, eventMapped: Sendable>(
-        // TODO check if @escaping is necessary
         _ eventChange: @escaping @Sendable (event) -> eventMapped,
         _ sub: PlatformSub_Sub<event>
     ) -> PlatformSub_Sub<eventMapped> {
@@ -2902,7 +2906,6 @@ public enum Elm {
         })
     }
     @Sendable public static func JsonDecode_lazy<a: Sendable>(
-        // TODO check if @escaping is necessary
         _ buildDecoder: @escaping @Sendable (Unit) -> JsonDecode_Decoder<a>
     )
         -> JsonDecode_Decoder<a>
@@ -2912,7 +2915,6 @@ public enum Elm {
         })
     }
     @Sendable public static func JsonDecode_andThen<a: Sendable, b: Sendable>(
-        // TODO check if @escaping is necessary
         _ valueToDecoder: @escaping @Sendable (a) -> JsonDecode_Decoder<b>,
         _ decoder: JsonDecode_Decoder<a>
     ) -> JsonDecode_Decoder<b> {
@@ -2926,7 +2928,6 @@ public enum Elm {
         })
     }
     @Sendable public static func JsonDecode_map<a: Sendable, b: Sendable>(
-        // TODO check if @escaping is necessary
         _ valueChange: @escaping @Sendable (a) -> b,
         _ decoder: JsonDecode_Decoder<a>
     ) -> JsonDecode_Decoder<b> {
@@ -2935,7 +2936,6 @@ public enum Elm {
         })
     }
     @Sendable public static func JsonDecode_map2<a: Sendable, b: Sendable, combined: Sendable>(
-        // TODO check if @escaping is necessary
         _ combine: @escaping @Sendable (a) -> (b) -> combined,
         _ aDecoder: JsonDecode_Decoder<a>,
         _ bDecoder: JsonDecode_Decoder<b>
@@ -2951,7 +2951,6 @@ public enum Elm {
     }
     @Sendable
     public static func JsonDecode_map3<a: Sendable, b: Sendable, c: Sendable, combined: Sendable>(
-        // TODO check if @escaping is necessary
         _ combine: @escaping @Sendable (a) -> (b) -> (c) -> combined,
         _ aDecoder: JsonDecode_Decoder<a>,
         _ bDecoder: JsonDecode_Decoder<b>,
@@ -2971,7 +2970,6 @@ public enum Elm {
     public static func JsonDecode_map4<
         a: Sendable, b: Sendable, c: Sendable, d: Sendable, combined: Sendable
     >(
-        // TODO check if @escaping is necessary
         _ combine: @escaping @Sendable (a) -> (b) -> (c) -> (d) -> combined,
         _ aDecoder: JsonDecode_Decoder<a>,
         _ bDecoder: JsonDecode_Decoder<b>,
@@ -2994,7 +2992,6 @@ public enum Elm {
     public static func JsonDecode_map5<
         a: Sendable, b: Sendable, c: Sendable, d: Sendable, e: Sendable, combined: Sendable
     >(
-        // TODO check if @escaping is necessary
         _ combine: @escaping @Sendable (a) -> (b) -> (c) -> (d) -> (e) -> combined,
         _ aDecoder: JsonDecode_Decoder<a>,
         _ bDecoder: JsonDecode_Decoder<b>,
@@ -3020,7 +3017,6 @@ public enum Elm {
         a: Sendable, b: Sendable, c: Sendable, d: Sendable, e: Sendable, f: Sendable,
         combined: Sendable
     >(
-        // TODO check if @escaping is necessary
         _ combine: @escaping @Sendable (a) -> (b) -> (c) -> (d) -> (e) -> (f) -> combined,
         _ aDecoder: JsonDecode_Decoder<a>,
         _ bDecoder: JsonDecode_Decoder<b>,
@@ -3048,7 +3044,6 @@ public enum Elm {
         a: Sendable, b: Sendable, c: Sendable, d: Sendable, e: Sendable, f: Sendable, g: Sendable,
         combined: Sendable
     >(
-        // TODO check if @escaping is necessary
         _ combine: @escaping @Sendable (a) -> (b) -> (c) -> (d) -> (e) -> (f) -> (g) -> combined,
         _ aDecoder: JsonDecode_Decoder<a>,
         _ bDecoder: JsonDecode_Decoder<b>,
@@ -3078,7 +3073,6 @@ public enum Elm {
         a: Sendable, b: Sendable, c: Sendable, d: Sendable, e: Sendable, f: Sendable, g: Sendable,
         h: Sendable, combined: Sendable
     >(
-        // TODO check if @escaping is necessary
         _ combine: @escaping @Sendable (a) -> (b) -> (c) -> (d) -> (e) -> (f) -> (g) -> (h) ->
             combined,
         _ aDecoder: JsonDecode_Decoder<a>,
@@ -3440,7 +3434,6 @@ public enum Elm {
         })
     }
     @Sendable public static func JsonDecode_oneOrMore<a: Sendable, combined: Sendable>(
-        // TODO check if @escaping is necessary
         _ combineHeadTail: @escaping @Sendable (a) -> (List_List<a>) -> combined,
         _ elementDecoder: JsonDecode_Decoder<a>
     )
