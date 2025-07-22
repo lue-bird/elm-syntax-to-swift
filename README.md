@@ -77,8 +77,8 @@ You will find these types:
   - elm `Float`s, `Int`s and `number-` variable typed values will be of type [`Double`](https://developer.apple.com/documentation/swift/double)
   - elm `Char`s will be of type [`UnicodeScalar`](https://developer.apple.com/documentation/swift/unicode/scalar)
   - elm unit `()` will be of type `Elm.Unit` and can be constructed and matched with `.Unit`
-  - elm tuples like `( Float, String )` will be of type `Elm.Tuple<Double, String>` and can be constructed and matched with `.Tuple(_, _)`
-  - elm triples like `( Float, Float, String )` will be of type `Elm.Triple<Double, Double, String>` and can be constructed and matched with `.Triple(_, _, _)`
+  - elm tuples like `( Float, String )` will be of type `Elm.Tuple<Double, String>` and can be constructed and matched with `.Tuple(_, _)`. `.first` and `.second` access also works
+  - elm triples like `( Float, Float, String )` will be of type `Elm.Triple<Double, Double, String>` and can be constructed and matched with `.Triple(_, _, _)`. `.first`, `.second` and `.third` access also works
   - elm records like `{ y : Float, x : Float }` will be of type `Elm.Generated_x_y<Double, Double>` with the fields sorted and can be constructed and matched with `Elm.Generated_x_y.Record(x: _, y: _)`. `record.x` access also works
   - a transpiled elm app does not run itself.
     An elm main `Platform.worker` program type will literally just consist of fields `Init`, `Update` and `Subscriptions` where

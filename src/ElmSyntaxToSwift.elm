@@ -29161,9 +29161,34 @@ defaultDeclarations =
 public enum Unit: Sendable, Equatable { case Unit }
 public enum Tuple<first: Sendable, second: Sendable>: Sendable {
     case Tuple(first, second)
+    var first: first {
+        switch self {
+        case let .Tuple(result, _): result
+        }
+    }
+    var second: second {
+        switch self {
+        case let .Tuple(_, result): result
+        }
+    }
 }
 public enum Triple<first: Sendable, second: Sendable, third: Sendable>: Sendable {
     case Triple(first, second, third)
+    var first: first {
+        switch self {
+        case let .Triple(result, _, _): result
+        }
+    }
+    var second: second {
+        switch self {
+        case let .Triple(_, result, _): result
+        }
+    }
+    var third: third {
+        switch self {
+        case let .Triple(_, _, result): result
+        }
+    }
 }
 public enum Basics_Order: Sendable, Equatable {
     case Basics_LT
@@ -30935,7 +30960,7 @@ private static func List_foldr<a, state>(
     _ list: List_List<a>
 ) -> List_List<a> {
     var asArray: [a] = Array_fromList(list)
-    asArray.sort(by: { (a, b) in elementCompare(a)(b) == .Basics_LT })  // mutate
+    asArray.sort(by: { (a, b) in elementCompare(a)(b) == .Basics_LT })
     return Array_toList(asArray)
 }
 
@@ -30944,7 +30969,7 @@ private static func List_foldr<a, state>(
     _ list: List_List<element>
 ) -> List_List<element> {
     var asArray: [element] = Array_fromList(list)
-    asArray.sort(by: { (a, b) in elementToComparable(a) < elementToComparable(b) })  // mutate
+    asArray.sort(by: { (a, b) in elementToComparable(a) < elementToComparable(b) })
     return Array_toList(asArray)
 }
 
@@ -31058,8 +31083,8 @@ private static func List_foldr<a, state>(
 @Sendable public static func Dict_empty<key, value>() -> [key: value] {
     Dictionary()
 }
-@Sendable public static func Dict_singleton<key, value>(_ key: key, _ value: value) -> [key:
-    value]
+@Sendable public static func Dict_singleton<key, value>(_ key: key, _ value: value)
+    -> [key: value]
 {
     [key: value]
 }
@@ -31074,32 +31099,35 @@ private static func List_foldr<a, state>(
     }
     return dictionary
 }
-@Sendable public static func Dict_toList<key, value>(_ dictionary: [key: value])
+@Sendable public static func Dict_toList<key: Comparable, value>(_ dictionary: [key: value])
     -> List_List<Tuple<key, value>>
 {
-    var list: List_List<Tuple<key, value>> = .List_Empty
-    for element in dictionary.reversed() {
-        list = .List_Cons(.Tuple(element.key, element.value), list)
+    var entryArray: [Tuple<key, value>] = []
+    for element in dictionary {
+        entryArray.append(.Tuple(element.key, element.value))
     }
-    return list
+    entryArray.sort(by: { a, b in a.first < b.first })
+    return Array_toList(entryArray)
 }
-@Sendable public static func Dict_keys<key, value>(_ dictionary: [key: value])
+@Sendable public static func Dict_keys<key: Comparable, value>(_ dictionary: [key: value])
     -> List_List<key>
 {
-    var list: List_List<key> = .List_Empty
-    for key in dictionary.keys.reversed() {
-        list = .List_Cons(key, list)
+    var keyArray: [key] = []
+    for key in dictionary.keys {
+        keyArray.append(key)
     }
-    return list
+    keyArray.sort()
+    return Array_toList(keyArray)
 }
-@Sendable public static func Dict_keys<key, value>(_ dictionary: [key: value])
+@Sendable public static func Dict_values<key: Comparable, value>(_ dictionary: [key: value])
     -> List_List<value>
 {
-    var list: List_List<value> = .List_Empty
-    for value in dictionary.values.reversed() {
-        list = .List_Cons(value, list)
+    var entryArray: [(key: key, value: value)] = []
+    for entry in dictionary {
+        entryArray.append(entry)
     }
-    return list
+    entryArray.sort(by: { a, b in a.key < b.key })
+    return Array_mapToList({ entry in entry.value }, entryArray)
 }
 @Sendable public static func Dict_isEmpty<key, value>(_ dictionary: [key: value]) -> Bool {
     dictionary.isEmpty
@@ -31177,7 +31205,7 @@ private static func List_foldr<a, state>(
     aDictionaryMutable.merge(bDictionary, uniquingKeysWith: { aValue, _ in aValue })
     return aDictionaryMutable
 }
-@Sendable public static func Dict_merge<key, a, b, state>(
+@Sendable public static func Dict_merge<key: Comparable, a, b, state>(
     _ onlyA: (key) -> (a) -> (state) -> state,
     _ bothAB: (key) -> (a) -> (b) -> (state) -> state,
     _ onlyB: (key) -> (b) -> (state) -> state,
@@ -31187,16 +31215,32 @@ private static func List_foldr<a, state>(
 )
     -> state
 {
+    var combinedKeyArray: [key] = []
+    for aKey in aDictionary.keys {
+        combinedKeyArray.append(aKey)
+    }
+    for bKey in bDictionary.keys {
+        combinedKeyArray.append(bKey)
+    }
+    combinedKeyArray.sort()
     var currentState: state = initialState
-    for key in Set(Array(aDictionary.keys) + Array(bDictionary.keys)) {
-        switch (aDictionary[key], bDictionary[key]) {
-        case let (.some(a), .some(b)):
-            currentState = bothAB(key)(a)(b)(currentState)
-        case let (.some(a), .none):
-            currentState = onlyA(key)(a)(currentState)
-        case let (.none, .some(b)):
-            currentState = onlyB(key)(b)(currentState)
-        case (.none, .none): break
+    var previousKey: key? = .none
+    for key in combinedKeyArray {
+        if key == previousKey {
+            // skip key that was added from both dictionaries
+            // next key is guaranteed to be different so let's make the comparison easy
+            previousKey = .none
+        } else {
+            previousKey = key
+            switch (aDictionary[key], bDictionary[key]) {
+            case let (.some(a), .some(b)):
+                currentState = bothAB(key)(a)(b)(currentState)
+            case let (.some(a), .none):
+                currentState = onlyA(key)(a)(currentState)
+            case let (.none, .some(b)):
+                currentState = onlyB(key)(b)(currentState)
+            case (.none, .none): break
+            }
         }
     }
     return currentState
@@ -31237,22 +31281,33 @@ private static func List_foldr<a, state>(
     }
     return .Tuple(left, right)
 }
-@Sendable public static func Dict_foldl<key, value, state>(
+@Sendable public static func Dict_foldl<key: Comparable, value, state>(
     _ reduce: (key) -> (value) -> (state) -> state,
     _ initialState: state,
     _ dictionary: [key: value]
 ) -> state {
-    dictionary.reduce(
+    var entryArray: [(key: key, value: value)] = []
+    for entry in dictionary {
+        entryArray.append(entry)
+    }
+    entryArray.sort(by: { a, b in a.key < b.key })
+    return entryArray.reduce(
         initialState,
         { soFar, entry in reduce(entry.key)(entry.value)(soFar) }
     )
 }
-@Sendable public static func Dict_foldr<key, value, state>(
+@Sendable public static func Dict_foldr<key: Comparable, value, state>(
     _ reduce: (key) -> (value) -> (state) -> state,
     _ initialState: state,
     _ dictionary: [key: value]
 ) -> state {
-    dictionary.reversed().reduce(
+    var entryArray: [(key: key, value: value)] = []
+    for entry in dictionary {
+        entryArray.append(entry)
+    }
+    // notice that we sort by > instead of < !
+    entryArray.sort(by: { a, b in a.key > b.key })
+    return entryArray.reduce(
         initialState,
         { soFar, entry in reduce(entry.key)(entry.value)(soFar) }
     )
