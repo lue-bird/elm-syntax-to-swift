@@ -1862,17 +1862,18 @@ public enum Elm {
         var set: Set<a> = Set()
         var remainingList: List_List<a> = list
         while case let .List_Cons(element, afterElement) = remainingList {
-            set.insert(element)
             remainingList = afterElement
+            set.insert(element)
         }
         return set
     }
-    @Sendable public static func Set_toList<a>(_ set: Set<a>) -> List_List<a> {
-        var list: List_List<a> = .List_Empty
-        for element in set.reversed() {
-            list = .List_Cons(element, list)
+    @Sendable public static func Set_toList<a: Comparable>(_ set: Set<a>) -> List_List<a> {
+        var keyArray: [a] = []
+        for key in set {
+            keyArray.append(key)
         }
-        return list
+        keyArray.sort()
+        return Array_toList(keyArray)
     }
     @Sendable public static func Set_isEmpty<a>(_ set: Set<a>) -> Bool {
         set.isEmpty
@@ -1924,22 +1925,33 @@ public enum Elm {
         }
         return .Tuple(left, right)
     }
-    @Sendable public static func Set_foldl<a, state>(
+    @Sendable public static func Set_foldl<a: Comparable, state>(
         _ reduce: (a) -> (state) -> state,
         _ initialState: state,
         _ set: Set<a>
     ) -> (state) {
-        set.reduce(
+        var keyArray: [a] = []
+        for key in set {
+            keyArray.append(key)
+        }
+        keyArray.sort()
+        return keyArray.reduce(
             initialState,
             { soFar, element in reduce(element)(soFar) }
         )
     }
-    @Sendable public static func Set_foldr<a, state>(
+    @Sendable public static func Set_foldr<a: Comparable, state>(
         _ reduce: (a) -> (state) -> state,
         _ initialState: state,
         _ set: Set<a>
     ) -> (state) {
-        set.reversed().reduce(
+        var keyArray: [a] = []
+        for key in set {
+            keyArray.append(key)
+        }
+        // notice that we sort by > instead of < !
+        keyArray.sort(by: { a, b in a > b })
+        return keyArray.reduce(
             initialState,
             { soFar, element in reduce(element)(soFar) }
         )
