@@ -6,7 +6,6 @@ extension Elm.Result_Result: Equatable where error: Equatable, success: Equatabl
 extension Elm.List_List: Equatable where a: Equatable {}
 extension Elm.List_List: Hashable where a: Hashable {}
 extension Elm.List_List: Comparable where a: Comparable {}
-extension Elm.PlatformCmd_CmdSingle: Equatable where event: Equatable {}
 extension Elm.Tuple: Equatable where first: Equatable, second: Equatable {}
 extension Elm.Tuple: Hashable where first: Hashable, second: Hashable {}
 extension Elm.Tuple: Comparable where first: Comparable, second: Comparable {}
@@ -97,7 +96,7 @@ public enum Elm {
         _ earlier: @escaping @Sendable (a) -> b,
         _ later: @escaping @Sendable (b) -> c
     )
-        -> (a) -> c
+        -> @Sendable (a) -> c
     {
         { food in later(earlier(food)) }
     }
@@ -105,7 +104,7 @@ public enum Elm {
         _ later: @escaping @Sendable (b) -> c,
         _ earlier: @escaping @Sendable (a) -> b
     )
-        -> (a) -> c
+        -> @Sendable (a) -> c
     {
         { food in later(earlier(food)) }
     }
@@ -2442,8 +2441,8 @@ public enum Elm {
         case Bytes_BE
     }
 
-    public enum PlatformCmd_CmdSingle<event>: Sendable {
-        case PlatformCmd_PortOutgoing(name: String, value: Data)
+    public enum PlatformCmd_CmdSingle<event: Sendable>: Sendable {
+        case PlatformCmd_PortOutgoing(name: String, value: JsonEncode_Value)
     }
     public typealias PlatformCmd_Cmd<event> =
         [PlatformCmd_CmdSingle<event>]
@@ -2467,7 +2466,7 @@ public enum Elm {
         })
     }
 
-    public enum PlatformSub_SubSingle<event>: Sendable {
+    public enum PlatformSub_SubSingle<event: Sendable>: Sendable {
         case PlatformSub_PortIncoming(name: String, onValue: @Sendable (Data) -> event)
     }
     public typealias PlatformSub_Sub<event> = [PlatformSub_SubSingle<event>]
