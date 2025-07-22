@@ -8226,13 +8226,22 @@ expression context expressionTypedNode =
                                             { parameters =
                                                 [ { name = "generated_onValue"
                                                   , type_ =
-                                                        expressionTypedNode.type_
-                                                            |> type_
-                                                                (\moduleName ->
-                                                                    context.moduleInfo
-                                                                        |> FastDict.get moduleName
-                                                                        |> Maybe.map .typeAliases
-                                                                )
+                                                        case expressionTypedNode.type_ of
+                                                            ElmSyntaxTypeInfer.TypeNotVariable (ElmSyntaxTypeInfer.TypeFunction expressionTypeFunction) ->
+                                                                expressionTypeFunction.input
+                                                                    |> type_
+                                                                        (\moduleName ->
+                                                                            context.moduleInfo
+                                                                                |> FastDict.get moduleName
+                                                                                |> Maybe.map .typeAliases
+                                                                        )
+
+                                                            _ ->
+                                                                -- error?
+                                                                SwiftTypeFunction
+                                                                    { input = [ swiftTypeJsonEncodeValue ]
+                                                                    , output = SwiftTypeVariable "event"
+                                                                    }
                                                   }
                                                 ]
                                             , statements = []
@@ -9563,6 +9572,7 @@ swiftPatternAlterBindingNames :
     -> SwiftPattern
     -> SwiftPattern
 swiftPatternAlterBindingNames variableNameChange inferredPattern =
+    -- IGNORE TCO
     case inferredPattern of
         SwiftPatternIgnore ->
             SwiftPatternIgnore
