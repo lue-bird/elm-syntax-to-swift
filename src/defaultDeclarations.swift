@@ -2194,7 +2194,30 @@ public enum Elm {
     }
 
     // not alias for Regex<Substring> because Regex is not Sendable
-    public enum Regex_Regex: Sendable, Equatable { case Regex_Regex(String) }
+    // when constructing, always validate with .regex
+    public enum Regex_Regex: Sendable, Equatable {
+        case Regex_Regex(patternString: String, ignoresCase: Bool, anchorsMatchLineEndings: Bool)
+
+        public var regex: Regex<AnyRegexOutput>? {
+            switch self {
+            case let .Regex_Regex(
+                patternString: patternString,
+                ignoresCase: ignoresCase,
+                anchorsMatchLineEndings: anchorsMatchLineEndings
+            ):
+                do {
+                    let patternRegex: Regex<AnyRegexOutput> = try Regex(patternString)
+                    return .some(
+                        patternRegex
+                            .ignoresCase(ignoresCase)
+                            .anchorsMatchLineEndings(anchorsMatchLineEndings)
+                    )
+                } catch {
+                    return .none
+                }
+            }
+        }
+    }
 
     public enum Generated_caseInsensitive_multiline<caseInsensitive: Sendable, multiline: Sendable>:
         Sendable
@@ -2207,7 +2230,7 @@ public enum Elm {
         }
         var multiline: multiline {
             switch self {
-            case let .Record(_, result, ): result
+            case let .Record(_, result): result
             }
         }
     }
@@ -2241,67 +2264,188 @@ public enum Elm {
     }
     public typealias Regex_Match =
         Generated_index_match_number_submatches<
-            Int,
+            Double,
             String,
-            Int,
+            Double,
             List_List<(Maybe_Maybe<String>)>
         >
 
-    public static let Regex_never: Regex_Regex = .Regex_Regex("/.^/")
+    public static let Regex_never: Regex_Regex = .Regex_Regex(
+        patternString: "/.^/",
+        ignoresCase: false,
+        anchorsMatchLineEndings: false
+    )
     @Sendable public static func Regex_fromString(_ string: String) -> Maybe_Maybe<Regex_Regex> {
-        do {
-            try _ = Regex(string)
-            return .Maybe_Just(.Regex_Regex(string))
-        } catch {
-            return .Maybe_Nothing
+        Regex_fromStringWith(.Record(caseInsensitive: false, multiline: false), string)
+    }
+    @Sendable public static func Regex_fromStringWith(_ options: Regex_Options, _ string: String)
+        -> Maybe_Maybe<Regex_Regex>
+    {
+        let regexInfo: Regex_Regex = .Regex_Regex(
+            patternString: string,
+            ignoresCase: options.caseInsensitive,
+            anchorsMatchLineEndings: options.multiline
+        )
+        return switch regexInfo.regex {
+        case .some(_): .Maybe_Just(regexInfo)
+        case .none: .Maybe_Nothing
         }
     }
-    @Sendable public static func Regex_contains(_ regex: Regex_Regex) -> (String) -> Bool {
-        { string in
-            switch regex {
-            case let .Regex_Regex(regexString):
-                do {
-                    return try string.contains(Regex(regexString))
-                } catch {
-                    return false
+    @Sendable public static func Regex_contains(_ regex: Regex_Regex, _ string: String) -> Bool {
+        switch regex.regex {
+        case let .some(swiftRegex):
+            string.contains(swiftRegex)
+        case .none:
+            false
+        }
+    }
+
+    static func toRegexMatch(
+        _ match: Regex<AnyRegexOutput>.Match,
+        matchIndex1Based: Int,
+        in string: String
+    )
+        -> Regex_Match
+    {
+        .Record(
+            index: Double(match.range.lowerBound.utf16Offset(in: string)),
+            match: String(match.0),
+            number: Double(matchIndex1Based),
+            submatches: Array_mapToList(
+                { submatch in
+                    switch submatch.substring {
+                    case .none: .Maybe_Nothing
+                    case let .some(submatchSubstring):
+                        .Maybe_Just(String(submatchSubstring))
+                    }
+                },
+                Array(match.output)
+            )
+        )
+    }
+    @Sendable public static func Regex_replace(
+        _ regexInfo: Regex_Regex,
+        _ matchToReplacementString: (Regex_Match) -> String,
+        _ string: String
+    ) -> String {
+        switch regexInfo.regex {
+        case .none: return string
+        case let .some(regex):
+            // we rely on the fact that String.replacing
+            // looks for matches from the start to the end in order
+            var matchIndex1Based: Int = 1
+            return string.replacing(
+                regex,
+                with: { (match: Regex<AnyRegexOutput>.Match) -> String in
+                    let matchToReplace: Regex_Match =
+                        toRegexMatch(
+                            match,
+                            matchIndex1Based: matchIndex1Based,
+                            in: string
+                        )
+                    matchIndex1Based = matchIndex1Based + 1
+                    return matchToReplacementString(matchToReplace)
                 }
-            }
+            )
         }
     }
-    @Sendable public static func Regex_split(_ regex: Regex_Regex, _ string: String)
+    @Sendable public static func Regex_replaceAtMost(
+        _ maxOccurrences: Double,
+        _ regexInfo: Regex_Regex,
+        _ matchToReplacementString: (Regex_Match) -> String,
+        _ string: String
+    ) -> String {
+        switch regexInfo.regex {
+        case .none: return string
+        case let .some(regex):
+            // we rely on the fact that String.replacing
+            // looks for matches from the start to the end in order
+            var matchIndex1Based = 1
+            return string.replacing(
+                regex,
+                maxReplacements: Int(maxOccurrences),
+                with: { (match: Regex<AnyRegexOutput>.Match) -> String in
+                    let matchToReplace: Regex_Match =
+                        toRegexMatch(
+                            match,
+                            matchIndex1Based: matchIndex1Based,
+                            in: string
+                        )
+                    matchIndex1Based = matchIndex1Based + 1
+                    return matchToReplacementString(matchToReplace)
+                }
+            )
+        }
+    }
+    @Sendable public static func Regex_find(_ regexInfo: Regex_Regex, _ string: String)
+        -> List_List<Regex_Match>
+    {
+        switch regexInfo.regex {
+        case .none: .List_Empty
+        case let .some(regex):
+            Array_toList(
+                string.matches(of: regex).enumerated()
+                    .map({ (matchIndex0Based, match: Regex.Match) in
+                        toRegexMatch(
+                            match,
+                            matchIndex1Based: 1 + matchIndex0Based,
+                            in: string
+                        )
+                    })
+            )
+        }
+    }
+    @Sendable public static func Regex_findAtMost(
+        _ maxOccurrences: Double,
+        _ regexInfo: Regex_Regex,
+        _ string: String
+    )
+        -> List_List<Regex_Match>
+    {
+        switch regexInfo.regex {
+        case .none: .List_Empty
+        case let .some(regex):
+            Array_toList(
+                // TODO optimize (as in really only match up until that point)
+                string.matches(of: regex).prefix(Int(maxOccurrences)).enumerated()
+                    .map({ (matchIndex0Based, match: Regex.Match) in
+                        toRegexMatch(
+                            match,
+                            matchIndex1Based: 1 + matchIndex0Based,
+                            in: string
+                        )
+                    })
+            )
+        }
+    }
+    @Sendable public static func Regex_split(_ regexInfo: Regex_Regex, _ string: String)
         -> List_List<String>
     {
-        switch regex {
-        case let .Regex_Regex(regexString):
-            do {
-                return try Array_mapToList(
-                    { sub in String(sub) },
-                    string.split(separator: Regex(regexString))
-                )
-            } catch {
-                return List_singleton(string)
-            }
+        switch regexInfo.regex {
+        case .none: List_singleton(string)
+        case let .some(regex):
+            Array_mapToList(
+                { sub in String(sub) },
+                string.split(separator: regex)
+            )
         }
     }
 
     @Sendable public static func Regex_splitAtMost(
         _ maxSplitCount: Double,
-        _ regex: Regex_Regex,
+        _ regexInfo: Regex_Regex,
         _ string: String
     ) -> List_List<String> {
-        switch regex {
-        case let .Regex_Regex(regexString):
-            do {
-                return try Array_mapToList(
-                    String.init,
-                    string.split(
-                        separator: Regex(regexString),
-                        maxSplits: Int(maxSplitCount)
-                    )
+        switch regexInfo.regex {
+        case .none: List_singleton(string)
+        case let .some(regex):
+            Array_mapToList(
+                String.init,
+                string.split(
+                    separator: regex,
+                    maxSplits: Int(maxSplitCount)
                 )
-            } catch {
-                return List_singleton(string)
-            }
+            )
         }
     }
 
