@@ -2630,6 +2630,213 @@ public enum Elm {
         Double(bytes.count)
     }
 
+    public enum BytesEncode_Encoder: Sendable, Equatable {
+        case BytesEncode_I8(Int8)
+        case BytesEncode_I16(Bytes_Endianness, Int16)
+        case BytesEncode_I32(Bytes_Endianness, Int32)
+        case BytesEncode_U8(UInt8)
+        case BytesEncode_U16(Bytes_Endianness, UInt16)
+        case BytesEncode_U32(Bytes_Endianness, UInt32)
+        case BytesEncode_F32(Bytes_Endianness, Float32)
+        case BytesEncode_F64(Bytes_Endianness, Float64)
+        case BytesEncode_Seq([BytesEncode_Encoder])
+        case BytesEncode_Utf8(String)
+        case BytesEncode_Bytes(Bytes_Bytes)
+    }
+    @Sendable public static func BytesEncode_EncoderByteCount(_ encoder: BytesEncode_Encoder) -> Int
+    {
+        var combinedByteCount: Int = 0
+        var encodersRemainingUnordered: [BytesEncode_Encoder] = [encoder]
+        while !encodersRemainingUnordered.isEmpty {
+            switch encodersRemainingUnordered.popLast() {
+            // should have been caught by while condition
+            case .none:
+                return combinedByteCount
+            case let .some(nextEncoder):
+                switch nextEncoder {
+                case .BytesEncode_I8(_):
+                    combinedByteCount = combinedByteCount + 1
+                case .BytesEncode_I16(_, _):
+                    combinedByteCount = combinedByteCount + 2
+                case .BytesEncode_I32(_, _):
+                    combinedByteCount = combinedByteCount + 4
+                case .BytesEncode_U8(_):
+                    combinedByteCount = combinedByteCount + 1
+                case .BytesEncode_U16(_, _):
+                    combinedByteCount = combinedByteCount + 2
+                case .BytesEncode_U32(_, _):
+                    combinedByteCount = combinedByteCount + 4
+                case .BytesEncode_F32(_, _):
+                    combinedByteCount = combinedByteCount + 4
+                case .BytesEncode_F64(_, _):
+                    combinedByteCount = combinedByteCount + 8
+                case let .BytesEncode_Seq(encoders):
+                    encodersRemainingUnordered.append(contentsOf: encoders)
+                case let .BytesEncode_Utf8(string):
+                    combinedByteCount =
+                        combinedByteCount + string.lengthOfBytes(using: String.Encoding.utf8)
+                case let .BytesEncode_Bytes(bytes):
+                    combinedByteCount = combinedByteCount + bytes.count
+                }
+            }
+        }
+        return combinedByteCount
+    }
+    @Sendable public static func BytesEncode_getStringWidth(_ string: String) -> Double {
+        Double(string.lengthOfBytes(using: String.Encoding.utf8))
+    }
+    @Sendable public static func BytesEncode_signedInt8(_ value: Double)
+        -> BytesEncode_Encoder
+    {
+        .BytesEncode_I8(Int8(value))
+    }
+    @Sendable public static func BytesEncode_signedInt16(
+        _ endianness: Bytes_Endianness,
+        _ value: Double
+    )
+        -> BytesEncode_Encoder
+    {
+        .BytesEncode_I16(endianness, Int16(value))
+    }
+    @Sendable public static func BytesEncode_signedInt32(
+        _ endianness: Bytes_Endianness,
+        _ value: Double
+    )
+        -> BytesEncode_Encoder
+    {
+        .BytesEncode_I32(endianness, Int32(value))
+    }
+    @Sendable public static func BytesEncode_unsignedInt8(_ value: Double)
+        -> BytesEncode_Encoder
+    {
+        .BytesEncode_U8(UInt8(value))
+    }
+    @Sendable public static func BytesEncode_unsignedInt16(
+        _ endianness: Bytes_Endianness,
+        _ value: Double
+    )
+        -> BytesEncode_Encoder
+    {
+        .BytesEncode_U16(endianness, UInt16(value))
+    }
+    @Sendable public static func BytesEncode_unsignedInt32(
+        _ endianness: Bytes_Endianness,
+        _ value: Double
+    )
+        -> BytesEncode_Encoder
+    {
+        .BytesEncode_U32(endianness, UInt32(value))
+    }
+    @Sendable public static func BytesEncode_float32(
+        _ endianness: Bytes_Endianness,
+        _ value: Double
+    )
+        -> BytesEncode_Encoder
+    {
+        .BytesEncode_F32(endianness, Float32(value))
+    }
+    @Sendable public static func BytesEncode_float64(
+        _ endianness: Bytes_Endianness,
+        _ value: Double
+    )
+        -> BytesEncode_Encoder
+    {
+        .BytesEncode_F64(endianness, value)
+    }
+    @Sendable public static func BytesEncode_bytes(
+        _ endianness: Bytes_Endianness,
+        _ value: Bytes_Bytes
+    )
+        -> BytesEncode_Encoder
+    {
+        .BytesEncode_Bytes(value)
+    }
+    @Sendable public static func BytesEncode_string(_ value: String)
+        -> BytesEncode_Encoder
+    {
+        .BytesEncode_Utf8(value)
+    }
+    @Sendable public static func BytesEncode_sequence(
+        _ encodersInSequence: List_List<BytesEncode_Encoder>
+    )
+        -> BytesEncode_Encoder
+    {
+        .BytesEncode_Seq(Array_fromList(encodersInSequence))
+    }
+
+    static func toBytes<a>(_ value: a) -> Bytes_Bytes {
+        withUnsafeBytes(of: value, Array.init)
+    }
+    @Sendable public static func BytesEncode_encode(_ encoder: BytesEncode_Encoder) -> Bytes_Bytes {
+        var bytesBuffer: Bytes_Bytes = []
+        bytesBuffer.reserveCapacity(BytesEncode_EncoderByteCount(encoder))
+        var encodersRemainingStack: [BytesEncode_Encoder] = [encoder]
+        while !encodersRemainingStack.isEmpty {
+            switch encodersRemainingStack.popLast() {
+            // should have been caught by while condition
+            case .none:
+                return bytesBuffer
+            case let .some(nextEncoder):
+                switch nextEncoder {
+                case let .BytesEncode_I8(i8):
+                    bytesBuffer.append(contentsOf: toBytes(i8))
+                case let .BytesEncode_I16(endianness, i16):
+                    switch endianness {
+                    case .Bytes_BE:
+                        bytesBuffer.append(contentsOf: toBytes(i16.bigEndian))
+                    case .Bytes_LE:
+                        bytesBuffer.append(contentsOf: toBytes(i16.littleEndian))
+                    }
+                case let .BytesEncode_I32(endianness, i32):
+                    switch endianness {
+                    case .Bytes_BE:
+                        bytesBuffer.append(contentsOf: toBytes(i32.bigEndian))
+                    case .Bytes_LE:
+                        bytesBuffer.append(contentsOf: toBytes(i32.littleEndian))
+                    }
+                case let .BytesEncode_U8(u8):
+                    bytesBuffer.append(u8)
+                case let .BytesEncode_U16(endianness, u16):
+                    switch endianness {
+                    case .Bytes_BE:
+                        bytesBuffer.append(contentsOf: toBytes(u16.bigEndian))
+                    case .Bytes_LE:
+                        bytesBuffer.append(contentsOf: toBytes(u16.littleEndian))
+                    }
+                case let .BytesEncode_U32(endianness, u32):
+                    switch endianness {
+                    case .Bytes_BE:
+                        bytesBuffer.append(contentsOf: toBytes(u32.bigEndian))
+                    case .Bytes_LE:
+                        bytesBuffer.append(contentsOf: toBytes(u32.littleEndian))
+                    }
+                case let .BytesEncode_F32(endianness, f32):
+                    switch endianness {
+                    case .Bytes_BE:
+                        bytesBuffer.append(contentsOf: toBytes(f32.bitPattern.bigEndian))
+                    case .Bytes_LE:
+                        bytesBuffer.append(contentsOf: toBytes(f32.bitPattern.littleEndian))
+                    }
+                case let .BytesEncode_F64(endianness, f64):
+                    switch endianness {
+                    case .Bytes_BE:
+                        bytesBuffer.append(contentsOf: toBytes(f64.bitPattern.bigEndian))
+                    case .Bytes_LE:
+                        bytesBuffer.append(contentsOf: toBytes(f64.bitPattern.littleEndian))
+                    }
+                case let .BytesEncode_Seq(encodersToAppend):
+                    encodersRemainingStack =
+                        encodersRemainingStack + encodersToAppend.reversed()
+                case let .BytesEncode_Utf8(utf8String):
+                    bytesBuffer.append(contentsOf: Array(Data(utf8String.utf8)))
+                case let .BytesEncode_Bytes(bytes):
+                    bytesBuffer.append(contentsOf: bytes)
+                }
+            }
+        }
+        return bytesBuffer
+    }
+
     public enum PlatformCmd_CmdSingle<event: Sendable>: Sendable {
         case PlatformCmd_PortOutgoing(name: String, value: JsonEncode_Value)
     }
