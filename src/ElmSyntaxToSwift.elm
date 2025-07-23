@@ -3788,7 +3788,6 @@ typeConstructReferenceToCoreSwift reference =
                     Nothing
 
         "Bytes.Decode" ->
-            -- TODO
             case reference.name of
                 "Decoder" ->
                     Just { moduleOrigin = Nothing, name = "BytesDecode_Decoder" }
@@ -4913,7 +4912,6 @@ referenceToCoreSwift reference =
                     Nothing
 
         "Bytes.Decode" ->
-            -- TODO
             case reference.name of
                 "Loop" ->
                     Just { moduleOrigin = Nothing, name = "BytesDecode_Loop" }
@@ -31959,6 +31957,369 @@ static func toBytes<a>(_ value: a) -> Bytes_Bytes {
         }
     }
     return bytesBuffer
+}
+
+public struct BytesDecode_Decoder<value: Sendable>: Sendable {
+    let decode:
+        @Sendable (_ index: Int, _ bytes: Bytes_Bytes)
+            -> (index: Int, value: value)?
+}
+public enum BytesDecode_Step<state: Sendable, a: Sendable>: Sendable {
+    case BytesDecode_Loop(state)
+    case BytesDecode_Done(a)
+}
+
+@Sendable public static func BytesDecode_decode<value>(
+    _ decoder: BytesDecode_Decoder<value>,
+    _ bytes: Bytes_Bytes
+)
+    -> Maybe_Maybe<value>
+{
+    switch decoder.decode(0, bytes) {
+    case .none: .Maybe_Nothing
+    case let .some(finalState):
+        .Maybe_Just(finalState.value)
+    }
+}
+@Sendable public static func BytesDecode_succeed<value>(_ value: value)
+    -> BytesDecode_Decoder<value>
+{
+    BytesDecode_Decoder(decode: { startIndex, _ in
+        (startIndex, value)
+    })
+}
+@Sendable public static func BytesDecode_fail<value>()
+    -> BytesDecode_Decoder<value>
+{
+    BytesDecode_Decoder(decode: { _, _ in .none })
+}
+@Sendable public static func BytesDecode_andThen<a, b>(
+    _ valueToFollowupDecoder: @escaping @Sendable (a) -> BytesDecode_Decoder<b>,
+    _ decoder: BytesDecode_Decoder<a>
+)
+    -> BytesDecode_Decoder<b>
+{
+    BytesDecode_Decoder(decode: { startIndex, bytes in
+        decoder.decode(startIndex, bytes)
+            .flatMap({ endIndex, value in
+                valueToFollowupDecoder(value).decode(endIndex, bytes)
+            })
+    })
+}
+@Sendable public static func BytesDecode_map<a, b>(
+    _ valueChange: @escaping @Sendable (a) -> b,
+    _ decoder: BytesDecode_Decoder<a>
+)
+    -> BytesDecode_Decoder<b>
+{
+    BytesDecode_Decoder(decode: { startIndex, bytes in
+        decoder.decode(startIndex, bytes)
+            .map({ endIndex, value in (endIndex, valueChange(value)) })
+    })
+}
+@Sendable public static func BytesDecode_map2<a, b, combined>(
+    _ valueCombine: @escaping @Sendable (a) -> (b) -> combined,
+    _ aDecoder: BytesDecode_Decoder<a>,
+    _ bDecoder: BytesDecode_Decoder<b>
+)
+    -> BytesDecode_Decoder<combined>
+{
+    BytesDecode_Decoder(decode: { startIndex, bytes in
+        aDecoder.decode(startIndex, bytes)
+            .flatMap({ indexAfterA, a in
+                bDecoder.decode(indexAfterA, bytes)
+                    .map({ indexAfterB, b in
+                        (indexAfterB, valueCombine(a)(b))
+                    })
+            })
+    })
+}
+@Sendable public static func BytesDecode_map3<a, b, c, combined>(
+    _ valueCombine: @escaping @Sendable (a) -> (b) -> (c) -> combined,
+    _ aDecoder: BytesDecode_Decoder<a>,
+    _ bDecoder: BytesDecode_Decoder<b>,
+    _ cDecoder: BytesDecode_Decoder<c>
+)
+    -> BytesDecode_Decoder<combined>
+{
+    BytesDecode_Decoder(decode: { startIndex, bytes in
+        aDecoder.decode(startIndex, bytes)
+            .flatMap({ indexAfterA, a in
+                bDecoder.decode(indexAfterA, bytes)
+                    .flatMap({ indexAfterB, b in
+                        cDecoder.decode(indexAfterB, bytes)
+                            .map({ indexAfterC, c in
+                                (indexAfterC, valueCombine(a)(b)(c))
+                            })
+                    })
+            })
+    })
+}
+@Sendable public static func BytesDecode_map4<a, b, c, d, combined>(
+    _ valueCombine: @escaping @Sendable (a) -> (b) -> (c) -> (d) -> combined,
+    _ aDecoder: BytesDecode_Decoder<a>,
+    _ bDecoder: BytesDecode_Decoder<b>,
+    _ cDecoder: BytesDecode_Decoder<c>,
+    _ dDecoder: BytesDecode_Decoder<d>
+)
+    -> BytesDecode_Decoder<combined>
+{
+    BytesDecode_Decoder(decode: { startIndex, bytes in
+        aDecoder.decode(startIndex, bytes)
+            .flatMap({ indexAfterA, a in
+                bDecoder.decode(indexAfterA, bytes)
+                    .flatMap({ indexAfterB, b in
+                        cDecoder.decode(indexAfterB, bytes)
+                            .flatMap({ indexAfterC, c in
+                                dDecoder.decode(indexAfterC, bytes)
+                                    .map({ indexAfterD, d in
+                                        (indexAfterD, valueCombine(a)(b)(c)(d))
+                                    })
+                            })
+                    })
+            })
+    })
+}
+@Sendable public static func BytesDecode_map5<a, b, c, d, e, combined>(
+    _ valueCombine: @escaping @Sendable (a) -> (b) -> (c) -> (d) -> (e) -> combined,
+    _ aDecoder: BytesDecode_Decoder<a>,
+    _ bDecoder: BytesDecode_Decoder<b>,
+    _ cDecoder: BytesDecode_Decoder<c>,
+    _ dDecoder: BytesDecode_Decoder<d>,
+    _ eDecoder: BytesDecode_Decoder<e>
+)
+    -> BytesDecode_Decoder<combined>
+{
+    BytesDecode_Decoder(decode: { startIndex, bytes in
+        aDecoder.decode(startIndex, bytes)
+            .flatMap({ indexAfterA, a in
+                bDecoder.decode(indexAfterA, bytes)
+                    .flatMap({ indexAfterB, b in
+                        cDecoder.decode(indexAfterB, bytes)
+                            .flatMap({ indexAfterC, c in
+                                dDecoder.decode(indexAfterC, bytes)
+                                    .flatMap({ indexAfterD, d in
+                                        eDecoder.decode(indexAfterD, bytes)
+                                            .map({ indexAfterE, e in
+                                                (indexAfterE, valueCombine(a)(b)(c)(d)(e))
+                                            })
+                                    })
+                            })
+                    })
+            })
+    })
+}
+@Sendable public static func BytesDecode_loop<state, a>(
+    _ initialState: state,
+    _ step: @escaping @Sendable (state) -> BytesDecode_Decoder<BytesDecode_Step<state, a>>
+)
+    -> BytesDecode_Decoder<a>
+{
+    BytesDecode_Decoder(decode: { startIndex, bytes in
+        BytesDecode_loopFunction(initialState, step, startIndex: startIndex, bytes: bytes)
+    })
+}
+@Sendable public static func BytesDecode_loopFunction<state, a>(
+    _ initialState: state,
+    _ step: @escaping @Sendable (state) -> BytesDecode_Decoder<BytesDecode_Step<state, a>>,
+    startIndex: Int,
+    bytes: Bytes_Bytes
+)
+    -> (index: Int, value: a)?
+{
+    switch step(initialState).decode(startIndex, bytes) {
+    case .none: .none
+    case let .some((index: indexAfterStep, value: stepValue)):
+        switch stepValue {
+        case let .BytesDecode_Done(result):
+            .some((index: indexAfterStep, value: result))
+        case let .BytesDecode_Loop(newState):
+            BytesDecode_loopFunction(newState, step, startIndex: indexAfterStep, bytes: bytes)
+        }
+    }
+}
+
+@Sendable public static func BytesDecode_signedInt8(_ endianness: Bytes_Endianness)
+    -> BytesDecode_Decoder<Double>
+{
+    BytesDecode_Decoder(decode: { index, bytes in
+        let indexAfter: Int = index + 1
+        return if indexAfter > bytes.count {
+            .none
+        } else {
+            .some((index: indexAfter, value: Double(Int8(bitPattern: bytes[index]))))
+        }
+    })
+}
+@Sendable public static func BytesDecode_signedInt16(_ endianness: Bytes_Endianness)
+    -> BytesDecode_Decoder<Double>
+{
+    BytesDecode_Decoder(decode: { index, bytes in
+        let indexAfter: Int = index + 2
+        if indexAfter > bytes.count {
+            return .none
+        } else {
+            let valueRaw: Int16 = bytes.withUnsafeBytes({ b in
+                b.load(fromByteOffset: index, as: Int16.self)
+            })
+            let valueCorrectedForEndianness: Int16 =
+                switch endianness {
+                case .Bytes_BE: Int16(bigEndian: valueRaw)
+                case .Bytes_LE: Int16(littleEndian: valueRaw)
+                }
+            return .some((index: indexAfter, value: Double(valueCorrectedForEndianness)))
+        }
+    })
+}
+@Sendable public static func BytesDecode_signedInt32(_ endianness: Bytes_Endianness)
+    -> BytesDecode_Decoder<Double>
+{
+    BytesDecode_Decoder(decode: { index, bytes in
+        let indexAfter: Int = index + 4
+        if indexAfter > bytes.count {
+            return .none
+        } else {
+            let valueRaw: Int32 = bytes.withUnsafeBytes({ b in
+                b.load(fromByteOffset: index, as: Int32.self)
+            })
+            let valueCorrectedForEndianness: Int32 =
+                switch endianness {
+                case .Bytes_BE: Int32(bigEndian: valueRaw)
+                case .Bytes_LE: Int32(littleEndian: valueRaw)
+                }
+            return .some((index: indexAfter, value: Double(valueCorrectedForEndianness)))
+        }
+    })
+}
+@Sendable public static func BytesDecode_unsignedInt8(_ endianness: Bytes_Endianness)
+    -> BytesDecode_Decoder<Double>
+{
+    BytesDecode_Decoder(decode: { index, bytes in
+        let indexAfter: Int = index + 1
+        return if indexAfter > bytes.count {
+            .none
+        } else {
+            .some((index: indexAfter, value: Double(bytes[index])))
+        }
+    })
+}
+@Sendable public static func BytesDecode_unsignedInt16(_ endianness: Bytes_Endianness)
+    -> BytesDecode_Decoder<Double>
+{
+    BytesDecode_Decoder(decode: { index, bytes in
+        let indexAfter: Int = index + 2
+        if indexAfter > bytes.count {
+            return .none
+        } else {
+            let valueRaw: UInt16 = bytes.withUnsafeBytes({ b in
+                b.load(fromByteOffset: index, as: UInt16.self)
+            })
+            let valueCorrectedForEndianness: UInt16 =
+                switch endianness {
+                case .Bytes_BE: UInt16(bigEndian: valueRaw)
+                case .Bytes_LE: UInt16(littleEndian: valueRaw)
+                }
+            return .some((index: indexAfter, value: Double(valueCorrectedForEndianness)))
+        }
+    })
+}
+@Sendable public static func BytesDecode_unsignedInt32(_ endianness: Bytes_Endianness)
+    -> BytesDecode_Decoder<Double>
+{
+    BytesDecode_Decoder(decode: { index, bytes in
+        let indexAfter: Int = index + 4
+        if indexAfter > bytes.count {
+            return .none
+        } else {
+            let valueRaw: UInt32 = bytes.withUnsafeBytes({ b in
+                b.load(fromByteOffset: index, as: UInt32.self)
+            })
+            let valueCorrectedForEndianness: UInt32 =
+                switch endianness {
+                case .Bytes_BE: UInt32(bigEndian: valueRaw)
+                case .Bytes_LE: UInt32(littleEndian: valueRaw)
+                }
+            return .some((index: indexAfter, value: Double(valueCorrectedForEndianness)))
+        }
+    })
+}
+@Sendable public static func BytesDecode_unsignedFloat32(_ endianness: Bytes_Endianness)
+    -> BytesDecode_Decoder<Double>
+{
+    BytesDecode_Decoder(decode: { index, bytes in
+        let indexAfter: Int = index + 4
+        if indexAfter > bytes.count {
+            return .none
+        } else {
+            let valueRaw: UInt32 = bytes.withUnsafeBytes({ b in
+                b.load(fromByteOffset: index, as: UInt32.self)
+            })
+            let valueCorrectedForEndianness: Float32 =
+                switch endianness {
+                case .Bytes_BE: Float32(bitPattern: UInt32(bigEndian: valueRaw))
+                case .Bytes_LE: Float32(bitPattern: UInt32(littleEndian: valueRaw))
+                }
+            return .some((index: indexAfter, value: Double(valueCorrectedForEndianness)))
+        }
+    })
+}
+@Sendable public static func BytesDecode_unsignedFloat64(_ endianness: Bytes_Endianness)
+    -> BytesDecode_Decoder<Double>
+{
+    BytesDecode_Decoder(decode: { index, bytes in
+        let indexAfter: Int = index + 8
+        if indexAfter > bytes.count {
+            return .none
+        } else {
+            let valueRaw: UInt64 = bytes.withUnsafeBytes({ b in
+                b.load(fromByteOffset: index, as: UInt64.self)
+            })
+            let valueCorrectedForEndianness: Float64 =
+                switch endianness {
+                case .Bytes_BE: Float64(bitPattern: UInt64(bigEndian: valueRaw))
+                case .Bytes_LE: Float64(bitPattern: UInt64(littleEndian: valueRaw))
+                }
+            return .some((index: indexAfter, value: Double(valueCorrectedForEndianness)))
+        }
+    })
+}
+@Sendable public static func BytesDecode_bytes(_ count: Double)
+    -> BytesDecode_Decoder<Bytes_Bytes>
+{
+    BytesDecode_Decoder(decode: { index, bytes in
+        let indexAfter: Int = index + Int(count)
+        return if indexAfter > bytes.count {
+            .none
+        } else {
+            .some(
+                (
+                    index: indexAfter,
+                    value: Array(bytes[index..<indexAfter])
+                )
+            )
+        }
+    })
+}
+@Sendable public static func BytesDecode_string(_ utf8Count: Double)
+    -> BytesDecode_Decoder<String>
+{
+    BytesDecode_Decoder(decode: { index, bytes -> (index: Int, value: String)? in
+        let indexAfter: Int = index + Int(utf8Count)
+        return if indexAfter > bytes.count {
+            .none
+        } else {
+            String(
+                bytes: bytes[index..<indexAfter],
+                encoding: String.Encoding.utf8
+            )
+            .map({ value in
+                (
+                    index: indexAfter,
+                    value: value
+                )
+            })
+        }
+    })
 }
 
 public enum PlatformCmd_CmdSingle<event: Sendable>: Sendable {
