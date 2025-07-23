@@ -29483,7 +29483,7 @@ public static let Basics_e: Double = exp(1.0)
 
 
 @Sendable public static func Char_fromCode(_ charCode: Double) -> UnicodeScalar {
-    UnicodeScalar(Int(charCode)) ?? "\0"
+    UnicodeScalar(Int(charCode)) ?? "\\0"
 }
 
 @Sendable public static func Char_isHexDigit(_ char: UnicodeScalar) -> Bool {
