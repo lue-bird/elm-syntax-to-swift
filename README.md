@@ -38,7 +38,7 @@ public enum Elm {
 
 -   not supported are
     -   ports that use non-json values like `port sendMessage : String -> Cmd msg`, glsl
-    -   `elm/file`, `elm/http`, `elm/browser`, `elm-explorations/markdown`, `elm-explorations/webgl`, `elm-explorations/benchmark` (for the moment also `elm/virtual-dom` and `elm/random`)
+    -   `elm/file`, `elm/http`, `elm/browser`, `elm-explorations/markdown`, `elm-explorations/webgl`, `elm-explorations/benchmark` (for the moment also `elm/random`)
     -   `Task`, `Process`, `Platform.Task`, `Platform.ProcessId`, `Platform.Router`, `Platform.sendToApp`, `Platform.sendToSelf`, `Random.generate`, `Time.now`, `Time.every`, `Time.here`, `Time.getZoneName`, `Bytes.getHostEndianness`, `Math.Matrix4` (due to swift's standard library not exposing many [simd types and operations available in apple's SDK](https://developer.apple.com/documentation/simd/simd_double4x4))
     -   extensible record types outside of module-level value/function declarations. For example, these declarations might not work:
         ```elm

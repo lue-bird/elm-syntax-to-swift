@@ -3803,7 +3803,6 @@ typeConstructReferenceToCoreSwift reference =
             Just { moduleOrigin = Nothing, name = "BytesEncode_Encoder" }
 
         "VirtualDom" ->
-            -- TODO
             case reference.name of
                 "Node" ->
                     Just { moduleOrigin = Nothing, name = "VirtualDom_Node" }
@@ -5053,7 +5052,6 @@ referenceToCoreSwift reference =
                     Nothing
 
         "Elm.Kernel.VirtualDom" ->
-            -- TODO
             case reference.name of
                 "property" ->
                     Just { moduleOrigin = Nothing, name = "VirtualDom_property" }
@@ -5080,7 +5078,6 @@ referenceToCoreSwift reference =
                     Nothing
 
         "VirtualDom" ->
-            -- TODO
             case reference.name of
                 "Normal" ->
                     Just { moduleOrigin = Nothing, name = "VirtualDom_Normal" }
@@ -29481,7 +29478,6 @@ public static let Basics_e: Double = exp(1.0)
     Double(char.value)
 }
 
-
 @Sendable public static func Char_fromCode(_ charCode: Double) -> UnicodeScalar {
     UnicodeScalar(Int(charCode)) ?? "\\0"
 }
@@ -33821,6 +33817,483 @@ private static func surrogatePairToUnicodeScalar(
     }
     return .Triple(
         Double(foundStartOffset ?? -1), Double(row), Double(col)
+    )
+}
+
+@Sendable public static func VirtualDom_noJavaScriptUri(_ uri: String) -> String {
+    switch uri.wholeMatch(of: #/^\\s*j\\s*a\\s*v\\s*a\\s*s\\s*c\\s*r\\s*i\\s*p\\s*t\\s*:/#.ignoresCase()) {
+    case .some(_): ""
+    case .none:
+        uri
+    }
+}
+
+@Sendable public static func VirtualDom_noJavaScriptOrHtmlUri(uri: String) -> String {
+    switch uri.wholeMatch(
+        of:
+            #/^\\s*(j\\s*a\\s*v\\s*a\\s*s\\s*c\\s*r\\s*i\\s*p\\s*t\\s*:|d\\s*a\\s*t\\s*a\\s*:\\s*t\\s*e\\s*x\\s*t\\s*\\/\\s*h\\s*t\\s*m\\s*l\\s*(,|;))/#
+            .ignoresCase()
+    )
+    {
+    case .some(_): ""
+    case .none:
+        uri
+    }
+}
+
+public enum Generated_message_preventDefault_stopPropagation<
+    message: Sendable, preventDefault: Sendable, stopPropagation: Sendable
+>: Sendable {
+    case Record(
+        message: message, preventDefault: preventDefault, stopPropagation: stopPropagation)
+    var message: message {
+        switch self {
+        case let .Record(result, _, _): result
+        }
+    }
+    var preventDefault: preventDefault {
+        switch self {
+        case let .Record(_, result, _): result
+        }
+    }
+    var stopPropagation: stopPropagation {
+        switch self {
+        case let .Record(_, _, result): result
+        }
+    }
+}
+
+public typealias VirtualDom_CustomHandledEvent<event> =
+    Generated_message_preventDefault_stopPropagation<event, Bool, Bool>
+
+public enum VirtualDom_Handler<event: Sendable>: Sendable {
+    case VirtualDom_Normal(JsonDecode_Decoder<event>)
+    case VirtualDom_MayStopPropagation(JsonDecode_Decoder<Tuple<event, Bool>>)
+    case VirtualDom_MayPreventDefault(JsonDecode_Decoder<Tuple<event, Bool>>)
+    case VirtualDom_Custom(JsonDecode_Decoder<VirtualDom_CustomHandledEvent<event>>)
+}
+
+public indirect enum VirtualDom_Attribute<event: Sendable>: Sendable {
+    case VirtualDom_ModifierAttribute(
+        namespace: String?,
+        key: String,
+        value: String
+    )
+    case VirtualDom_ModifierStyle(key: String, value: String)
+    case VirtualDom_ModifierProperty(
+        key: String,
+        value: JsonDecode_Value
+    )
+    case VirtualDom_ModifierEventListener(
+        name: String,
+        handler: VirtualDom_Handler<event>
+    )
+}
+
+public indirect enum VirtualDom_Node<event: Sendable>: Sendable {
+    case VirtualDom_Text(String)
+    case VirtualDom_Element(
+        tag: String,
+        namespace: String?,
+        subs: List_List<VirtualDom_Node<event>>,
+        modifiers: List_List<VirtualDom_Attribute<event>>
+    )
+    case VirtualDom_ElementKeyed(
+        tag: String,
+        namespace: String?,
+        subs: List_List<Tuple<String, VirtualDom_Node<event>>>,
+        modifiers: List_List<VirtualDom_Attribute<event>>
+    )
+    case VirtualDom_NodeLazy(
+        // to know when to construct:
+        // element-wise check for all pairs with typeErasedEq
+        keys: [any Equatable & Sendable],
+        construct: @Sendable () -> VirtualDom_Node<event>
+    )
+}
+
+@Sendable
+public static func VirtualDom_customHandledEventMap<event: Sendable, eventMapped: Sendable>(
+    _ eventChange: (event) -> eventMapped,
+    _ handledEvent: VirtualDom_CustomHandledEvent<event>
+)
+    -> VirtualDom_CustomHandledEvent<eventMapped>
+{
+    .Record(
+        message: eventChange(handledEvent.message),
+        preventDefault: handledEvent.preventDefault,
+        stopPropagation: handledEvent.stopPropagation
+    )
+}
+
+@Sendable public static func VirtualDom_text<event>(_ string: String) -> VirtualDom_Node<event>
+{
+    .VirtualDom_Text(string)
+}
+
+@Sendable public static func VirtualDom_node<event>(
+    _ tag: String,
+    _ modifiers: List_List<VirtualDom_Attribute<event>>,
+    _ subs: List_List<VirtualDom_Node<event>>
+)
+    -> VirtualDom_Node<event>
+{
+    .VirtualDom_Element(
+        tag: tag,
+        namespace: .none,
+        subs: subs, modifiers: modifiers)
+}
+
+@Sendable public static func VirtualDom_nodeNS<event>(
+    namespace_: String,
+    _ tag: String,
+    _ modifiers: List_List<VirtualDom_Attribute<event>>,
+    _ subs: List_List<VirtualDom_Node<event>>
+)
+    -> VirtualDom_Node<event>
+{
+    .VirtualDom_Element(
+        tag: tag,
+        namespace: .some(namespace_),
+        subs: subs, modifiers: modifiers)
+}
+
+@Sendable public static func VirtualDom_KeyedNode<event>(
+    _ tag: String,
+    _ modifiers: List_List<VirtualDom_Attribute<event>>,
+    _ subs: List_List<Tuple<String, VirtualDom_Node<event>>>
+)
+    -> VirtualDom_Node<event>
+{
+    .VirtualDom_ElementKeyed(
+        tag: tag,
+        namespace: .none,
+        subs: subs, modifiers: modifiers)
+}
+
+@Sendable public static func VirtualDom_KeyedNodeNS<event>(
+    namespace_: String,
+    _ tag: String,
+    _ modifiers: List_List<VirtualDom_Attribute<event>>,
+    _ subs: List_List<Tuple<String, VirtualDom_Node<event>>>
+)
+    -> VirtualDom_Node<event>
+{
+    .VirtualDom_ElementKeyed(
+        tag: tag,
+        namespace: .some(namespace_),
+        subs: subs, modifiers: modifiers)
+}
+
+@Sendable public static func VirtualDom_style<event>(
+    _ key: String,
+    _ value: String
+)
+    -> VirtualDom_Attribute<event>
+{
+    .VirtualDom_ModifierStyle(
+        key: key,
+        value: value)
+}
+
+@Sendable public static func VirtualDom_property<event>(
+    _ key: String,
+    _ value: JsonDecode_Value
+)
+    -> VirtualDom_Attribute<event>
+{
+    .VirtualDom_ModifierProperty(
+        key: key,
+        value: value)
+}
+
+@Sendable public static func VirtualDom_attribute<event>(_ key: String, _ value: String)
+    -> VirtualDom_Attribute<event>
+{
+    .VirtualDom_ModifierAttribute(
+        namespace: .none,
+        key: key,
+        value: value)
+}
+
+@Sendable public static func VirtualDom_attributeNS<event>(
+    _ namespace_: String,
+    _ key: String,
+    _ value: String
+)
+    -> VirtualDom_Attribute<event>
+{
+    .VirtualDom_ModifierAttribute(
+        namespace: .some(namespace_),
+        key: key,
+        value: value)
+}
+@Sendable public static func VirtualDom_on<event>(
+    _ name: String,
+    _ handler: VirtualDom_Handler<event>
+)
+    -> VirtualDom_Attribute<event>
+{
+    .VirtualDom_ModifierEventListener(
+        name: name,
+        handler: handler)
+}
+
+@Sendable public static func VirtualDom_mapAttribute<event, eventMapped>(
+    _ eventChange: @escaping @Sendable (event) -> eventMapped,
+    _ modifier: VirtualDom_Attribute<event>
+)
+    -> VirtualDom_Attribute<eventMapped>
+{
+    switch modifier {
+    case let .VirtualDom_ModifierAttribute(namespace: namespace, key: key, value: value):
+        .VirtualDom_ModifierAttribute(namespace: namespace, key: key, value: value)
+    case let .VirtualDom_ModifierStyle(key: key, value: value):
+        .VirtualDom_ModifierStyle(key: key, value: value)
+    case let .VirtualDom_ModifierProperty(key: key, value: value):
+        .VirtualDom_ModifierProperty(key: key, value: value)
+    case let .VirtualDom_ModifierEventListener(name: name, handler: handler):
+        .VirtualDom_ModifierEventListener(
+            name: name,
+            handler: VirtualDom_handlerMap(eventChange, handler)
+        )
+    }
+}
+static func VirtualDom_handlerMap<event, eventMapped>(
+    _ eventChange: @escaping @Sendable (event) -> eventMapped,
+    _ handler: VirtualDom_Handler<event>
+)
+    -> VirtualDom_Handler<eventMapped>
+{
+    switch handler {
+    case let .VirtualDom_Normal(decoder):
+        .VirtualDom_Normal(JsonDecode_map(eventChange, decoder))
+    case let .VirtualDom_MayStopPropagation(decoder):
+        .VirtualDom_MayStopPropagation(
+            JsonDecode_map(
+                { decoded in
+                    .Tuple(eventChange(decoded.first), decoded.second)
+                },
+                decoder
+            )
+        )
+    case let .VirtualDom_MayPreventDefault(decoder):
+        .VirtualDom_MayPreventDefault(
+            JsonDecode_map(
+                { decoded in
+                    .Tuple(eventChange(decoded.first), decoded.second)
+                },
+                decoder
+            )
+        )
+    case let .VirtualDom_Custom(decoder):
+        .VirtualDom_Custom(
+            JsonDecode_map(
+                { custom in
+                    VirtualDom_customHandledEventMap(eventChange, custom)
+                },
+                decoder
+            )
+        )
+    }
+}
+
+@Sendable public static func VirtualDom_map<event, eventMapped>(
+    _ eventChange: @escaping @Sendable (event) -> eventMapped,
+    _ node: VirtualDom_Node<event>
+)
+    -> VirtualDom_Node<eventMapped>
+{
+    switch node {
+    case let .VirtualDom_Text(text): .VirtualDom_Text(text)
+    case let .VirtualDom_Element(
+        tag: tag, namespace: namespace, subs: subs, modifiers: modifiers):
+        .VirtualDom_Element(
+            tag: tag,
+            namespace: namespace,
+            subs: List_map({ sub in VirtualDom_map(eventChange, sub) }, subs),
+            modifiers:
+                List_map(
+                    { modifier in VirtualDom_mapAttribute(eventChange, modifier) },
+                    modifiers
+                )
+        )
+    case let .VirtualDom_ElementKeyed(
+        tag: tag, namespace: namespace, subs: subs, modifiers: modifiers):
+        .VirtualDom_ElementKeyed(
+            tag: tag,
+            namespace: namespace,
+            subs: List_map(
+                { sub in .Tuple(sub.first, VirtualDom_map(eventChange, sub.second)) },
+                subs),
+            modifiers:
+                List_map(
+                    { modifier in VirtualDom_mapAttribute(eventChange, modifier) },
+                    modifiers
+                )
+        )
+    case let .VirtualDom_NodeLazy(keys: keys, construct: construct):
+        .VirtualDom_NodeLazy(
+            keys: keys,
+            construct: { VirtualDom_map(eventChange, construct()) }
+        )
+    }
+}
+
+@Sendable public static func VirtualDom_lazy<a: Equatable & Sendable, event>(
+    _ construct: @escaping @Sendable (a) -> VirtualDom_Node<event>,
+    _ a: a
+)
+    -> VirtualDom_Node<event>
+{
+    .VirtualDom_NodeLazy(
+        keys: [a],
+        construct: { construct(a) }
+    )
+}
+@Sendable
+public static func VirtualDom_lazy2<a: Equatable & Sendable, b: Equatable & Sendable, event>(
+    _ construct:
+        @escaping @Sendable (a) -> (b) ->
+        VirtualDom_Node<event>,
+    _ a: a,
+    _ b: b
+)
+    -> VirtualDom_Node<event>
+{
+    .VirtualDom_NodeLazy(
+        keys: [a, b],
+        construct: { construct(a)(b) }
+    )
+}
+@Sendable
+public static func VirtualDom_lazy3<
+    a: Equatable & Sendable, b: Equatable & Sendable, c: Equatable & Sendable, event
+>(
+    _ construct:
+        @escaping @Sendable (a) -> (b) -> (c) ->
+        VirtualDom_Node<event>,
+    _ a: a,
+    _ b: b,
+    _ c: c
+)
+    -> VirtualDom_Node<event>
+{
+    .VirtualDom_NodeLazy(
+        keys: [a, b, c],
+        construct: { construct(a)(b)(c) }
+    )
+}
+@Sendable
+public static func VirtualDom_lazy4<
+    a: Equatable & Sendable, b: Equatable & Sendable, c: Equatable & Sendable,
+    d: Equatable & Sendable, event
+>(
+    _ construct:
+        @escaping @Sendable (a) -> (b) -> (c) -> (d) ->
+        VirtualDom_Node<event>,
+    _ a: a,
+    _ b: b,
+    _ c: c,
+    _ d: d
+)
+    -> VirtualDom_Node<event>
+{
+    .VirtualDom_NodeLazy(
+        keys: [a, b, c, d],
+        construct: { construct(a)(b)(c)(d) }
+    )
+}
+@Sendable
+public static func VirtualDom_lazy5<
+    a: Equatable & Sendable, b: Equatable & Sendable, c: Equatable & Sendable,
+    d: Equatable & Sendable, e: Equatable & Sendable, event
+>(
+    _ construct:
+        @escaping @Sendable (a) -> (b) -> (c) -> (d) -> (e) ->
+        VirtualDom_Node<event>,
+    _ a: a,
+    _ b: b,
+    _ c: c,
+    _ d: d,
+    _ e: e
+)
+    -> VirtualDom_Node<event>
+{
+    .VirtualDom_NodeLazy(
+        keys: [a, b, c, d, e],
+        construct: { construct(a)(b)(c)(d)(e) }
+    )
+}
+@Sendable
+public static func VirtualDom_lazy6<
+    a: Equatable & Sendable, b: Equatable & Sendable, c: Equatable & Sendable,
+    d: Equatable & Sendable, e: Equatable & Sendable, f: Equatable & Sendable, event
+>(
+    _ construct:
+        @escaping @Sendable (a) -> (b) -> (c) -> (d) -> (e) -> (f) ->
+        VirtualDom_Node<event>,
+    _ a: a,
+    _ b: b,
+    _ c: c,
+    _ d: d,
+    _ e: e,
+    _ f: f
+)
+    -> VirtualDom_Node<event>
+{
+    .VirtualDom_NodeLazy(
+        keys: [a, b, c, d, e, f],
+        construct: { construct(a)(b)(c)(d)(e)(f) }
+    )
+}
+@Sendable
+public static func VirtualDom_lazy7<
+    a: Equatable & Sendable, b: Equatable & Sendable, c: Equatable & Sendable,
+    d: Equatable & Sendable, e: Equatable & Sendable, f: Equatable & Sendable,
+    g: Equatable & Sendable, event
+>(
+    _ construct:
+        @escaping @Sendable (a) -> (b) -> (c) -> (d) -> (e) -> (f) -> (g) ->
+        VirtualDom_Node<event>,
+    _ a: a,
+    _ b: b,
+    _ c: c,
+    _ d: d,
+    _ e: e,
+    _ f: f,
+    _ g: g
+)
+    -> VirtualDom_Node<event>
+{
+    .VirtualDom_NodeLazy(
+        keys: [a, b, c, d, e, f, g],
+        construct: { construct(a)(b)(c)(d)(e)(f)(g) }
+    )
+}
+@Sendable
+public static func VirtualDom_lazy8<
+    a: Equatable & Sendable, b: Equatable & Sendable, c: Equatable & Sendable,
+    d: Equatable & Sendable, e: Equatable & Sendable, f: Equatable & Sendable,
+    g: Equatable & Sendable, h: Equatable & Sendable, event
+>(
+    _ construct:
+        @escaping @Sendable (a) -> (b) -> (c) -> (d) -> (e) -> (f) -> (g) -> (h) ->
+        VirtualDom_Node<event>,
+    _ a: a,
+    _ b: b,
+    _ c: c,
+    _ d: d,
+    _ e: e,
+    _ f: f,
+    _ g: g,
+    _ h: h
+)
+    -> VirtualDom_Node<event>
+{
+    .VirtualDom_NodeLazy(
+        keys: [a, b, c, d, e, f, g, h],
+        construct: { construct(a)(b)(c)(d)(e)(f)(g)(h) }
     )
 }
 """
