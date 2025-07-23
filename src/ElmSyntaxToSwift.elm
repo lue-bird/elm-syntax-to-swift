@@ -29276,8 +29276,8 @@ public indirect enum List_List<a: Sendable>: Sendable {
 }
 // necessary because elm type variables do not have information about being equatable
 @Sendable public static func Basics_eq<a>(_ a: a, _ b: a) -> Bool {
-    if let a = a as? any Equatable,
-        let b = b as? any Equatable
+    if let a: any Equatable = a as? any Equatable,
+        let b: any Equatable = b as? any Equatable
     {
         typeErasedEq(a, b)
     } else {
@@ -29290,8 +29290,8 @@ public indirect enum List_List<a: Sendable>: Sendable {
 }
 // necessary because elm type variables do not have information about being equatable
 @Sendable public static func Basics_neq<a>(_ a: a, _ b: a) -> Bool {
-    if let a = a as? any Equatable,
-        let b = b as? any Equatable
+    if let a: any Equatable = a as? any Equatable,
+        let b: any Equatable = b as? any Equatable
     {
         typeErasedNeq(a, b)
     } else {
@@ -29300,15 +29300,15 @@ public indirect enum List_List<a: Sendable>: Sendable {
 }
 
 // https://swiftunwrap.com/article/comparing-equatable-using-opened-existentials/
-static func typeErasedEq<A: Equatable, B: Equatable>(_ a: A, _ b: B) -> Bool {
-    if let b = b as? A {
+static func typeErasedEq<a: Equatable, b: Equatable>(_ a: a, _ b: b) -> Bool {
+    if let b: a = b as? a {
         a == b
     } else {
         fatalError("/= on non-Equatable types")
     }
 }
-static func typeErasedNeq<A: Equatable, B: Equatable>(_ a: A, _ b: B) -> Bool {
-    if let b = b as? A {
+static func typeErasedNeq<a: Equatable, b: Equatable>(_ a: a, _ b: b) -> Bool {
+    if let b: a = b as? a {
         a != b
     } else {
         fatalError("/= on non-Equatable types")
@@ -29481,12 +29481,9 @@ public static let Basics_e: Double = exp(1.0)
     Double(char.value)
 }
 
+
 @Sendable public static func Char_fromCode(_ charCode: Double) -> UnicodeScalar {
-    return if let scalar = UnicodeScalar(Int(charCode)) {
-        scalar
-    } else {
-        "\\0"
-    }
+    UnicodeScalar(Int(charCode)) ?? "\0"
 }
 
 @Sendable public static func Char_isHexDigit(_ char: UnicodeScalar) -> Bool {
@@ -29511,35 +29508,23 @@ public static let Basics_e: Double = exp(1.0)
 }
 
 @Sendable public static func Char_toUpper(_ char: UnicodeScalar) -> UnicodeScalar {
-    if let uppercasedChar = Character(char).uppercased().unicodeScalars.first {
-        uppercasedChar
-    } else {
-        char
-    }
+    Character(char).uppercased().unicodeScalars.first
+        ?? char
 }
 @Sendable public static func Char_toLocaleUpper(_ char: UnicodeScalar) -> UnicodeScalar {
     // Character does not have uppercased(with: Locale)
-    if let uppercasedChar = String(char).uppercased(with: Locale.current).unicodeScalars.first {
-        uppercasedChar
-    } else {
-        char
-    }
+    String(char).uppercased(with: Locale.current).unicodeScalars.first
+        ?? char
 }
 
 @Sendable public static func Char_toLower(_ char: UnicodeScalar) -> UnicodeScalar {
     // Character does not have lowercased(with: Locale)
-    if let uppercasedChar = Character(char).lowercased().unicodeScalars.first {
-        uppercasedChar
-    } else {
-        char
-    }
+    Character(char).lowercased().unicodeScalars.first
+        ?? char
 }
 @Sendable public static func Char_toLocaleLower(_ char: UnicodeScalar) -> UnicodeScalar {
-    if let uppercasedChar = String(char).lowercased(with: Locale.current).unicodeScalars.first {
-        uppercasedChar
-    } else {
-        char
-    }
+    String(char).lowercased(with: Locale.current).unicodeScalars.first
+        ?? char
 }
 
 @Sendable public static func String_fromChar(_ char: UnicodeScalar) -> String {
@@ -30342,14 +30327,14 @@ static func Array_mapFromList<a, b>(_ elementChange: (a) -> b, _ fullList: List_
 @Sendable public static func Array_length<a>(_ array: [a]) -> Double {
     Double(array.count)
 }
-@Sendable public static func Array_get<a>(_ indexAsDouble: Double, _ array: [a]) -> Maybe_Maybe<
-    a
-> {
-    let index = Int(indexAsDouble)
-    if (index >= 0) && (index < array.count) {
-        return .Maybe_Just(array[index])
+@Sendable public static func Array_get<a>(_ indexAsDouble: Double, _ array: [a])
+    -> Maybe_Maybe<a>
+{
+    let index: Int = Int(indexAsDouble)
+    return if (index >= 0) && (index < array.count) {
+        .Maybe_Just(array[index])
     } else {
-        return .Maybe_Nothing
+        .Maybe_Nothing
     }
 }
 @Sendable public static func Array_empty<a>() -> [a] {
@@ -31546,7 +31531,7 @@ static func toRegexMatch(
 }
 
 public enum Time_Posix: Sendable, Equatable, Hashable {
-    case Time_Posix(Double)
+    case Time_Posix(Int64)
 }
 
 public enum Generated_offset_start<offset: Sendable, start: Sendable>: Sendable {
@@ -31563,10 +31548,10 @@ public enum Generated_offset_start<offset: Sendable, start: Sendable>: Sendable 
     }
 }
 public typealias Time_Era =
-    Generated_offset_start<Double, Double>
+    Generated_offset_start<Int64, Int64>
 
 public enum Time_Zone: Sendable, Equatable {
-    case Time_Zone(Double, List_List<Time_Era>)
+    case Time_Zone(Int64, [Time_Era])
 }
 
 public enum Time_Weekday: Sendable, Equatable {
@@ -31598,23 +31583,19 @@ public enum Time_ZoneName: Sendable, Equatable {
     case Time_Name(String)
     case Time_Offset(Double)
 }
-
-public typealias Time_Civil = (
-    day: Double,
-    month: Double,
-    year: Double
-)
-
-@Sendable public static func Time_posixToMillis(_ timePosix: Time_Posix) -> Double {
+static func Time_posixToMillisInt(_ timePosix: Time_Posix) -> Int64 {
     switch timePosix {
     case let .Time_Posix(millis): millis
     }
 }
+@Sendable public static func Time_posixToMillis(_ timePosix: Time_Posix) -> Double {
+    Double(Time_posixToMillisInt(timePosix))
+}
 @Sendable public static func Time_millisToPosix(_ millis: Double) -> Time_Posix {
-    .Time_Posix(millis)
+    .Time_Posix(Int64(millis))
 }
 
-public static let Time_utc: Time_Zone = .Time_Zone(0, .List_Empty)
+public static let Time_utc: Time_Zone = .Time_Zone(0, [])
 
 @Sendable public static func Time_customZone(
     _ n: Double,
@@ -31622,61 +31603,67 @@ public static let Time_utc: Time_Zone = .Time_Zone(0, .List_Empty)
 )
     -> Time_Zone
 {
-    .Time_Zone(n, eras)
-}
-
-@Sendable public static func flooredDiv(_ numerator: Double, _ denominator: Double) -> Double {
-    floor(numerator / denominator)
+    .Time_Zone(
+        Int64(n),
+        Array_mapFromList(
+            { era in
+                .Record(offset: Int64(era.offset), start: Int64(era.start))
+            },
+            eras
+        )
+    )
 }
 
 static func Time_toAdjustedMinutesHelp(
-    _ defaultOffset: Double,
-    _ posixMinutes: Double,
-    _ eras: List_List<Time_Era>
+    _ defaultOffset: Int64,
+    _ posixMinutes: Int64,
+    _ eras: [Time_Era]
 )
-    -> Double
+    -> Int64
 {
-    switch eras {
-    case .List_Empty:
-        posixMinutes + defaultOffset
-    case let .List_Cons(era, olderEras):
+    for era in eras {
         if era.start < posixMinutes {
-            posixMinutes + era.offset
+            return posixMinutes + Int64(era.offset)
         } else {
-            Time_toAdjustedMinutesHelp(defaultOffset, posixMinutes, olderEras)
+            // continue
         }
     }
+    return posixMinutes + Int64(defaultOffset)
 }
 
-static func Time_toAdjustedMinutes(_ timeZone: Time_Zone, _ time: Time_Posix) -> Double {
+static func Time_toAdjustedMinutes(_ timeZone: Time_Zone, _ time: Time_Posix) -> Int64 {
     switch timeZone {
     case let .Time_Zone(defaultOffset, eras):
         Time_toAdjustedMinutesHelp(
             defaultOffset,
-            flooredDiv(Time_posixToMillis(time), 60000),
+            (Time_posixToMillisInt(time) / 60000),
             eras
         )
     }
 }
 
-@Sendable public static func Time_toCivil(_ minutes: Double) -> Time_Civil {
-    let rawDay = flooredDiv(minutes, 60 * 24) + 719468
-    let era = if rawDay >= 0 { rawDay / 146097 } else { (rawDay - 146096) / 146097 }
-    let dayOfEra = rawDay - era * 146097  // [0, 146096]
+static func Time_toCivil(_ minutes: Int64) -> (
+    day: Int64,
+    month: Int64,
+    year: Int64
+) {
+    let rawDay: Int64 = (minutes / (60 * 24)) + 719468
+    let era: Int64 = if rawDay >= 0 { rawDay / 146097 } else { (rawDay - 146096) / 146097 }
+    let dayOfEra: Int64 = rawDay - era * 146097  // [0, 146096]
 
-    let yearOfEra =
+    let yearOfEra: Int64 =
         (dayOfEra - dayOfEra / 1460 + dayOfEra / 36524 - dayOfEra / 146096)
         / 365  // [0, 399]
 
-    let year = yearOfEra + era * 400
+    let year: Int64 = yearOfEra + era * 400
 
-    let dayOfYear =
+    let dayOfYear: Int64 =
         dayOfEra - (365 * yearOfEra + yearOfEra / 4 - yearOfEra / 100)  // [0, 365]
 
-    let mp = (5 * dayOfYear + 2) / 153  // [0, 11]
-    let month = if mp < 10 { mp + 3 } else { mp - 9 }  // [1, 12]
+    let mp: Int64 = (5 * dayOfYear + 2) / 153  // [0, 11]
+    let month: Int64 = if mp < 10 { mp + 3 } else { mp - 9 }  // [1, 12]
 
-    let resultYear = if month <= 2 { year + 1 } else { year }
+    let resultYear: Int64 = if month <= 2 { year + 1 } else { year }
 
     return (
         day: dayOfYear - (153 * mp + 2) / 5 + 1,  // [1, 31]
@@ -31686,7 +31673,7 @@ static func Time_toAdjustedMinutes(_ timeZone: Time_Zone, _ time: Time_Posix) ->
 }
 
 @Sendable public static func Time_toYear(_ zone: Time_Zone, _ time: Time_Posix) -> Double {
-    (Time_toCivil(Time_toAdjustedMinutes(zone, time))).year
+    Double((Time_toCivil(Time_toAdjustedMinutes(zone, time))).year)
 }
 
 @Sendable public static func Time_toMonth(_ zone: Time_Zone, _ time: Time_Posix) -> Time_Month {
@@ -31707,13 +31694,13 @@ static func Time_toAdjustedMinutes(_ timeZone: Time_Zone, _ time: Time_Posix) ->
 }
 
 @Sendable public static func Time_toDay(_ zone: Time_Zone, _ time: Time_Posix) -> Double {
-    (Time_toCivil(Time_toAdjustedMinutes(zone, time))).day
+    Double((Time_toCivil(Time_toAdjustedMinutes(zone, time))).day)
 }
 
 @Sendable public static func Time_toWeekday(_ zone: Time_Zone, _ time: Time_Posix)
     -> Time_Weekday
 {
-    switch Basics_modBy(7, flooredDiv(Time_toAdjustedMinutes(zone, time), 60 * 24))
+    switch (Time_toAdjustedMinutes(zone, time) / (60 * 24)) % 7
     {
     case 0: .Time_Thu
     case 1: .Time_Fri
@@ -31726,19 +31713,19 @@ static func Time_toAdjustedMinutes(_ timeZone: Time_Zone, _ time: Time_Posix) ->
 }
 
 @Sendable public static func Time_toHour(_ zone: Time_Zone, _ time: Time_Posix) -> Double {
-    Basics_modBy(24, flooredDiv(Time_toAdjustedMinutes(zone, time), 60))
+    Double((Time_toAdjustedMinutes(zone, time) / 60) % 24)
 }
 
 @Sendable public static func Time_toMinute(_ zone: Time_Zone, _ time: Time_Posix) -> Double {
-    Basics_modBy(60, Time_toAdjustedMinutes(zone, time))
+    Double(Time_toAdjustedMinutes(zone, time) % 60)
 }
 
 @Sendable public static func Time_toSecond(_ zone: Time_Zone, _ time: Time_Posix) -> Double {
-    Basics_modBy(60, flooredDiv(Time_posixToMillis(time), 1000))
+    Double((Time_posixToMillisInt(time) / 1000) % 60)
 }
 
 @Sendable public static func Time_toMillis(_ zone: Time_Zone, _ time: Time_Posix) -> Double {
-    Basics_modBy(1000, Time_posixToMillis(time))
+    Double(Time_posixToMillisInt(time) % 1000)
 }
 
 public typealias Bytes_Bytes = [UInt8]
@@ -32492,14 +32479,14 @@ public static let JsonEncode_null: JsonEncode_Value =
 )
     -> String
 {
+    let options: JSONSerialization.WritingOptions =
+        if indentSize <= 0 {
+            []
+        } else {
+            [.prettyPrinted]  // indent size 2
+        }
     do {
-        let options: JSONSerialization.WritingOptions =
-            if indentSize <= 0 {
-                []
-            } else {
-                [.prettyPrinted]  // indent size 2
-            }
-        let prettyPrintedData = try JSONSerialization.data(
+        let prettyPrintedData: Data = try JSONSerialization.data(
             withJSONObject: encoded,
             options: options
         )
@@ -33052,7 +33039,7 @@ static func JsonDecode_fieldValue(_ fieldName: String)
     JsonDecode_Decoder(decode: { toDecode in
         switch toDecode.value {
         case let arrayToDecode as NSArray:
-            let index = Int(indexAsDouble)
+            let index: Int = Int(indexAsDouble)
             return if index >= 0 && index < arrayToDecode.count {
                 switch elementDecoder.decode(JsonDecode_Value(value: arrayToDecode[index]))
                 {
@@ -33223,7 +33210,7 @@ static func JsonDecode_errorToStringHelp(
         }
 
     case let .JsonDecode_Failure(msg, json):
-        let introduction =
+        let introduction: String =
             switch context {
             case .List_Empty: "Problem with the given value:\\n\\n"
             case .List_Cons(_, _):
@@ -33816,8 +33803,8 @@ private static func surrogatePairToUnicodeScalar(
                 + smallString.utf16.count
         }
     while offset < foundEndOffsetOrBigStringEnd {
-        let code: Unicode.UTF16.CodeUnit = stringUtf16CodePointAt(
-            bigString, offset)
+        let code: Unicode.UTF16.CodeUnit =
+            stringUtf16CodePointAt(bigString, offset)
         if code == 0x000A /* \\n */ {
             offset = offset + 1
             col = 1
