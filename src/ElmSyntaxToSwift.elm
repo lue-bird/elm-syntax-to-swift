@@ -29450,7 +29450,7 @@ public indirect enum List_List<a: Sendable>: Sendable {
 }
 
 @Sendable public static func Debug_todo<a>(_ message: String) -> a {
-    fatalError("TODO " + message)
+    fatalError("TODO \\(message)")
 }
 
 @Sendable public static func Basics_identity<a>(_ a: a) -> a {
@@ -29690,7 +29690,10 @@ public static let Basics_e: Double = exp(1.0)
 }
 
 @Sendable public static func Char_fromCode(_ charCode: Double) -> UnicodeScalar {
-    UnicodeScalar(Int(charCode)) ?? "\\0"
+    switch UnicodeScalar(Int(charCode)) {
+    case .none: "\\0"
+    case let .some(unicodeScalar): unicodeScalar
+    }
 }
 
 @Sendable public static func Char_isHexDigit(_ char: UnicodeScalar) -> Bool {
@@ -29715,23 +29718,31 @@ public static let Basics_e: Double = exp(1.0)
 }
 
 @Sendable public static func Char_toUpper(_ char: UnicodeScalar) -> UnicodeScalar {
-    Character(char).uppercased().unicodeScalars.first
-        ?? char
+    switch Character(char).uppercased().unicodeScalars.first {
+    case .none: char
+    case let .some(uppercased): uppercased
+    }
 }
 @Sendable public static func Char_toLocaleUpper(_ char: UnicodeScalar) -> UnicodeScalar {
     // Character does not have uppercased(with: Locale)
-    String(char).uppercased(with: Locale.current).unicodeScalars.first
-        ?? char
+    switch String(char).uppercased(with: Locale.current).unicodeScalars.first {
+    case .none: char
+    case let .some(uppercased): uppercased
+    }
 }
 
 @Sendable public static func Char_toLower(_ char: UnicodeScalar) -> UnicodeScalar {
     // Character does not have lowercased(with: Locale)
-    Character(char).lowercased().unicodeScalars.first
-        ?? char
+    switch Character(char).lowercased().unicodeScalars.first {
+    case .none: char
+    case let .some(lowercased): lowercased
+    }
 }
 @Sendable public static func Char_toLocaleLower(_ char: UnicodeScalar) -> UnicodeScalar {
-    String(char).lowercased(with: Locale.current).unicodeScalars.first
-        ?? char
+    switch String(char).lowercased(with: Locale.current).unicodeScalars.first {
+    case .none: char
+    case let .some(lowercased): lowercased
+    }
 }
 
 @Sendable public static func String_fromChar(_ char: UnicodeScalar) -> String {
@@ -29986,28 +29997,29 @@ public static let Basics_e: Double = exp(1.0)
 )
     -> String
 {
+    let stringLength: Int = string.utf16.count
     let realStartIndexInclusive: Int =
         possiblyNegativeIndexForCount(
             index: Int(startInclusivePossiblyNegativeAsDouble),
-            count: string.utf16.count
+            count: stringLength
         )
     let realEndIndexExclusive: Int =
         possiblyNegativeIndexForCount(
             index: Int(endExclusivePossiblyNegative),
-            count: string.utf16.count
+            count: stringLength
         )
     return if realStartIndexInclusive >= realEndIndexExclusive {
         ""
     } else {
         String(
-            string.utf16[
+            string.unicodeScalars[
                 string.utf16.index(
                     string.utf16.startIndex, offsetBy: realStartIndexInclusive
                 )..<string.utf16.index(
                     string.utf16.startIndex, offsetBy: realEndIndexExclusive
                 )
             ]
-        ) ?? ""
+        )
     }
 }
 // For an index where -1 meaning one before the last element, 1 meaning one after the first element,
@@ -31849,12 +31861,13 @@ static func Time_toAdjustedMinutes(_ timeZone: Time_Zone, _ time: Time_Posix) ->
     }
 }
 
+static let minutesPerDay: Int64 = 60 * 24
 static func Time_toCivil(_ minutes: Int64) -> (
     day: Int64,
     month: Int64,
     year: Int64
 ) {
-    let rawDay: Int64 = (minutes / (60 * 24)) + 719468
+    let rawDay: Int64 = (minutes / minutesPerDay) + 719468
     let era: Int64 = if rawDay >= 0 { rawDay / 146097 } else { (rawDay - 146096) / 146097 }
     let dayOfEra: Int64 = rawDay - era * 146097  // [0, 146096]
 
@@ -31907,8 +31920,7 @@ static func Time_toCivil(_ minutes: Int64) -> (
 @Sendable public static func Time_toWeekday(_ zone: Time_Zone, _ time: Time_Posix)
     -> Time_Weekday
 {
-    switch (Time_toAdjustedMinutes(zone, time) / (60 * 24)) % 7
-    {
+    switch (Time_toAdjustedMinutes(zone, time) / minutesPerDay) % 7 {
     case 0: .Time_Thu
     case 1: .Time_Fri
     case 2: .Time_Sat
@@ -32704,7 +32716,7 @@ public static let JsonEncode_null: JsonEncode_Value =
                 // set indent size
                 encodedJsonAsString.replacing(
                     "\\n  ",
-                    with: "\\n" + String(repeating: " ", count: Int(indentSize))
+                    with: "\\n\\(String(repeating: " ", count: Int(indentSize)))"
                 )
             }
         case .none:
@@ -33076,9 +33088,7 @@ static func JsonDecode_fieldValue(_ fieldName: String)
             case .none:
                 .Result_Err(
                     .JsonDecode_Failure(
-                        "Expecting an OBJECT with a field named '"
-                            + fieldName
-                            + "'",
+                        "Expecting an OBJECT with a field named '\\(fieldName)'",
                         toDecode
                     )
                 )
@@ -33086,9 +33096,7 @@ static func JsonDecode_fieldValue(_ fieldName: String)
         case _:
             .Result_Err(
                 .JsonDecode_Failure(
-                    "Expecting an OBJECT with a field named '"
-                        + fieldName
-                        + "'",
+                    "Expecting an OBJECT with a field named '\\(fieldName)'",
                     toDecode
                 )
             )
@@ -33257,9 +33265,7 @@ static func JsonDecode_fieldValue(_ fieldName: String)
             } else {
                 .Result_Err(
                     .JsonDecode_Failure(
-                        "Expecting an ARRAY with an index ["
-                            + String(index)
-                            + "]",
+                        "Expecting an ARRAY with an index [\\(String(index))]",
                         toDecode
                     )
                 )
@@ -33347,10 +33353,11 @@ static func indent(_ str: String) -> String {
     str.split(separator: "\\n").joined(separator: "\\n    ")
 }
 @Sendable public static func JsonDecode_errorToString(_ error: JsonDecode_Error) -> String {
-    JsonDecode_errorToStringHelp(error, .List_Empty)
+    JsonDecode_errorToStringHelp(error, [])
 }
 static func JsonDecode_errorToStringHelp(
-    _ error: JsonDecode_Error, _ context: List_List<String>
+    _ error: JsonDecode_Error,
+    _ context: [String]
 )
     -> String
 {
@@ -33360,42 +33367,33 @@ static func JsonDecode_errorToStringHelp(
             switch String_uncons(f) {
             case .Maybe_Nothing: false
             case let .Maybe_Just(.Tuple(head, rest)):
-                Char_isAlpha(head) && String_all(Char_isAlphaNum, rest)
+                Char_isAlpha(head) && rest.unicodeScalars.allSatisfy(Char_isAlphaNum)
             }
         let fieldName: String =
-            if isSimple { "." + f } else { "['" + f + "']" }
-        return JsonDecode_errorToStringHelp(err, .List_Cons(fieldName, context))
-
+            if isSimple { ".\\(f)" } else { "['\\(f)']" }
+        return JsonDecode_errorToStringHelp(err, Array_push(fieldName, context))
     case let .JsonDecode_Index(index, err):
-        let indexName: String = "[" + String(Int(index)) + "]"
-        return JsonDecode_errorToStringHelp(err, .List_Cons(indexName, context))
-
+        let indexName: String = "[\\(String(Int(index)))]"
+        return JsonDecode_errorToStringHelp(err, Array_push(indexName, context))
     case let .JsonDecode_OneOf(errors):
         switch errors {
         case .List_Empty:
-            return switch context {
-            case .List_Empty: "Ran into a Json.Decode.oneOf with no possibilities!"
-            case .List_Cons(_, _):
-                "Ran into a Json.Decode.oneOf with no possibilities at json"
-                    + String_concat(List_reverse(context))
+            return if context.isEmpty {
+                "Ran into a Json.Decode.oneOf with no possibilities!"
+            } else {
+                "Ran into a Json.Decode.oneOf with no possibilities at json\\(context.joined())"
             }
-
         case let .List_Cons(err, .List_Empty):
             return JsonDecode_errorToStringHelp(err, context)
-
         case _:
             let starter: String =
-                switch context {
-                case .List_Empty: "Json.Decode.oneOf"
-                case .List_Cons(_, _):
-                    "The Json.Decode.oneOf at json"
-                        + String_concat(List_reverse(context))
+                if context.isEmpty {
+                    "Json.Decode.oneOf"
+                } else {
+                    "The Json.Decode.oneOf at json\\(context.joined())"
                 }
             let introduction: String =
-                starter
-                + " failed in the following "
-                + String(Int(List_length(errors)))
-                + " ways:"
+                "\\(starter) failed in the following \\(String(Int(List_length(errors)))) ways:"
             return String_join(
                 "\\n\\n",
                 .List_Cons(
@@ -33403,10 +33401,7 @@ static func JsonDecode_errorToStringHelp(
                     List_indexedMap(
                         { (i: Double) in
                             { (error: JsonDecode_Error) in
-                                "\\n\\n("
-                                    + String(Int(i + 1))
-                                    + ") "
-                                    + indent(JsonDecode_errorToStringHelp(error, .List_Empty))
+                                "\\n\\n(\\(String(Int(i + 1)))) \\(indent(JsonDecode_errorToStringHelp(error, [])))"
                             }
                         },
                         errors
@@ -33414,20 +33409,14 @@ static func JsonDecode_errorToStringHelp(
                 )
             )
         }
-
     case let .JsonDecode_Failure(msg, json):
         let introduction: String =
-            switch context {
-            case .List_Empty: "Problem with the given value:\\n\\n"
-            case .List_Cons(_, _):
-                "Problem with the value at json"
-                    + String_concat(List_reverse(context))
-                    + ":\\n\\n    "
+            if context.isEmpty {
+                "Problem with the given value:\\n\\n"
+            } else {
+                "Problem with the value at json\\(context.joined()):\\n\\n    "
             }
-        return introduction
-            + indent((JsonEncode_encode(4, json)))
-            + "\\n\\n"
-            + msg
+        return "\\(introduction)\\(indent(JsonEncode_encode(4, json)))\\n\\n\\(msg)"
     }
 }
 
@@ -34025,8 +34014,13 @@ private static func surrogatePairToUnicodeScalar(
                 }
         }
     }
+    let startOffsetOrNegative1ForNotFound: Double =
+        switch foundStartOffset {
+        case .none: -1.0
+        case let .some(startOffset): Double(startOffset)
+        }
     return .Triple(
-        Double(foundStartOffset ?? -1), Double(row), Double(col)
+        startOffsetOrNegative1ForNotFound, Double(row), Double(col)
     )
 }
 
