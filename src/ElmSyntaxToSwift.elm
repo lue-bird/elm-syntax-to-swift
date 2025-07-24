@@ -1918,17 +1918,19 @@ charIsLatinAlphaNumOrUnderscoreFast c =
 and populate them in switches and let destructurings
 -}
 destructuringToSwiftStatements :
-    (String
-     ->
-        Maybe
-            (FastDict.Dict
-                String
-                { parameters : List String
-                , recordFieldOrder : Maybe (List String)
-                , type_ : ElmSyntaxTypeInfer.Type
-                }
-            )
-    )
+    { path : List String
+    , typeAliasesInModule :
+        String
+        ->
+            Maybe
+                (FastDict.Dict
+                    String
+                    { parameters : List String
+                    , recordFieldOrder : Maybe (List String)
+                    , type_ : ElmSyntaxTypeInfer.Type
+                    }
+                )
+    }
     ->
         { pattern :
             ElmSyntaxTypeInfer.TypedNode
@@ -1936,7 +1938,7 @@ destructuringToSwiftStatements :
         , expression : SwiftExpression
         }
     -> List SwiftStatement
-destructuringToSwiftStatements typeAliasesInModule toDestructure =
+destructuringToSwiftStatements context toDestructure =
     (toDestructure.pattern
         |> inferredPatternIntroducedVariables
         |> List.map
@@ -1947,11 +1949,11 @@ destructuringToSwiftStatements typeAliasesInModule toDestructure =
                             bindingToIntroduce.name
                     , type_ =
                         bindingToIntroduce.type_
-                            |> type_ typeAliasesInModule
+                            |> type_ context.typeAliasesInModule
                     }
             )
     )
-        ++ destructuringToSwiftAssignmentStatements
+        ++ destructuringToSwiftAssignmentStatements context
             { pattern = toDestructure.pattern
             , expression = toDestructure.expression
             }
@@ -2400,13 +2402,27 @@ generatedDestructuringVariableNameFor variableName =
 
 
 destructuringToSwiftAssignmentStatements :
-    { pattern :
-        ElmSyntaxTypeInfer.TypedNode
-            ElmSyntaxTypeInfer.Pattern
-    , expression : SwiftExpression
+    { path : List String
+    , typeAliasesInModule :
+        String
+        ->
+            Maybe
+                (FastDict.Dict
+                    String
+                    { parameters : List String
+                    , recordFieldOrder : Maybe (List String)
+                    , type_ : ElmSyntaxTypeInfer.Type
+                    }
+                )
     }
+    ->
+        { pattern :
+            ElmSyntaxTypeInfer.TypedNode
+                ElmSyntaxTypeInfer.Pattern
+        , expression : SwiftExpression
+        }
     -> List SwiftStatement
-destructuringToSwiftAssignmentStatements toDestructure =
+destructuringToSwiftAssignmentStatements context toDestructure =
     let
         patternUntilAsPatterns :
             { pattern : SwiftPattern
@@ -2430,7 +2446,7 @@ destructuringToSwiftAssignmentStatements toDestructure =
             patternUntilAsPatterns.patternAliases
                 |> List.concatMap
                     (\variableAsPatternAlias ->
-                        destructuringToSwiftAssignmentStatements
+                        destructuringToSwiftAssignmentStatements context
                             { expression =
                                 SwiftExpressionReference
                                     { moduleOrigin = Nothing
@@ -2467,17 +2483,29 @@ destructuringToSwiftAssignmentStatements toDestructure =
             ++ asPatternAliasDestructuringStatements
 
     else
-        [ SwiftStatementSwitch
-            { matched = toDestructure.expression
-            , case0 =
-                { pattern = patternUntilAsPatternsWithGeneratedVariableNames
-                , statements =
-                    asPatternAliasDestructuringStatements
-                        ++ patternUntilAsPatternsIntroducedVariableAssignments
-                }
-            , case1Up = []
-            }
-        ]
+        let
+            matchedWrappedInLetIfIfOrSwitch : { statements : List SwiftStatement, result : SwiftExpression }
+            matchedWrappedInLetIfIfOrSwitch =
+                swiftExpressionWrapInLetIfOrSwitchResult context.path
+                    { expression = toDestructure.expression
+                    , type_ =
+                        \() ->
+                            toDestructure.pattern.type_
+                                |> type_ context.typeAliasesInModule
+                    }
+        in
+        matchedWrappedInLetIfIfOrSwitch.statements
+            ++ [ SwiftStatementSwitch
+                    { matched = matchedWrappedInLetIfIfOrSwitch.result
+                    , case0 =
+                        { pattern = patternUntilAsPatternsWithGeneratedVariableNames
+                        , statements =
+                            asPatternAliasDestructuringStatements
+                                ++ patternUntilAsPatternsIntroducedVariableAssignments
+                        }
+                    , case1Up = []
+                    }
+               ]
 
 
 swiftPatternIntroducedVariables : SwiftPattern -> List String
@@ -7331,7 +7359,9 @@ valueOrFunctionDeclaration moduleContext syntaxDeclarationValueOrFunction =
 
                                                         _ ->
                                                             destructuringToSwiftStatements
-                                                                typeAliasesInModule
+                                                                { path = [ "parameter" ++ (parameterIndex |> String.fromInt) ]
+                                                                , typeAliasesInModule = typeAliasesInModule
+                                                                }
                                                                 { pattern = parameter
                                                                 , expression =
                                                                     SwiftExpressionReference
@@ -7475,6 +7505,9 @@ swiftKeywords =
         ]
 
 
+{-| Attention: Use `expressionWrappingInLetIfOrSwitchResult`
+instead when swift if/switch are not allowed as `.result`
+-}
 expression :
     { variablesFromWithinDeclarationInScope : FastSet.Set String
     , letDeclaredValueAndFunctionTypes : FastDict.Dict String ElmSyntaxTypeInfer.Type
@@ -7673,7 +7706,7 @@ expression context expressionTypedNode =
                             called
                 )
                 (call.called
-                    |> expression
+                    |> expressionWrappingInLetIfOrSwitchResult
                         { moduleInfo = context.moduleInfo
                         , variablesFromWithinDeclarationInScope =
                             context.variablesFromWithinDeclarationInScope
@@ -7683,7 +7716,7 @@ expression context expressionTypedNode =
                         }
                 )
                 (call.argument0
-                    |> expression
+                    |> expressionWrappingInLetIfOrSwitchResult
                         { moduleInfo = context.moduleInfo
                         , variablesFromWithinDeclarationInScope =
                             context.variablesFromWithinDeclarationInScope
@@ -7697,7 +7730,7 @@ expression context expressionTypedNode =
                     |> listMapAndCombineOk
                         (\( argumentIndex, argument ) ->
                             argument
-                                |> expression
+                                |> expressionWrappingInLetIfOrSwitchResult
                                     { moduleInfo = context.moduleInfo
                                     , variablesFromWithinDeclarationInScope =
                                         context.variablesFromWithinDeclarationInScope
@@ -7731,7 +7764,7 @@ expression context expressionTypedNode =
                             }
                         )
                         (infixOperation.left
-                            |> expression
+                            |> expressionWrappingInLetIfOrSwitchResult
                                 { moduleInfo = context.moduleInfo
                                 , variablesFromWithinDeclarationInScope =
                                     context.variablesFromWithinDeclarationInScope
@@ -7741,7 +7774,7 @@ expression context expressionTypedNode =
                                 }
                         )
                         (infixOperation.right
-                            |> expression
+                            |> expressionWrappingInLetIfOrSwitchResult
                                 { moduleInfo = context.moduleInfo
                                 , variablesFromWithinDeclarationInScope =
                                     context.variablesFromWithinDeclarationInScope
@@ -7770,7 +7803,7 @@ expression context expressionTypedNode =
                             }
                         )
                         (infixOperation.left
-                            |> expression
+                            |> expressionWrappingInLetIfOrSwitchResult
                                 { moduleInfo = context.moduleInfo
                                 , variablesFromWithinDeclarationInScope =
                                     context.variablesFromWithinDeclarationInScope
@@ -7780,7 +7813,7 @@ expression context expressionTypedNode =
                                 }
                         )
                         (infixOperation.right
-                            |> expression
+                            |> expressionWrappingInLetIfOrSwitchResult
                                 { moduleInfo = context.moduleInfo
                                 , variablesFromWithinDeclarationInScope =
                                     context.variablesFromWithinDeclarationInScope
@@ -7824,7 +7857,7 @@ expression context expressionTypedNode =
                             }
                         )
                         (infixOperation.left
-                            |> expression
+                            |> expressionWrappingInLetIfOrSwitchResult
                                 { moduleInfo = context.moduleInfo
                                 , variablesFromWithinDeclarationInScope =
                                     context.variablesFromWithinDeclarationInScope
@@ -7834,7 +7867,7 @@ expression context expressionTypedNode =
                                 }
                         )
                         (infixOperation.right
-                            |> expression
+                            |> expressionWrappingInLetIfOrSwitchResult
                                 { moduleInfo = context.moduleInfo
                                 , variablesFromWithinDeclarationInScope =
                                     context.variablesFromWithinDeclarationInScope
@@ -7864,7 +7897,7 @@ expression context expressionTypedNode =
                             infixOperation.operator
                         )
                         (infixOperation.left
-                            |> expression
+                            |> expressionWrappingInLetIfOrSwitchResult
                                 { moduleInfo = context.moduleInfo
                                 , variablesFromWithinDeclarationInScope =
                                     context.variablesFromWithinDeclarationInScope
@@ -7874,7 +7907,7 @@ expression context expressionTypedNode =
                                 }
                         )
                         (infixOperation.right
-                            |> expression
+                            |> expressionWrappingInLetIfOrSwitchResult
                                 { moduleInfo = context.moduleInfo
                                 , variablesFromWithinDeclarationInScope =
                                     context.variablesFromWithinDeclarationInScope
@@ -8321,44 +8354,31 @@ expression context expressionTypedNode =
         ElmSyntaxTypeInfer.ExpressionIfThenElse ifThenElse ->
             Result.map3
                 (\condition onTrue onFalse ->
-                    let
-                        ifLocalResultVariableToInitialize : String
-                        ifLocalResultVariableToInitialize =
-                            generatedLocalReturnResult context.path
-
-                        typeAliasesInModule : String -> Maybe (FastDict.Dict String { parameters : List String, recordFieldOrder : Maybe (List String), type_ : ElmSyntaxTypeInfer.Type })
-                        typeAliasesInModule moduleNameToAccess =
-                            context.moduleInfo
-                                |> FastDict.get moduleNameToAccess
-                                |> Maybe.map .typeAliases
-                    in
                     if
                         (onTrue.statements |> List.isEmpty)
                             && (onFalse.statements |> List.isEmpty)
                     then
-                        { statements =
-                            condition.statements
-                                ++ [ SwiftStatementLetDeclaration
-                                        { name = ifLocalResultVariableToInitialize
-                                        , resultType =
-                                            expressionTypedNode.type_
-                                                |> type_ typeAliasesInModule
-                                        , result =
-                                            SwiftExpressionIfElse
-                                                { condition = condition.result
-                                                , onTrue = onTrue.result
-                                                , onFalse = onFalse.result
-                                                }
-                                        }
-                                   ]
+                        { statements = condition.statements
                         , result =
-                            SwiftExpressionReference
-                                { moduleOrigin = Nothing
-                                , name = ifLocalResultVariableToInitialize
+                            SwiftExpressionIfElse
+                                { condition = condition.result
+                                , onTrue = onTrue.result
+                                , onFalse = onFalse.result
                                 }
                         }
 
                     else
+                        let
+                            ifLocalResultVariableToInitialize : String
+                            ifLocalResultVariableToInitialize =
+                                generatedLocalReturnResult context.path
+
+                            typeAliasesInModule : String -> Maybe (FastDict.Dict String { parameters : List String, recordFieldOrder : Maybe (List String), type_ : ElmSyntaxTypeInfer.Type })
+                            typeAliasesInModule moduleNameToAccess =
+                                context.moduleInfo
+                                    |> FastDict.get moduleNameToAccess
+                                    |> Maybe.map .typeAliases
+                        in
                         { statements =
                             condition.statements
                                 ++ [ SwiftStatementLetDeclarationUninitialized
@@ -8393,7 +8413,7 @@ expression context expressionTypedNode =
                         }
                 )
                 (ifThenElse.condition
-                    |> expression
+                    |> expressionWrappingInLetIfOrSwitchResult
                         { moduleInfo = context.moduleInfo
                         , variablesFromWithinDeclarationInScope =
                             context.variablesFromWithinDeclarationInScope
@@ -8462,7 +8482,7 @@ expression context expressionTypedNode =
                     }
                 )
                 (parts.part0
-                    |> expression
+                    |> expressionWrappingInLetIfOrSwitchResult
                         { moduleInfo = context.moduleInfo
                         , variablesFromWithinDeclarationInScope =
                             context.variablesFromWithinDeclarationInScope
@@ -8472,7 +8492,7 @@ expression context expressionTypedNode =
                         }
                 )
                 (parts.part1
-                    |> expression
+                    |> expressionWrappingInLetIfOrSwitchResult
                         { moduleInfo = context.moduleInfo
                         , variablesFromWithinDeclarationInScope =
                             context.variablesFromWithinDeclarationInScope
@@ -8497,7 +8517,7 @@ expression context expressionTypedNode =
                     }
                 )
                 (parts.part0
-                    |> expression
+                    |> expressionWrappingInLetIfOrSwitchResult
                         { moduleInfo = context.moduleInfo
                         , variablesFromWithinDeclarationInScope =
                             context.variablesFromWithinDeclarationInScope
@@ -8507,7 +8527,7 @@ expression context expressionTypedNode =
                         }
                 )
                 (parts.part1
-                    |> expression
+                    |> expressionWrappingInLetIfOrSwitchResult
                         { moduleInfo = context.moduleInfo
                         , variablesFromWithinDeclarationInScope =
                             context.variablesFromWithinDeclarationInScope
@@ -8517,7 +8537,7 @@ expression context expressionTypedNode =
                         }
                 )
                 (parts.part2
-                    |> expression
+                    |> expressionWrappingInLetIfOrSwitchResult
                         { moduleInfo = context.moduleInfo
                         , variablesFromWithinDeclarationInScope =
                             context.variablesFromWithinDeclarationInScope
@@ -8554,7 +8574,7 @@ expression context expressionTypedNode =
                     |> listMapAndCombineOk
                         (\( elementIndex, element ) ->
                             element
-                                |> expression
+                                |> expressionWrappingInLetIfOrSwitchResult
                                     { moduleInfo = context.moduleInfo
                                     , variablesFromWithinDeclarationInScope =
                                         context.variablesFromWithinDeclarationInScope
@@ -8617,7 +8637,7 @@ expression context expressionTypedNode =
                                     )
                                 )
                                 (field.value
-                                    |> expression
+                                    |> expressionWrappingInLetIfOrSwitchResult
                                         { moduleInfo = context.moduleInfo
                                         , variablesFromWithinDeclarationInScope =
                                             context.variablesFromWithinDeclarationInScope
@@ -8713,7 +8733,7 @@ expression context expressionTypedNode =
                                             )
                                         )
                                         (field.value
-                                            |> expression
+                                            |> expressionWrappingInLetIfOrSwitchResult
                                                 { moduleInfo = context.moduleInfo
                                                 , variablesFromWithinDeclarationInScope =
                                                     context.variablesFromWithinDeclarationInScope
@@ -8792,7 +8812,11 @@ expression context expressionTypedNode =
 
                                                         _ ->
                                                             destructuringToSwiftStatements
-                                                                typeAliasesInModule
+                                                                { typeAliasesInModule = typeAliasesInModule
+                                                                , path =
+                                                                    ("parameter" ++ (parameterIndex |> String.fromInt))
+                                                                        :: context.path
+                                                                }
                                                                 { pattern = parameter
                                                                 , expression =
                                                                     SwiftExpressionReference
@@ -8849,20 +8873,9 @@ expression context expressionTypedNode =
                 )
 
         ElmSyntaxTypeInfer.ExpressionCaseOf caseOf ->
-            let
-                typeAliasesInModule : String -> Maybe (FastDict.Dict String { parameters : List String, recordFieldOrder : Maybe (List String), type_ : ElmSyntaxTypeInfer.Type })
-                typeAliasesInModule moduleNameToAccess =
-                    context.moduleInfo
-                        |> FastDict.get moduleNameToAccess
-                        |> Maybe.map .typeAliases
-            in
             Result.map3
                 (\matched case0 case1Up ->
                     let
-                        switchLocalResultVariableToInitialize : String
-                        switchLocalResultVariableToInitialize =
-                            generatedLocalReturnResult context.path
-
                         allCasesHaveNoStatements : Bool
                         allCasesHaveNoStatements =
                             (case0 :: case1Up)
@@ -8871,41 +8884,47 @@ expression context expressionTypedNode =
                                         swiftCase.statements |> List.isEmpty
                                     )
                     in
-                    { statements =
-                        matched.statements
-                            ++ (if allCasesHaveNoStatements then
-                                    [ SwiftStatementLetDeclaration
-                                        { name = switchLocalResultVariableToInitialize
-                                        , resultType =
-                                            expressionTypedNode.type_
-                                                |> type_ typeAliasesInModule
-                                        , result =
-                                            SwiftExpressionSwitch
-                                                { matched = matched.result
-                                                , case0 =
-                                                    { pattern = case0.pattern
-                                                    , result = case0.result
-                                                    }
-                                                , case1Up =
-                                                    case1Up
-                                                        |> List.map
-                                                            (\swiftCase ->
-                                                                { pattern = swiftCase.pattern
-                                                                , result = swiftCase.result
-                                                                }
-                                                            )
+                    if allCasesHaveNoStatements then
+                        { statements = matched.statements
+                        , result =
+                            SwiftExpressionSwitch
+                                { matched = matched.result
+                                , case0 =
+                                    { pattern = case0.pattern
+                                    , result = case0.result
+                                    }
+                                , case1Up =
+                                    case1Up
+                                        |> List.map
+                                            (\swiftCase ->
+                                                { pattern = swiftCase.pattern
+                                                , result = swiftCase.result
                                                 }
-                                        }
-                                    ]
+                                            )
+                                }
+                        }
 
-                                else
-                                    [ SwiftStatementLetDeclarationUninitialized
+                    else
+                        let
+                            switchLocalResultVariableToInitialize : String
+                            switchLocalResultVariableToInitialize =
+                                generatedLocalReturnResult context.path
+
+                            typeAliasesInModule : String -> Maybe (FastDict.Dict String { parameters : List String, recordFieldOrder : Maybe (List String), type_ : ElmSyntaxTypeInfer.Type })
+                            typeAliasesInModule moduleNameToAccess =
+                                context.moduleInfo
+                                    |> FastDict.get moduleNameToAccess
+                                    |> Maybe.map .typeAliases
+                        in
+                        { statements =
+                            matched.statements
+                                ++ [ SwiftStatementLetDeclarationUninitialized
                                         { name = switchLocalResultVariableToInitialize
                                         , type_ =
                                             expressionTypedNode.type_
                                                 |> type_ typeAliasesInModule
                                         }
-                                    , SwiftStatementSwitch
+                                   , SwiftStatementSwitch
                                         { matched = matched.result
                                         , case0 =
                                             { pattern = case0.pattern
@@ -8932,17 +8951,16 @@ expression context expressionTypedNode =
                                                         }
                                                     )
                                         }
-                                    ]
-                               )
-                    , result =
-                        SwiftExpressionReference
-                            { moduleOrigin = Nothing
-                            , name = switchLocalResultVariableToInitialize
-                            }
-                    }
+                                   ]
+                        , result =
+                            SwiftExpressionReference
+                                { moduleOrigin = Nothing
+                                , name = switchLocalResultVariableToInitialize
+                                }
+                        }
                 )
                 (caseOf.matched
-                    |> expression
+                    |> expressionWrappingInLetIfOrSwitchResult
                         { moduleInfo = context.moduleInfo
                         , variablesFromWithinDeclarationInScope =
                             context.variablesFromWithinDeclarationInScope
@@ -9086,6 +9104,162 @@ expression context expressionTypedNode =
                         , path = "letResult" :: context.path
                         }
                 )
+
+
+{-| `if` and `switch` swift expressions are only allowed directly in let, func, return and lambda.
+Calling this will make sure the if/switch is first put into a let variable
+which is then used as the result instead.
+
+If you already have a transpiled SwiftExpression, use `swiftExpressionWrapInLetIfOrSwitchResult`
+
+-}
+expressionWrappingInLetIfOrSwitchResult :
+    { variablesFromWithinDeclarationInScope : FastSet.Set String
+    , letDeclaredValueAndFunctionTypes : FastDict.Dict String ElmSyntaxTypeInfer.Type
+    , moduleInfo :
+        FastDict.Dict
+            {- module origin -} String
+            { portsIncoming : FastSet.Set String
+            , portsOutgoing : FastSet.Set String
+            , -- TODO rename to valueAndFunctionTypesWithExpandedAliases
+              valueAndFunctionAnnotations :
+                FastDict.Dict
+                    String
+                    ElmSyntaxTypeInfer.Type
+            , typeAliases :
+                FastDict.Dict
+                    String
+                    { parameters : List String
+                    , recordFieldOrder : Maybe (List String)
+                    , type_ : ElmSyntaxTypeInfer.Type
+                    }
+            }
+    , path : List String
+    }
+    ->
+        ElmSyntaxTypeInfer.TypedNode
+            ElmSyntaxTypeInfer.Expression
+    ->
+        Result
+            String
+            { statements : List SwiftStatement
+            , result : SwiftExpression
+            }
+expressionWrappingInLetIfOrSwitchResult context expressionTypedNode =
+    case expressionTypedNode |> expression context of
+        Err error ->
+            Err error
+
+        Ok expressionTranspiled ->
+            let
+                wrappedInLetIfIfOrSwitch : { statements : List SwiftStatement, result : SwiftExpression }
+                wrappedInLetIfIfOrSwitch =
+                    swiftExpressionWrapInLetIfOrSwitchResult context.path
+                        { expression = expressionTranspiled.result
+                        , type_ =
+                            \() ->
+                                expressionTypedNode.type_
+                                    |> type_
+                                        (\moduleNameToAccess ->
+                                            context.moduleInfo
+                                                |> FastDict.get moduleNameToAccess
+                                                |> Maybe.map .typeAliases
+                                        )
+                        }
+            in
+            Ok
+                { statements =
+                    expressionTranspiled.statements
+                        ++ wrappedInLetIfIfOrSwitch.statements
+                , result = wrappedInLetIfIfOrSwitch.result
+                }
+
+
+swiftExpressionWrapInLetIfOrSwitchResult :
+    List String
+    ->
+        { expression : SwiftExpression
+        , type_ : () -> SwiftType
+        }
+    ->
+        { statements : List SwiftStatement
+        , result : SwiftExpression
+        }
+swiftExpressionWrapInLetIfOrSwitchResult path swiftExpressionTyped =
+    let
+        mustBeWrapped : Bool
+        mustBeWrapped =
+            case swiftExpressionTyped.expression of
+                SwiftExpressionSwitch _ ->
+                    True
+
+                SwiftExpressionIfElse _ ->
+                    True
+
+                SwiftExpressionDouble _ ->
+                    False
+
+                SwiftExpressionUnicodeScalar _ ->
+                    False
+
+                SwiftExpressionStringLiteral _ ->
+                    False
+
+                SwiftExpressionSelf ->
+                    False
+
+                SwiftExpressionReference _ ->
+                    False
+
+                SwiftExpressionVariant _ ->
+                    False
+
+                SwiftExpressionNegateOperation _ ->
+                    False
+
+                SwiftExpressionRecordAccess _ ->
+                    False
+
+                SwiftExpressionTuple _ ->
+                    False
+
+                SwiftExpressionArrayLiteral _ ->
+                    False
+
+                SwiftExpressionRecord _ ->
+                    False
+
+                SwiftExpressionCall _ ->
+                    False
+
+                SwiftExpressionLambda _ ->
+                    False
+    in
+    if mustBeWrapped then
+        let
+            switchLocalResultVariableToInitialize : String
+            switchLocalResultVariableToInitialize =
+                generatedLocalReturnResult path
+        in
+        { statements =
+            [ SwiftStatementLetDeclaration
+                { name = switchLocalResultVariableToInitialize
+                , resultType =
+                    swiftExpressionTyped.type_ ()
+                , result = swiftExpressionTyped.expression
+                }
+            ]
+        , result =
+            SwiftExpressionReference
+                { moduleOrigin = Nothing
+                , name = switchLocalResultVariableToInitialize
+                }
+        }
+
+    else
+        { statements = []
+        , result = swiftExpressionTyped.expression
+        }
 
 
 swiftTypeJsonEncodeValue : SwiftType
@@ -11443,11 +11617,13 @@ letDeclaration context syntaxLetDeclarationNode =
                 (\destructuredExpression ->
                     destructuredExpression.statements
                         ++ destructuringToSwiftStatements
-                            (\moduleNameToAccess ->
-                                context.moduleInfo
-                                    |> FastDict.get moduleNameToAccess
-                                    |> Maybe.map .typeAliases
-                            )
+                            { typeAliasesInModule =
+                                \moduleNameToAccess ->
+                                    context.moduleInfo
+                                        |> FastDict.get moduleNameToAccess
+                                        |> Maybe.map .typeAliases
+                            , path = "destructuredExpression" :: context.path
+                            }
                             { pattern = letDestructuring.pattern
                             , expression = destructuredExpression.result
                             }
@@ -11587,7 +11763,14 @@ letValueOrFunctionDeclaration context syntaxLetDeclarationValueOrFunctionNode =
                            )
                 )
                 (syntaxLetDeclarationValueOrFunctionNode.declaration.result
-                    |> expression context
+                    |> expression
+                        { moduleInfo = context.moduleInfo
+                        , path = context.path
+                        , letDeclaredValueAndFunctionTypes =
+                            context.letDeclaredValueAndFunctionTypes
+                        , variablesFromWithinDeclarationInScope =
+                            context.variablesFromWithinDeclarationInScope
+                        }
                 )
 
         _ :: _ ->
@@ -11654,7 +11837,11 @@ letValueOrFunctionDeclaration context syntaxLetDeclarationValueOrFunctionNode =
 
                                                         _ ->
                                                             destructuringToSwiftStatements
-                                                                typeAliasesInModule
+                                                                { typeAliasesInModule = typeAliasesInModule
+                                                                , path =
+                                                                    ("parameter" ++ (parameterIndex |> String.fromInt))
+                                                                        :: context.path
+                                                                }
                                                                 { pattern = parameter
                                                                 , expression =
                                                                     SwiftExpressionReference
