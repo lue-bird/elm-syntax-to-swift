@@ -1252,10 +1252,13 @@ swiftTypeIsEquatable swiftType =
 
                         Nothing ->
                             case construct.name of
-                                "JsonEncode_Value" ->
+                                "Platform_Program" ->
                                     False
 
-                                "JsonDecode_Value" ->
+                                "BytesDecode_Decoder" ->
+                                    False
+
+                                "JsonDecode_Decoder" ->
                                     False
 
                                 _ ->
@@ -8236,26 +8239,28 @@ expression context expressionTypedNode =
                                                 ]
                                             , statements = []
                                             , result =
-                                                SwiftExpressionCall
-                                                    { called =
-                                                        SwiftExpressionVariant
-                                                            { originTypeName = "PlatformCmd_CmdSingle"
-                                                            , name = "PlatformCmd_PortOutgoing"
-                                                            }
-                                                    , arguments =
-                                                        [ { label = Just "name"
-                                                          , value =
-                                                                SwiftExpressionStringLiteral reference.name
-                                                          }
-                                                        , { label = Just "value"
-                                                          , value =
-                                                                SwiftExpressionReference
-                                                                    { moduleOrigin = Nothing
-                                                                    , name = "generated_value"
-                                                                    }
-                                                          }
-                                                        ]
-                                                    }
+                                                SwiftExpressionArrayLiteral
+                                                    [ SwiftExpressionCall
+                                                        { called =
+                                                            SwiftExpressionVariant
+                                                                { originTypeName = "PlatformCmd_CmdSingle"
+                                                                , name = "PlatformCmd_PortOutgoing"
+                                                                }
+                                                        , arguments =
+                                                            [ { label = Just "name"
+                                                              , value =
+                                                                    SwiftExpressionStringLiteral reference.name
+                                                              }
+                                                            , { label = Just "value"
+                                                              , value =
+                                                                    SwiftExpressionReference
+                                                                        { moduleOrigin = Nothing
+                                                                        , name = "generated_value"
+                                                                        }
+                                                              }
+                                                            ]
+                                                        }
+                                                    ]
                                             }
 
                                     else if referenceOriginModuleInfo.portsIncoming |> FastSet.member reference.name then
@@ -8283,22 +8288,28 @@ expression context expressionTypedNode =
                                                 ]
                                             , statements = []
                                             , result =
-                                                SwiftExpressionCall
-                                                    { called =
-                                                        SwiftExpressionVariant
-                                                            { originTypeName = "PlatformSub_SubSingle"
-                                                            , name = "PlatformSub_PortIncoming"
-                                                            }
-                                                    , arguments =
-                                                        [ { label = Just "onValue"
-                                                          , value =
-                                                                SwiftExpressionReference
-                                                                    { moduleOrigin = Nothing
-                                                                    , name = "generated_onValue"
-                                                                    }
-                                                          }
-                                                        ]
-                                                    }
+                                                SwiftExpressionArrayLiteral
+                                                    [ SwiftExpressionCall
+                                                        { called =
+                                                            SwiftExpressionVariant
+                                                                { originTypeName = "PlatformSub_SubSingle"
+                                                                , name = "PlatformSub_PortIncoming"
+                                                                }
+                                                        , arguments =
+                                                            [ { label = Just "name"
+                                                              , value =
+                                                                    SwiftExpressionStringLiteral reference.name
+                                                              }
+                                                            , { label = Just "onValue"
+                                                              , value =
+                                                                    SwiftExpressionReference
+                                                                        { moduleOrigin = Nothing
+                                                                        , name = "generated_onValue"
+                                                                        }
+                                                              }
+                                                            ]
+                                                        }
+                                                    ]
                                             }
 
                                     else
@@ -15759,7 +15770,7 @@ extension Elm.Generated_x_y: Equatable where x: Equatable, y: Equatable {}
 extension Elm.Generated_x_y_z: Equatable where x: Equatable, y: Equatable, z: Equatable {}
 extension Elm.Generated_w_x_y_z: Equatable
 where x: Equatable, y: Equatable, z: Equatable, w: Equatable {}
-extension Elm.Generated_init__update_subscriptions: Equatable
+extension Elm.Generated_init__subscriptions_update: Equatable
 where init_: Equatable, update: Equatable, subscriptions: Equatable {}
 """
         ++ (deriveProtocolConformances |> String.join "\n")
@@ -32557,7 +32568,10 @@ public typealias PlatformCmd_Cmd<event> =
 }
 
 public enum PlatformSub_SubSingle<event: Sendable>: Sendable {
-    case PlatformSub_PortIncoming(name: String, onValue: @Sendable (Data) -> event)
+    case PlatformSub_PortIncoming(
+        name: String,
+        onValue: @Sendable (JsonDecode_Value) -> event
+    )
 }
 public typealias PlatformSub_Sub<event> = [PlatformSub_SubSingle<event>]
 
@@ -32587,31 +32601,31 @@ public typealias PlatformSub_Sub<event> = [PlatformSub_SubSingle<event>]
     })
 }
 
-public enum Generated_init__update_subscriptions<
-    init_: Sendable, update: Sendable, subscriptions: Sendable
+public enum Generated_init__subscriptions_update<
+    init_: Sendable, subscriptions: Sendable, update: Sendable
 >: Sendable {
-    case Record(init_: init_, update: update, subscriptions: subscriptions)
+    case Record(init_: init_, subscriptions: subscriptions, update: update)
     var init_: init_ {
         switch self {
         case let .Record(result, _, _): result
         }
     }
-    var update: update {
+    var subscriptions: subscriptions {
         switch self {
         case let .Record(_, result, _): result
         }
     }
-    var subscriptions: subscriptions {
+    var update: update {
         switch self {
         case let .Record(_, _, result): result
         }
     }
 }
 public typealias Platform_Program<flags: Sendable, state: Sendable, event: Sendable> =
-    Generated_init__update_subscriptions<
+    Generated_init__subscriptions_update<
         @Sendable (flags) -> Tuple<state, PlatformCmd_Cmd<event>>,
-        @Sendable (event) -> (state) -> Tuple<state, PlatformCmd_Cmd<event>>,
-        @Sendable (state) -> PlatformSub_Sub<event>
+        @Sendable (state) -> PlatformSub_Sub<event>,
+        @Sendable (event) -> (state) -> Tuple<state, PlatformCmd_Cmd<event>>
     >
 
 @Sendable public static func Platform_worker<flags, state, event>(
@@ -32622,9 +32636,13 @@ public typealias Platform_Program<flags: Sendable, state: Sendable, event: Senda
     config
 }
 
-public struct JsonDecode_Value: @unchecked Sendable {
+public struct JsonDecode_Value: @unchecked Sendable, Equatable {
     // NSString | NSNumber (covering Int, Float, Bool) | NSArray | NSDictionary | NSNull
-    let value: Any
+    let value: any Equatable
+
+    public static func == (l: JsonDecode_Value, r: JsonDecode_Value) -> Bool {
+        typeErasedEq(l, r)
+    }
 }
 public typealias JsonEncode_Value = JsonDecode_Value
 
@@ -32727,7 +32745,7 @@ public static let JsonEncode_null: JsonEncode_Value =
     }
 }
 
-public indirect enum JsonDecode_Error: Sendable {
+public indirect enum JsonDecode_Error: Sendable, Equatable {
     case JsonDecode_Field(String, JsonDecode_Error)
     case JsonDecode_Index(Double, JsonDecode_Error)
     case JsonDecode_OneOf(List_List<JsonDecode_Error>)
@@ -32748,13 +32766,19 @@ public struct JsonDecode_Decoder<value: Sendable>: Sendable {
     _ toDecode: String
 ) -> Result_Result<JsonDecode_Error, value> {
     do {
-        return decoder.decode(
-            JsonDecode_Value(
-                value: try JSONSerialization.jsonObject(
-                    with: Data(toDecode.utf8)
+        return
+            switch try JSONSerialization.jsonObject(with: Data(toDecode.utf8))
+        {
+        case let value as any Equatable:
+            decoder.decode(JsonDecode_Value(value: value))
+        case _:
+            .Result_Err(
+                .JsonDecode_Failure(
+                    "This is not valid JSON!",
+                    JsonEncode_string(toDecode)
                 )
             )
-        )
+        }
     } catch {
         return .Result_Err(
             .JsonDecode_Failure(
@@ -33083,9 +33107,9 @@ static func JsonDecode_fieldValue(_ fieldName: String)
         switch toDecode.value {
         case let dictToDecode as NSDictionary:
             switch dictToDecode.value(forKey: fieldName) {
-            case let .some(valueJson):
+            case let .some(valueJson as any Equatable):
                 .Result_Ok(JsonDecode_Value(value: valueJson))
-            case .none:
+            case /* .none | as not-Equatable */ _:
                 .Result_Err(
                     .JsonDecode_Failure(
                         "Expecting an OBJECT with a field named '\\(fieldName)'",
@@ -33142,15 +33166,15 @@ static func JsonDecode_fieldValue(_ fieldName: String)
         case let dictToDecode as NSDictionary:
             var decodedDictionary: [String: value] = Dictionary()
             for entryToDecode in dictToDecode {
-                let key: String
+                let keyToDecode: String
                 switch entryToDecode.key {
                 case let castedKey as String:
-                    key = castedKey
-                case _:
-                    switch JsonDecode_string.decode(JsonDecode_Value(value: entryToDecode.key))
+                    keyToDecode = castedKey
+                case let keyToDecodeJson as any Equatable:
+                    switch JsonDecode_string.decode(JsonDecode_Value(value: keyToDecodeJson))
                     {
                     case let .Result_Ok(decodedKey):
-                        key = decodedKey
+                        keyToDecode = decodedKey
                     case .Result_Err(_):
                         return .Result_Err(
                             .JsonDecode_Failure(
@@ -33159,12 +33183,32 @@ static func JsonDecode_fieldValue(_ fieldName: String)
                             )
                         )
                     }
+                case _:
+                    return .Result_Err(
+                        .JsonDecode_Failure(
+                            "Expecting an OBJECT with valid JSON STRING keys",
+                            toDecode
+                        )
+                    )
                 }
-                switch valueDecoder.decode(JsonDecode_Value(value: entryToDecode.value)) {
-                case let .Result_Err(error):
-                    return .Result_Err(.JsonDecode_Field(key, error))
-                case let .Result_Ok(decodedValue):
-                    decodedDictionary[key] = decodedValue
+                switch entryToDecode.value {
+                case let valueToDecode as any Equatable:
+                    switch valueDecoder.decode(JsonDecode_Value(value: valueToDecode)) {
+                    case let .Result_Err(error):
+                        return .Result_Err(.JsonDecode_Field(keyToDecode, error))
+                    case let .Result_Ok(decodedValue):
+                        decodedDictionary[keyToDecode] = decodedValue
+                    }
+                case _:
+                    return .Result_Err(
+                        .JsonDecode_Field(
+                            keyToDecode,
+                            .JsonDecode_Failure(
+                                "Expecting an OBJECT with valid JSON values",
+                                toDecode
+                            )
+                        )
+                    )
                 }
             }
             return .Result_Ok(decodedDictionary)
@@ -33178,45 +33222,9 @@ static func JsonDecode_fieldValue(_ fieldName: String)
 @Sendable public static func JsonDecode_keyValuePairs<value: Sendable>(
     _ valueDecoder: JsonDecode_Decoder<value>
 )
-    -> JsonDecode_Decoder<List_List<(String, value)>>
+    -> JsonDecode_Decoder<List_List<Tuple<String, value>>>
 {
-    JsonDecode_Decoder(decode: { toDecode in
-        switch toDecode.value {
-        case let dictToDecode as NSDictionary:
-            var decodedDictionary: List_List<(String, value)> = .List_Empty
-            for entryToDecode in dictToDecode.reversed() {
-                let key: String
-                switch entryToDecode.key {
-                case let castedKey as String:
-                    key = castedKey
-                case _:
-                    switch JsonDecode_string.decode(JsonDecode_Value(value: entryToDecode.key))
-                    {
-                    case let .Result_Ok(decodedKey):
-                        key = decodedKey
-                    case .Result_Err(_):
-                        return .Result_Err(
-                            .JsonDecode_Failure(
-                                "Expecting an OBJECT with STRING keys",
-                                toDecode
-                            )
-                        )
-                    }
-                }
-                switch valueDecoder.decode(JsonDecode_Value(value: entryToDecode.value)) {
-                case let .Result_Err(error):
-                    return .Result_Err(.JsonDecode_Field(key, error))
-                case let .Result_Ok(decodedValue):
-                    decodedDictionary = .List_Cons((key, decodedValue), decodedDictionary)
-                }
-            }
-            return .Result_Ok(decodedDictionary)
-        case _:
-            return .Result_Err(
-                .JsonDecode_Failure("Expecting an OBJECT", toDecode)
-            )
-        }
-    })
+    JsonDecode_map(Dict_toList, JsonDecode_dict(valueDecoder))
 }
 @Sendable public static func JsonDecode_array<a: Sendable>(
     _ elementDecoder: JsonDecode_Decoder<a>
@@ -33228,12 +33236,22 @@ static func JsonDecode_fieldValue(_ fieldName: String)
         case let arrayToDecode as NSArray:
             var decodedArray: [a] = []
             decodedArray.reserveCapacity(arrayToDecode.count)
-            for (index, elementToDecode) in arrayToDecode.enumerated() {
-                switch elementDecoder.decode(JsonDecode_Value(value: elementToDecode)) {
-                case let .Result_Err(error):
-                    return .Result_Err(.JsonDecode_Index(Double(index), error))
-                case let .Result_Ok(elementDecoded):
-                    decodedArray.append(elementDecoded)
+            for (index, elementToDecodeAny) in arrayToDecode.enumerated() {
+                switch elementToDecodeAny {
+                case let elementToDecode as any Equatable:
+                    switch elementDecoder.decode(JsonDecode_Value(value: elementToDecode)) {
+                    case let .Result_Err(error):
+                        return .Result_Err(.JsonDecode_Index(Double(index), error))
+                    case let .Result_Ok(elementDecoded):
+                        decodedArray.append(elementDecoded)
+                    }
+                case _:
+                    return .Result_Err(
+                        .JsonDecode_Index(
+                            Double(index),
+                            .JsonDecode_Failure("an ARRAY with valid JSON elements", toDecode)
+                        )
+                    )
                 }
             }
             return .Result_Ok(decodedArray)
@@ -33255,12 +33273,25 @@ static func JsonDecode_fieldValue(_ fieldName: String)
         case let arrayToDecode as NSArray:
             let index: Int = Int(indexAsDouble)
             return if index >= 0 && index < arrayToDecode.count {
-                switch elementDecoder.decode(JsonDecode_Value(value: arrayToDecode[index]))
-                {
-                case let .Result_Err(error):
-                    .Result_Err(.JsonDecode_Index(indexAsDouble, error))
-                case let .Result_Ok(elementDecoded):
-                    .Result_Ok(elementDecoded)
+                switch arrayToDecode[index] {
+                case let elementToDecode as any Equatable:
+                    switch elementDecoder.decode(JsonDecode_Value(value: elementToDecode))
+                    {
+                    case let .Result_Err(error):
+                        .Result_Err(.JsonDecode_Index(indexAsDouble, error))
+                    case let .Result_Ok(elementDecoded):
+                        .Result_Ok(elementDecoded)
+                    }
+                case _:
+                    .Result_Err(
+                        .JsonDecode_Index(
+                            indexAsDouble,
+                            .JsonDecode_Failure(
+                                "Expecting an ARRAY with with valid JSON elements",
+                                toDecode
+                            )
+                        )
+                    )
                 }
             } else {
                 .Result_Err(
@@ -33286,12 +33317,22 @@ static func JsonDecode_fieldValue(_ fieldName: String)
         switch toDecode.value {
         case let arrayToDecode as NSArray:
             var decodedList: List_List<a> = .List_Empty
-            for (index, elementToDecode) in arrayToDecode.enumerated().reversed() {
-                switch elementDecoder.decode(JsonDecode_Value(value: elementToDecode)) {
-                case let .Result_Err(error):
-                    return .Result_Err(.JsonDecode_Index(Double(index), error))
-                case let .Result_Ok(elementDecoded):
-                    decodedList = .List_Cons(elementDecoded, decodedList)
+            for (index, elementToDecodeAny) in arrayToDecode.enumerated().reversed() {
+                switch elementToDecodeAny {
+                case let elementToDecode as any Equatable:
+                    switch elementDecoder.decode(JsonDecode_Value(value: elementToDecode)) {
+                    case let .Result_Err(error):
+                        return .Result_Err(.JsonDecode_Index(Double(index), error))
+                    case let .Result_Ok(elementDecoded):
+                        decodedList = .List_Cons(elementDecoded, decodedList)
+                    }
+                case _:
+                    return .Result_Err(
+                        .JsonDecode_Index(
+                            Double(index),
+                            .JsonDecode_Failure("an ARRAY with valid JSON elements", toDecode)
+                        )
+                    )
                 }
             }
             return .Result_Ok(decodedList)
