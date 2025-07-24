@@ -29678,34 +29678,27 @@ public static let Basics_e: Double = exp(1.0)
     atan2(y, x)
 }
 
-
-static func doubleToInt32DroppingLaterBits(_ double: Double) -> Int32 {
-    Int32(truncatingIfNeeded: Int(double))
-}
-static func doubleToUInt32DroppingLaterBits(_ double: Double) -> UInt32 {
-    UInt32(truncatingIfNeeded: Int(double))
-}
 @Sendable public static func Bitwise_complement(_ int: Double) -> Double {
-    Double(~doubleToInt32DroppingLaterBits(int))
+    Double(~Int32(truncatingIfNeeded: Int(int)))
 }
 @Sendable public static func Bitwise_and(_ a: Double, _ b: Double) -> Double {
-    Double(doubleToInt32DroppingLaterBits(a) & doubleToInt32DroppingLaterBits(b))
+    Double(Int32(truncatingIfNeeded: Int(a)) & Int32(truncatingIfNeeded: Int(b)))
 }
 @Sendable public static func Bitwise_or(_ a: Double, _ b: Double) -> Double {
-    Double(doubleToInt32DroppingLaterBits(a) | doubleToInt32DroppingLaterBits(b))
+    Double(Int32(truncatingIfNeeded: Int(a)) | Int32(truncatingIfNeeded: Int(b)))
 }
 @Sendable public static func Bitwise_xor(_ a: Double, _ b: Double) -> Double {
-    Double(doubleToInt32DroppingLaterBits(a) ^ doubleToInt32DroppingLaterBits(b))
+    Double(Int32(truncatingIfNeeded: Int(a)) ^ Int32(truncatingIfNeeded: Int(b)))
 }
 @Sendable public static func Bitwise_shiftLeftBy(_ shifts: Double, _ float: Double) -> Double {
-    Double(doubleToInt32DroppingLaterBits(float) << doubleToInt32DroppingLaterBits(shifts))
+    Double(Int32(truncatingIfNeeded: Int(float)) << Int32(truncatingIfNeeded: Int(shifts)))
 }
 @Sendable public static func Bitwise_shiftRightBy(_ shifts: Double, _ float: Double) -> Double {
-    Double(doubleToInt32DroppingLaterBits(float) >> doubleToInt32DroppingLaterBits(shifts))
+    Double(Int32(truncatingIfNeeded: Int(float)) >> Int32(truncatingIfNeeded: Int(shifts)))
 }
 @Sendable public static func Bitwise_shiftRightZfBy(_ shifts: Double, _ float: Double) -> Double
 {
-    Double(doubleToUInt32DroppingLaterBits(float) >> doubleToUInt32DroppingLaterBits(shifts))
+    Double(UInt32(truncatingIfNeeded: Int(float)) >> UInt32(truncatingIfNeeded: Int(shifts)))
 }
 
 @Sendable public static func Char_toCode(_ char: UnicodeScalar) -> Double {
@@ -32027,7 +32020,7 @@ public enum BytesEncode_Encoder: Sendable, Equatable {
 @Sendable public static func BytesEncode_signedInt8(_ value: Double)
     -> BytesEncode_Encoder
 {
-    .BytesEncode_I8(Int8(value))
+    .BytesEncode_I8(Int8(truncatingIfNeeded: Int(value)))
 }
 @Sendable public static func BytesEncode_signedInt16(
     _ endianness: Bytes_Endianness,
@@ -32035,7 +32028,7 @@ public enum BytesEncode_Encoder: Sendable, Equatable {
 )
     -> BytesEncode_Encoder
 {
-    .BytesEncode_I16(endianness, Int16(value))
+    .BytesEncode_I16(endianness, Int16(truncatingIfNeeded: Int(value)))
 }
 @Sendable public static func BytesEncode_signedInt32(
     _ endianness: Bytes_Endianness,
@@ -32043,7 +32036,7 @@ public enum BytesEncode_Encoder: Sendable, Equatable {
 )
     -> BytesEncode_Encoder
 {
-    .BytesEncode_I32(endianness, Int32(value))
+    .BytesEncode_I32(endianness, Int32(truncatingIfNeeded: Int(value)))
 }
 @Sendable public static func BytesEncode_unsignedInt8(_ value: Double)
     -> BytesEncode_Encoder
@@ -32056,7 +32049,7 @@ public enum BytesEncode_Encoder: Sendable, Equatable {
 )
     -> BytesEncode_Encoder
 {
-    .BytesEncode_U16(endianness, UInt16(value))
+    .BytesEncode_U16(endianness, UInt16(truncatingIfNeeded: Int(value)))
 }
 @Sendable public static func BytesEncode_unsignedInt32(
     _ endianness: Bytes_Endianness,
@@ -32064,7 +32057,7 @@ public enum BytesEncode_Encoder: Sendable, Equatable {
 )
     -> BytesEncode_Encoder
 {
-    .BytesEncode_U32(endianness, UInt32(value))
+    .BytesEncode_U32(endianness, UInt32(truncatingIfNeeded: Int(value)))
 }
 @Sendable public static func BytesEncode_float32(
     _ endianness: Bytes_Endianness,
