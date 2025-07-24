@@ -14740,8 +14740,8 @@ printSwiftExpressionCall call =
                                                 )
                             )
 
-                argumentSpread : Print.LineSpread
-                argumentSpread =
+                argumentsLineSpread : Print.LineSpread
+                argumentsLineSpread =
                     argumentPrints
                         |> Print.lineSpreadListMapAndCombine Print.lineSpread
             in
@@ -14749,19 +14749,19 @@ printSwiftExpressionCall call =
                 |> Print.followedBy printExactlyParenOpening
                 |> Print.followedBy
                     (Print.withIndentAtNextMultipleOf4
-                        (Print.emptyOrLinebreakIndented argumentSpread
+                        (Print.emptyOrLinebreakIndented argumentsLineSpread
                             |> Print.followedBy
                                 (argumentPrints
                                     |> Print.listIntersperseAndFlatten
                                         (printExactlyComma
                                             |> Print.followedBy
-                                                (Print.spaceOrLinebreakIndented argumentSpread)
+                                                (Print.spaceOrLinebreakIndented argumentsLineSpread)
                                         )
                                 )
                         )
                     )
                 |> Print.followedBy
-                    (Print.emptyOrLinebreakIndented argumentSpread)
+                    (Print.emptyOrLinebreakIndented argumentsLineSpread)
                 |> Print.followedBy printExactlyParenClosing
 
 
