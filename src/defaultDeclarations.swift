@@ -221,14 +221,6 @@ public enum Elm {
         }
     }
 
-    @Sendable public static func Basics_min<a: Comparable>(_ a: a, _ b: a) -> a {
-        if a < b { a } else { b }
-    }
-
-    @Sendable public static func Basics_max<a: Comparable>(_ a: a, _ b: a) -> a {
-        if a > b { a } else { b }
-    }
-
     public static let Basics_e: Double = exp(1.0)
 
     @Sendable public static func Basics_clamp(_ low: Double, _ high: Double, _ number: Double)
@@ -239,10 +231,6 @@ public enum Elm {
 
     @Sendable public static func Basics_negate(_ float: Double) -> Double {
         -float
-    }
-
-    @Sendable public static func Basics_abs(_ float: Double) -> Double {
-        abs(float)
     }
 
     @Sendable public static func Basics_truncate(_ float: Double) -> Double {
@@ -325,10 +313,6 @@ public enum Elm {
         case let .Tuple(x, y):
             .Tuple(sqrt((x * x) + (y * y)), atan2(y, x))
         }
-    }
-
-    @Sendable public static func Basics_atan2(_ y: Double, _ x: Double) -> Double {
-        atan2(y, x)
     }
 
     @Sendable public static func Bitwise_complement(_ int: Double) -> Double {
@@ -1347,7 +1331,7 @@ public enum Elm {
     }
 
     @Sendable public static func List_cons<a>(_ newHead: a, _ tail: List_List<a>) -> List_List<a> {
-        List_List.List_Cons(newHead, tail)
+        .List_Cons(newHead, tail)
     }
 
     @Sendable public static func List_isEmpty<a>(_ list: List_List<a>) -> Bool {
@@ -1787,7 +1771,7 @@ public enum Elm {
         case .List_Empty:
             .Maybe_Nothing
         case let .List_Cons(head, tail):
-            .Maybe_Just(List_foldl(Basics_max, head, tail))
+            .Maybe_Just(List_foldl(max, head, tail))
         }
     }
 
@@ -1797,7 +1781,7 @@ public enum Elm {
         case .List_Empty:
             .Maybe_Nothing
         case let .List_Cons(head, tail):
-            .Maybe_Just(List_foldl(Basics_min, head, tail))
+            .Maybe_Just(List_foldl(min, head, tail))
         }
     }
 
@@ -2810,8 +2794,7 @@ public enum Elm {
                         bytesBuffer.append(contentsOf: toBytes(f64.bitPattern.littleEndian))
                     }
                 case let .BytesEncode_Seq(encodersToAppend):
-                    encodersRemainingStack =
-                        encodersRemainingStack + encodersToAppend.reversed()
+                    encodersRemainingStack.append(contentsOf: encodersToAppend.reversed())
                 case let .BytesEncode_Utf8(utf8String):
                     bytesBuffer.append(contentsOf: Array(Data(utf8String.utf8)))
                 case let .BytesEncode_Bytes(bytes):
@@ -4151,7 +4134,7 @@ public enum Elm {
         vec2Mutable.y = newY
         return vec2Mutable
     }
-    @Sendable public static func MathVector2_add(a: MathVector2_Vec2, _ b: MathVector2_Vec2)
+    @Sendable public static func MathVector2_add(_ a: MathVector2_Vec2, _ b: MathVector2_Vec2)
         -> MathVector2_Vec2
     {
         a + b
@@ -4272,7 +4255,7 @@ public enum Elm {
         vec3Mutable.z = newZ
         return vec3Mutable
     }
-    @Sendable public static func MathVector3_add(a: MathVector3_Vec3, _ b: MathVector3_Vec3)
+    @Sendable public static func MathVector3_add(_ a: MathVector3_Vec3, _ b: MathVector3_Vec3)
         -> MathVector3_Vec3
     {
         a + b
@@ -4417,7 +4400,7 @@ public enum Elm {
         vec4Mutable.w = newW
         return vec4Mutable
     }
-    @Sendable public static func MathVector4_add(a: MathVector4_Vec4, _ b: MathVector4_Vec4)
+    @Sendable public static func MathVector4_add(_ a: MathVector4_Vec4, _ b: MathVector4_Vec4)
         -> MathVector4_Vec4
     {
         a + b
@@ -4708,7 +4691,7 @@ public enum Elm {
         }
     }
 
-    @Sendable public static func VirtualDom_noJavaScriptOrHtmlUri(uri: String) -> String {
+    @Sendable public static func VirtualDom_noJavaScriptOrHtmlUri(_ uri: String) -> String {
         switch uri.wholeMatch(
             of:
                 #/^\s*(j\s*a\s*v\s*a\s*s\s*c\s*r\s*i\s*p\s*t\s*:|d\s*a\s*t\s*a\s*:\s*t\s*e\s*x\s*t\s*\/\s*h\s*t\s*m\s*l\s*(,|;))/#
@@ -5258,9 +5241,9 @@ public enum Elm {
         switch firstWeighted {
         case let .Tuple(weight, value):
             switch others {
-            case List_List.List_Empty:
+            case .List_Empty:
                 value
-            case let List_List.List_Cons(second, otherOthers):
+            case let .List_Cons(second, otherOthers):
                 if countdown <= abs(weight) {
                     value
                 } else {
