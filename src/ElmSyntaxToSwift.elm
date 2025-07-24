@@ -8569,22 +8569,40 @@ expression context expressionTypedNode =
             Result.map
                 (\elements ->
                     { statements =
-                        elements
-                            |> List.concatMap .statements
+                        elements |> List.concatMap .statements
                     , result =
-                        -- check if slow. If yes, replace with .List_Cons | .List_Empty
-                        SwiftExpressionCall
-                            { called =
-                                SwiftExpressionReference
-                                    { moduleOrigin = Nothing, name = "Array_toList" }
-                            , arguments =
-                                [ { label = Nothing
-                                  , value =
-                                        SwiftExpressionArrayLiteral
-                                            (elements |> List.map .result)
-                                  }
-                                ]
-                            }
+                        case elements of
+                            [] ->
+                                swiftExpressionListEmpty
+
+                            [ onlyElement ] ->
+                                SwiftExpressionCall
+                                    { called =
+                                        SwiftExpressionReference
+                                            { moduleOrigin = Nothing, name = "List_singleton" }
+                                    , arguments =
+                                        [ { label = Nothing
+                                          , value = onlyElement.result
+                                          }
+                                        ]
+                                    }
+
+                            element0 :: element1 :: element2Up ->
+                                -- check if slow. If yes, replace with .List_Cons | .List_Empty
+                                SwiftExpressionCall
+                                    { called =
+                                        SwiftExpressionReference
+                                            { moduleOrigin = Nothing, name = "Array_toList" }
+                                    , arguments =
+                                        [ { label = Nothing
+                                          , value =
+                                                SwiftExpressionArrayLiteral
+                                                    ((element0 :: element1 :: element2Up)
+                                                        |> List.map .result
+                                                    )
+                                          }
+                                        ]
+                                    }
                     }
                 )
                 (elementNodes
@@ -9122,6 +9140,14 @@ expression context expressionTypedNode =
                         , path = "letResult" :: context.path
                         }
                 )
+
+
+swiftExpressionListEmpty : SwiftExpression
+swiftExpressionListEmpty =
+    SwiftExpressionVariant
+        { originTypeName = "List_List"
+        , name = "List_Empty"
+        }
 
 
 {-| `if` and `switch` swift expressions are only allowed directly in let, func, return and lambda.
