@@ -3792,7 +3792,6 @@ typeConstructReferenceToCoreSwift reference =
                     Nothing
 
         "Random" ->
-            -- TODO
             case reference.name of
                 "Seed" ->
                     Just { moduleOrigin = Nothing, name = "Random_Seed" }
@@ -4840,7 +4839,6 @@ referenceToCoreSwift reference =
                     Nothing
 
         "Random" ->
-            -- TODO
             case reference.name of
                 "int" ->
                     Just { moduleOrigin = Nothing, name = "Random_int" }
@@ -5874,8 +5872,9 @@ modules syntaxDeclarationsIncludingOverwrittenOnes =
                             "Time" ->
                                 False
 
-                            -- TODO "Random" ->
-                            -- TODO     False
+                            "Random" ->
+                                False
+
                             "Markdown" ->
                                 False
 
@@ -29679,30 +29678,34 @@ public static let Basics_e: Double = exp(1.0)
     atan2(y, x)
 }
 
+
+static func doubleToInt32DroppingLaterBits(_ double: Double) -> Int32 {
+    Int32(truncatingIfNeeded: Int(double))
+}
+static func doubleToUInt32DroppingLaterBits(_ double: Double) -> UInt32 {
+    UInt32(truncatingIfNeeded: Int(double))
+}
 @Sendable public static func Bitwise_complement(_ int: Double) -> Double {
-    Double(~(Int32(int)))
+    Double(~doubleToInt32DroppingLaterBits(int))
 }
 @Sendable public static func Bitwise_and(_ a: Double, _ b: Double) -> Double {
-    Double(Int32(a) & Int32(b))
+    Double(doubleToInt32DroppingLaterBits(a) & doubleToInt32DroppingLaterBits(b))
 }
 @Sendable public static func Bitwise_or(_ a: Double, _ b: Double) -> Double {
-    Double(Int32(a) | Int32(b))
+    Double(doubleToInt32DroppingLaterBits(a) | doubleToInt32DroppingLaterBits(b))
 }
 @Sendable public static func Bitwise_xor(_ a: Double, _ b: Double) -> Double {
-    Double(Int32(a) ^ Int32(b))
+    Double(doubleToInt32DroppingLaterBits(a) ^ doubleToInt32DroppingLaterBits(b))
 }
 @Sendable public static func Bitwise_shiftLeftBy(_ shifts: Double, _ float: Double) -> Double {
-    Double(Int32(float) << Int32(shifts))
+    Double(doubleToInt32DroppingLaterBits(float) << doubleToInt32DroppingLaterBits(shifts))
 }
 @Sendable public static func Bitwise_shiftRightBy(_ shifts: Double, _ float: Double) -> Double {
-    Double(Int32(float) >> Int32(shifts))
+    Double(doubleToInt32DroppingLaterBits(float) >> doubleToInt32DroppingLaterBits(shifts))
 }
 @Sendable public static func Bitwise_shiftRightZfBy(_ shifts: Double, _ float: Double) -> Double
 {
-    Double(
-        UInt32(bitPattern: Int32(float))
-            >> UInt32(bitPattern: Int32(shifts))
-    )
+    Double(doubleToUInt32DroppingLaterBits(float) >> doubleToUInt32DroppingLaterBits(shifts))
 }
 
 @Sendable public static func Char_toCode(_ char: UnicodeScalar) -> Double {
@@ -34525,6 +34528,346 @@ public static func VirtualDom_lazy8<
     .VirtualDom_NodeLazy(
         keys: [a, b, c, d, e, f, g, h],
         construct: { construct(a)(b)(c)(d)(e)(f)(g)(h) }
+    )
+}
+
+public enum Random_Seed: Sendable, Equatable {
+    // FUTURE improvement: change to ints
+    // the first number is the state of the RNG and stepped with each random generation
+    // the second state is the increment which corresponds to an independent RNG
+    case Random_Seed(Double, Double)
+}
+
+public struct Random_Generator<a: Sendable>: Sendable {
+    let step: @Sendable (Random_Seed) -> (a, Random_Seed)
+}
+
+public static let Random_independentSeed: Random_Generator<Random_Seed> =
+    Random_Generator(step: { (seed0: Random_Seed) in
+        @Sendable func makeIndependentSeed(_ state: Double, _ b: Double, _ c: Double)
+            -> Random_Seed
+        {
+            // Although it probably doesn't hold water theoretically, xor two
+            // random numbers to make an increment less likely to be
+            // pathological. Then make sure that it's odd, which is required.
+            // Next make sure it is positive. Finally step it once before use.
+            Random_next(
+                .Random_Seed(
+                    state, Bitwise_shiftRightZfBy(0.0, Bitwise_or(1.0, Bitwise_xor(b, c)))
+                )
+            )
+        }
+        let gen: Random_Generator<Double> = Random_int(0.0, 4294967295.0)
+        return
+            Random_map3(
+                { state in { b in { c in makeIndependentSeed(state, b, c) } } },
+                gen,
+                gen,
+                gen
+            ).step(seed0)
+    })
+
+public static let Random_maxInt: Double = 2147483647.0
+public static let Random_minInt: Double = -2147483648.0
+
+@Sendable public static func Random_andThen<a: Sendable, b: Sendable>(
+    _ callback: @Sendable @escaping (a) -> Random_Generator<b>,
+    _ generator: Random_Generator<a>
+) -> Random_Generator<b> {
+    Random_Generator(step: { (seed: Random_Seed) in
+        let (result, newSeed) = generator.step(seed)
+        return callback(result).step(newSeed)
+    })
+}
+
+@Sendable public static func Random_constant<a: Sendable>(_ value: a) -> Random_Generator<a> {
+    Random_Generator(step: { (seed: Random_Seed) in (value, seed) })
+}
+
+@Sendable public static func Random_float(_ a: Double, _ b: Double) -> Random_Generator<Double>
+{
+    Random_Generator(step: { (seed0: Random_Seed) in
+        // Get 64 bits of randomness
+        let seed1: Random_Seed = Random_next(seed0)
+        let n1: Double = Random_peel(seed1)
+        let n0: Double = Random_peel(seed0)
+        // Get a uniformly distributed IEEE-754 double between 0.0 and 1.0
+        let lo: Double = Double(Bitwise_and(134217727.0, n1))
+        let hi: Double = Double(Bitwise_and(67108863.0, n0))
+        let val: Double =
+            // These magic constants are 2^27 and 2^53
+            Basics_fdiv((hi * 134217728.0) + lo, 9007199254740992.0)
+        // Scale it into our range
+        let range: Double = abs(b - a)
+        let scaled: Double = Basics_add(Basics_mul(val, range), a)
+        return (scaled, Random_next(seed1))
+    })
+}
+
+@Sendable public static func Random_getByWeight<a: Sendable>(
+    _ firstWeighted: Tuple<Double, a>,
+    _ others: List_List<Tuple<Double, a>>,
+    _ countdown: Double
+) -> a {
+    switch firstWeighted {
+    case let .Tuple(weight, value):
+        switch others {
+        case List_List.List_Empty:
+            value
+        case let List_List.List_Cons(second, otherOthers):
+            if countdown <= abs(weight) {
+                value
+            } else {
+                Random_getByWeight(second, otherOthers, countdown - abs(weight))
+            }
+        }
+    }
+}
+
+@Sendable public static func Random_initialSeed(_ x: Double) -> Random_Seed {
+    switch Random_next(.Random_Seed(0.0, 1013904223.0)) {
+    case let .Random_Seed(state1, incr):
+        let state2: Double =
+            Bitwise_shiftRightZfBy(0.0, Basics_add(state1, x))
+        return Random_next(.Random_Seed(state2, incr))
+    }
+}
+
+@Sendable public static func Random_int(_ a: Double, _ b: Double) -> Random_Generator<Double> {
+    Random_Generator(step: { (seed0: Random_Seed) in
+        let (lo, hi): (Double, Double) =
+            if a < b {
+                (a, b)
+            } else {
+                (b, a)
+            }
+        let range: Double = ((hi - lo) + 1.0)
+        // fast path for power of 2
+        if Bitwise_and(range - 1.0, range) == 0.0 {
+            return
+                (
+                    Bitwise_shiftRightZfBy(
+                        0.0,
+                        Bitwise_and(range - 1.0, Random_peel(seed0))
+                    )
+                        + lo,
+                    Random_next(seed0)
+                )
+        } else {
+            let threshold: Double =
+                // essentially: period % max
+                Bitwise_shiftRightZfBy(
+                    0.0,
+                    Basics_remainderBy(
+                        range,
+                        Bitwise_shiftRightZfBy(0.0, -range)
+                    )
+                )
+            @Sendable func accountForBias(_ seed: Random_Seed) -> (Double, Random_Seed) {
+                let x: Double = Random_peel(seed)
+                let seedN: Random_Seed = Random_next(seed)
+                return if x < threshold {
+                    // in practice this recurses almost never
+                    accountForBias(seedN)
+                } else {
+                    (Basics_remainderBy(range, x) + lo, seedN)
+                }
+            }
+            return accountForBias(seed0)
+        }
+    })
+}
+
+@Sendable public static func Random_lazy<a: Sendable>(
+    _ callback: @Sendable @escaping (Unit) -> Random_Generator<a>
+) -> Random_Generator<a> {
+    Random_Generator(step: { (seed: Random_Seed) in
+        callback(.Unit).step(seed)
+    })
+}
+
+@Sendable public static func Random_list<a: Sendable>(
+    _ n: Double, _ elementGenerator: Random_Generator<a>
+) -> Random_Generator<List_List<a>> {
+    let gen: @Sendable (Random_Seed) -> (a, Random_Seed) = elementGenerator.step
+    return Random_Generator(step: { (seed: Random_Seed) in
+        Random_listHelp(.List_Empty, n, gen, seed)
+    })
+}
+
+@Sendable public static func Random_listHelp<a: Sendable>(
+    _ revList: List_List<a>,
+    _ n: Double,
+    _ gen: @Sendable @escaping (Random_Seed) -> (a, Random_Seed),
+    _ seed: Random_Seed
+) -> (List_List<a>, Random_Seed) {
+    if Basics_lt(n, 1.0) {
+        return (revList, seed)
+    } else {
+        let (value, newSeed): (a, Random_Seed) = gen(seed)
+        return
+            Random_listHelp(
+                .List_Cons(value, revList),
+                n - 1.0,
+                gen,
+                newSeed
+            )
+    }
+}
+
+@Sendable public static func Random_map<a: Sendable, b: Sendable>(
+    _ valueChange: @Sendable @escaping (a) -> b,
+    _ generator: Random_Generator<a>
+) -> Random_Generator<b> {
+    Random_Generator(step: { (seed0: Random_Seed) in
+        let (value, seed1): (a, Random_Seed) = generator.step(seed0)
+        return (valueChange(value), seed1)
+    })
+}
+@Sendable
+public static func Random_map2<
+    a: Sendable, b: Sendable, combined: Sendable
+>(
+    _ combine: @Sendable @escaping (a) -> (b) -> combined,
+    _ aGenerator: Random_Generator<a>,
+    _ bGenerator: Random_Generator<b>
+) -> Random_Generator<combined> {
+    Random_Generator(step: { (seed0: Random_Seed) in
+        let (a, seed1): (a, Random_Seed) = aGenerator.step(seed0)
+        let (b, seed2): (b, Random_Seed) = bGenerator.step(seed1)
+        return (combine(a)(b), seed2)
+    })
+}
+@Sendable
+public static func Random_map3<
+    a: Sendable, b: Sendable, c: Sendable, combined: Sendable
+>(
+    _ combine: @Sendable @escaping (a) -> (b) -> (c) -> combined,
+    _ aGenerator: Random_Generator<a>,
+    _ bGenerator: Random_Generator<b>,
+    _ cGenerator: Random_Generator<c>
+) -> Random_Generator<combined> {
+    Random_Generator(step: { (seed0: Random_Seed) in
+        let (a, seed1): (a, Random_Seed) = aGenerator.step(seed0)
+        let (b, seed2): (b, Random_Seed) = bGenerator.step(seed1)
+        let (c, seed3): (c, Random_Seed) = cGenerator.step(seed2)
+        return (combine(a)(b)(c), seed3)
+    })
+}
+@Sendable
+public static func Random_map4<
+    a: Sendable, b: Sendable, c: Sendable, d: Sendable, combined: Sendable
+>(
+    _ combine: @Sendable @escaping (a) -> (b) -> (c) -> (d) -> combined,
+    _ aGenerator: Random_Generator<a>,
+    _ bGenerator: Random_Generator<b>,
+    _ cGenerator: Random_Generator<c>,
+    _ dGenerator: Random_Generator<d>
+) -> Random_Generator<combined> {
+    Random_Generator(step: { (seed0: Random_Seed) in
+        let (a, seed1): (a, Random_Seed) = aGenerator.step(seed0)
+        let (b, seed2): (b, Random_Seed) = bGenerator.step(seed1)
+        let (c, seed3): (c, Random_Seed) = cGenerator.step(seed2)
+        let (d, seed4): (d, Random_Seed) = dGenerator.step(seed3)
+        return (combine(a)(b)(c)(d), seed4)
+    })
+}
+@Sendable
+public static func Random_map5<
+    a: Sendable, b: Sendable, c: Sendable, d: Sendable, e: Sendable, combined: Sendable
+>(
+    _ combine: @Sendable @escaping (a) -> (b) -> (c) -> (d) -> (e) -> combined,
+    _ aGenerator: Random_Generator<a>,
+    _ bGenerator: Random_Generator<b>,
+    _ cGenerator: Random_Generator<c>,
+    _ dGenerator: Random_Generator<d>,
+    _ eGenerator: Random_Generator<e>
+) -> Random_Generator<combined> {
+    Random_Generator(step: { (seed0: Random_Seed) in
+        let (a, seed1): (a, Random_Seed) = aGenerator.step(seed0)
+        let (b, seed2): (b, Random_Seed) = bGenerator.step(seed1)
+        let (c, seed3): (c, Random_Seed) = cGenerator.step(seed2)
+        let (d, seed4): (d, Random_Seed) = dGenerator.step(seed3)
+        let (e, seed5): (e, Random_Seed) = eGenerator.step(seed4)
+        return (combine(a)(b)(c)(d)(e), seed5)
+    })
+}
+
+@Sendable public static func Random_next(_ generated_0: Random_Seed) -> Random_Seed {
+    // step the RNG to produce the next seed
+    // this is incredibly simple: multiply the state by a constant factor, modulus it
+    // by 2^32, and add a magic addend. The addend can be varied to produce independent
+    // RNGs, so it is stored as part of the seed. It is given to the new seed unchanged.
+    switch generated_0 {
+    case let .Random_Seed(state0, incr):
+        // The magic constant is from Numerical Recipes
+        .Random_Seed(Bitwise_shiftRightZfBy(0.0, (state0 * 1664525.0) + incr), incr)
+    }
+}
+
+@Sendable public static func Random_pair<a: Sendable, b: Sendable>(
+    _ genA: Random_Generator<a>,
+    _ genB: Random_Generator<b>
+) -> Random_Generator<Tuple<a, b>> {
+    Random_map2({ (a: a) in { (b: b) in .Tuple(a, b) } }, genA, genB)
+}
+
+// obtain a pseudorandom 32-bit integer from a seed
+@Sendable public static func Random_peel(_ seed: Random_Seed) -> Double {
+    // This is the RXS-M-SH version of PCG, see section 6.3.4 of the paper
+    // and line 184 of pcg_variants.h in the 0.94 (non-minimal) C implementation,
+    // the latter of which is the source of the magic constant.
+    switch seed {
+    case let .Random_Seed(state, _):
+        let word: Double =
+            Bitwise_xor(
+                state,
+                Bitwise_shiftRightZfBy(
+                    Bitwise_shiftRightZfBy(28.0, state) + 4.0,
+                    state
+                )
+            )
+            * 277803737.0
+        return Bitwise_shiftRightZfBy(
+            0.0,
+            Bitwise_xor(
+                Bitwise_shiftRightZfBy(22.0, word),
+                word
+            )
+        )
+    }
+}
+
+@Sendable public static func Random_step<a: Sendable>(
+    _ generator: Random_Generator<a>,
+    _ seed: Random_Seed
+) -> Tuple<a, Random_Seed> {
+    let (value, newSeed): (a, Random_Seed) = generator.step(seed)
+    return .Tuple(value, newSeed)
+}
+
+@Sendable public static func Random_uniform<a: Sendable>(_ value: a, _ valueList: List_List<a>)
+    -> Random_Generator<a>
+{
+    Random_weighted(Random_addOne(value), List_map(Random_addOne, valueList))
+}
+@Sendable public static func Random_addOne<a: Sendable>(_ value: a) -> Tuple<Double, a> {
+    .Tuple(1.0, value)
+}
+
+@Sendable public static func Random_weighted<a: Sendable>(
+    _ first: Tuple<Double, a>,
+    _ others: List_List<Tuple<Double, a>>
+) -> Random_Generator<a> {
+    @Sendable func normalize<ignored: Sendable>(_ weighted: Tuple<Double, ignored>) -> Double {
+        abs(weighted.first)
+    }
+    let total: Double = normalize(first) + List_sum(List_map(normalize, others))
+    return Random_map(
+        { (countdown: Double) in
+            Random_getByWeight(first, others, countdown)
+        },
+        Random_float(0.0, total)
     )
 }
 """
