@@ -612,53 +612,72 @@ printSwiftEnumDeclaration swiftEnumType =
                                 Print.linebreakIndented
                         )
                     |> Print.followedBy
-                        Print.linebreakIndented
-                    |> Print.followedBy
-                        (swiftEnumType.computedProperties
-                            |> FastDict.toList
-                            |> Print.listMapAndIntersperseAndFlatten
-                                (\( name, computedProperty ) ->
-                                    let
-                                        assignedValuePrint : Print
-                                        assignedValuePrint =
-                                            printSwiftExpressionNotParenthesized
-                                                computedProperty.value
+                        (if swiftEnumType.computedProperties |> FastDict.isEmpty then
+                            Print.empty
 
-                                        resultTypePrint : Print
-                                        resultTypePrint =
-                                            printSwiftTypeNotParenthesized
-                                                Nothing
-                                                computedProperty.type_
-                                    in
-                                    Print.exactly ("var " ++ name ++ ":")
-                                        |> Print.followedBy
-                                            (Print.withIndentAtNextMultipleOf4
-                                                (Print.spaceOrLinebreakIndented
-                                                    (resultTypePrint |> Print.lineSpread)
-                                                    |> Print.followedBy resultTypePrint
-                                                    |> Print.followedBy
-                                                        printExactlySpaceCurlyOpening
-                                                    |> Print.followedBy
-                                                        (Print.spaceOrLinebreakIndented
-                                                            (assignedValuePrint |> Print.lineSpread)
-                                                        )
-                                                    |> Print.followedBy
-                                                        assignedValuePrint
-                                                )
+                         else
+                            Print.linebreakIndented
+                                |> Print.followedBy
+                                    (swiftEnumType.computedProperties
+                                        |> FastDict.toList
+                                        |> Print.listMapAndIntersperseAndFlatten
+                                            (\( name, computedProperty ) ->
+                                                printSwiftComputedProperty
+                                                    { name = name
+                                                    , value = computedProperty.value
+                                                    , type_ = computedProperty.type_
+                                                    }
                                             )
-                                        |> Print.followedBy
-                                            (Print.spaceOrLinebreakIndented
-                                                (assignedValuePrint |> Print.lineSpread)
-                                            )
-                                        |> Print.followedBy
-                                            printExactlyCurlyClosing
-                                )
-                                Print.linebreakIndented
+                                            Print.linebreakIndented
+                                    )
                         )
                 )
             )
         |> Print.followedBy Print.linebreakIndented
         |> Print.followedBy printExactlyCurlyClosing
+
+
+printSwiftComputedProperty :
+    { name : String
+    , value : SwiftExpression
+    , type_ : SwiftType
+    }
+    -> Print
+printSwiftComputedProperty computedProperty =
+    let
+        assignedValuePrint : Print
+        assignedValuePrint =
+            printSwiftExpressionNotParenthesized
+                computedProperty.value
+
+        resultTypePrint : Print
+        resultTypePrint =
+            printSwiftTypeNotParenthesized
+                Nothing
+                computedProperty.type_
+    in
+    Print.exactly ("var " ++ computedProperty.name ++ ":")
+        |> Print.followedBy
+            (Print.withIndentAtNextMultipleOf4
+                (Print.spaceOrLinebreakIndented
+                    (resultTypePrint |> Print.lineSpread)
+                    |> Print.followedBy resultTypePrint
+                    |> Print.followedBy
+                        printExactlySpaceCurlyOpening
+                    |> Print.followedBy
+                        (Print.spaceOrLinebreakIndented
+                            (assignedValuePrint |> Print.lineSpread)
+                        )
+                    |> Print.followedBy
+                        assignedValuePrint
+                )
+            )
+        |> Print.followedBy
+            (Print.spaceOrLinebreakIndented
+                (assignedValuePrint |> Print.lineSpread)
+            )
+        |> Print.followedBy
+            printExactlyCurlyClosing
 
 
 printSwiftEnumCaseDeclaration :
@@ -5855,9 +5874,8 @@ modules syntaxDeclarationsIncludingOverwrittenOnes =
                             "Time" ->
                                 False
 
-                            "Random" ->
-                                False
-
+                            -- TODO "Random" ->
+                            -- TODO     False
                             "Markdown" ->
                                 False
 
