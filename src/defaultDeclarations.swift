@@ -616,6 +616,10 @@ public enum Elm {
         Array_toList(string.components(separatedBy: .newlines))
     }
 
+    @Sendable public static func String_words(_ string: String) -> List_List<String> {
+        Array_toList(string.components(separatedBy: .whitespaces))
+    }
+
     @Sendable public static func String_split(_ separator: String, _ string: String) -> List_List<
         String
     > {
