@@ -195,13 +195,6 @@ runningInterface state =
             , content =
                 transpiledDeclarationsAndErrors.declarations
                     |> ElmSyntaxToSwift.swiftDeclarationsToModuleString
-                    |> -- TODO remove for general use
-                       String.replace
-                        "ListExtra_uniqueHelp<'a>"
-                        "ListExtra_uniqueHelp<'a when 'a: equality>"
-                    |> String.replace
-                        "ListExtra_unique<'a>"
-                        "ListExtra_unique<'a when 'a: equality>"
                     |> Bytes.Encode.string
                     |> Bytes.Encode.encode
             }
