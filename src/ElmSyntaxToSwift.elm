@@ -32719,9 +32719,9 @@ public static let JsonEncode_null: JsonEncode_Value =
 {
     let options: JSONSerialization.WritingOptions =
         if indentSize <= 0 {
-            []
+            [.fragmentsAllowed]
         } else {
-            [.prettyPrinted]  // indent size 2
+            [.fragmentsAllowed, .prettyPrinted]  // indent size 2
         }
     do {
         let prettyPrintedData: Data = try JSONSerialization.data(
@@ -32769,7 +32769,10 @@ public struct JsonDecode_Decoder<value: Sendable>: Sendable {
 ) -> Result_Result<JsonDecode_Error, value> {
     do {
         return
-            switch try JSONSerialization.jsonObject(with: Data(toDecode.utf8))
+            switch try JSONSerialization.jsonObject(
+                with: Data(toDecode.utf8),
+                options: [.fragmentsAllowed]
+            )
         {
         case let value as any Equatable:
             decoder.decode(JsonDecode_Value(value: value))
