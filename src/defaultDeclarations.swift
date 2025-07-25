@@ -3369,7 +3369,7 @@ public enum Elm {
             }
         do {
             let prettyPrintedData: Data = try JSONSerialization.data(
-                withJSONObject: encoded,
+                withJSONObject: encoded.value,
                 options: options
             )
             return switch String(data: prettyPrintedData, encoding: .utf8) {

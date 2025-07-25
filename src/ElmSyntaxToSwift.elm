@@ -32725,7 +32725,7 @@ public static let JsonEncode_null: JsonEncode_Value =
         }
     do {
         let prettyPrintedData: Data = try JSONSerialization.data(
-            withJSONObject: encoded,
+            withJSONObject: encoded.value,
             options: options
         )
         return switch String(data: prettyPrintedData, encoding: .utf8) {
