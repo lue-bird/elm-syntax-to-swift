@@ -184,7 +184,7 @@ public enum Elm {
         if let b: a = b as? a {
             a == b
         } else {
-            fatalError("/= on non-Equatable types")
+            fatalError("== on non-Equatable types")
         }
     }
     static func typeErasedNeq<a: Equatable, b: Equatable>(_ a: a, _ b: b) -> Bool {
@@ -3284,10 +3284,66 @@ public enum Elm {
 
     public struct JsonDecode_Value: @unchecked Sendable, Equatable {
         // NSString | NSNumber (covering Int, Float, Bool) | NSArray | NSDictionary | NSNull
-        let value: any Equatable
+        let value: Any
 
         public static func == (l: JsonDecode_Value, r: JsonDecode_Value) -> Bool {
-            typeErasedEq(l, r)
+            anyEquals(l.value, r.value)
+        }
+        static func anyEquals(_ l: Any, _ r: Any) -> Bool {
+            switch (l, r) {
+            case (_ as NSNull, _ as NSNull):
+                true
+            case (_ as NSNull, _), (_, _ as NSNull): false
+            case let (lNumber as NSNumber, rNumber as NSNumber):
+                lNumber == rNumber
+            case (_ as NSNumber, _), (_, _ as NSNumber): false
+            case let (lString as NSString, rString as NSString):
+                lString == rString
+            case (_ as NSString, _), (_, _ as NSString): false
+            case let (lArray as NSArray, rArray as NSArray):
+                lArray.elementsEqual(rArray, by: anyEquals)
+            case (_ as NSArray, _), (_, _ as NSArray): false
+            case let (lDictionary as NSDictionary, rDictionary as NSDictionary):
+                lDictionary.allSatisfy({ lEntry in
+                    switch rDictionary[lEntry.key] {
+                    case .none: false
+                    case let .some(rEntryValue):
+                        anyEquals(lEntry.value, rEntryValue)
+                    }
+                })
+            case (_ as NSDictionary, _), (_, _ as NSDictionary): false
+            // non-standard, usually type-equivalent so cases likely impossible
+            case let (lNumber as Double, rNumber as Double):
+                lNumber == rNumber
+            case (_ as Double, _), (_, _ as Double): false
+            case let (lNumber as Int, rNumber as Int):
+                lNumber == rNumber
+            case (_ as Int, _), (_, _ as Int): false
+            case let (lNumber as Bool, rNumber as Bool):
+                lNumber == rNumber
+            case (_ as Bool, _), (_, _ as Bool): false
+            case let (lString as String, rString as String):
+                lString == rString
+            case (_ as String, _), (_, _ as String): false
+            case let (lArray as [Any], rArray as [Any]):
+                lArray.elementsEqual(rArray, by: anyEquals)
+            case let (lDictionary as [AnyHashable: Any], rDictionary as [AnyHashable: Any]):
+                lDictionary.allSatisfy({ lEntry in
+                    switch rDictionary[lEntry.key] {
+                    case .none: false
+                    case let .some(rEntryValue):
+                        anyEquals(lEntry.value, rEntryValue)
+                    }
+                })
+            case (_ as [AnyHashable: Any], _), (_, _ as [AnyHashable: Any]): false
+            // last resort
+            case let (lHashable as AnyHashable, rHashable as AnyHashable):
+                lHashable == rHashable
+            case let (lEquatable as any Equatable, rEquatable as any Equatable):
+                typeErasedEq(lEquatable, rEquatable)
+            case (_, _):
+                fatalError("== on non-Equatable json values \(l) and \(r)")
+            }
         }
     }
     public typealias JsonEncode_Value = JsonDecode_Value
@@ -3295,7 +3351,7 @@ public enum Elm {
     public static let JsonEncode_null: JsonEncode_Value =
         JsonDecode_Value(value: NSNull())
     @Sendable public static func JsonEncode_int(_ int: Double) -> JsonEncode_Value {
-        JsonDecode_Value(value: NSNumber(value: int))
+        JsonDecode_Value(value: NSNumber(value: Int64(int)))
     }
     @Sendable public static func JsonEncode_float(_ float: Double) -> JsonEncode_Value {
         JsonDecode_Value(value: NSNumber(value: float))
@@ -3412,26 +3468,18 @@ public enum Elm {
         _ toDecode: String
     ) -> Result_Result<JsonDecode_Error, value> {
         do {
-            return
-                switch try JSONSerialization.jsonObject(
-                    with: Data(toDecode.utf8),
-                    options: [.fragmentsAllowed]
-                )
-            {
-            case let value as any Equatable:
-                decoder.decode(JsonDecode_Value(value: value))
-            case _:
-                .Result_Err(
-                    .JsonDecode_Failure(
-                        "This is not valid JSON!",
-                        JsonEncode_string(toDecode)
+            return decoder.decode(
+                JsonDecode_Value(
+                    value: try JSONSerialization.jsonObject(
+                        with: Data(toDecode.utf8),
+                        options: [.fragmentsAllowed]
                     )
                 )
-            }
-        } catch {
+            )
+        } catch let error {
             return .Result_Err(
                 .JsonDecode_Failure(
-                    "This is not valid JSON!",
+                    "This is not valid JSON! \(error.localizedDescription)",
                     JsonEncode_string(toDecode)
                 )
             )
@@ -3720,6 +3768,9 @@ public enum Elm {
             switch toDecode.value {
             case let nsNumber as NSNumber:
                 .Result_Ok(nsNumber.doubleValue)
+            // non-standard
+            case let double as Double:
+                .Result_Ok(double)
             case _:
                 .Result_Err(
                     .JsonDecode_Failure("Expecting a NUMBER", toDecode)
@@ -3731,6 +3782,9 @@ public enum Elm {
             switch toDecode.value {
             case let nsString as NSString:
                 .Result_Ok(String(nsString))
+            // non-standard
+            case let string as String:
+                .Result_Ok(String(string))
             case _:
                 .Result_Err(
                     .JsonDecode_Failure("Expecting a NUMBER", toDecode)
@@ -3756,9 +3810,9 @@ public enum Elm {
             switch toDecode.value {
             case let dictToDecode as NSDictionary:
                 switch dictToDecode.value(forKey: fieldName) {
-                case let .some(valueJson as any Equatable):
+                case let .some(valueJson):
                     .Result_Ok(JsonDecode_Value(value: valueJson))
-                case /* .none | as not-Equatable */ _:
+                case .none:
                     .Result_Err(
                         .JsonDecode_Failure(
                             "Expecting an OBJECT with a field named '\(fieldName)'",
@@ -3815,47 +3869,20 @@ public enum Elm {
             case let dictToDecode as NSDictionary:
                 var decodedDictionary: [String: value] = Dictionary()
                 for entryToDecode in dictToDecode {
-                    let keyToDecode: String
-                    switch entryToDecode.key {
-                    case let castedKey as String:
-                        keyToDecode = castedKey
-                    case let keyToDecodeJson as any Equatable:
-                        switch JsonDecode_string.decode(JsonDecode_Value(value: keyToDecodeJson))
-                        {
-                        case let .Result_Ok(decodedKey):
-                            keyToDecode = decodedKey
-                        case .Result_Err(_):
-                            return .Result_Err(
-                                .JsonDecode_Failure(
-                                    "Expecting an OBJECT with STRING keys",
-                                    toDecode
-                                )
-                            )
-                        }
-                    case _:
-                        return .Result_Err(
-                            .JsonDecode_Failure(
-                                "Expecting an OBJECT with valid JSON STRING keys",
-                                toDecode
-                            )
-                        )
-                    }
-                    switch entryToDecode.value {
-                    case let valueToDecode as any Equatable:
-                        switch valueDecoder.decode(JsonDecode_Value(value: valueToDecode)) {
+                    switch JsonDecode_string.decode(JsonDecode_Value(value: entryToDecode.key))
+                    {
+                    case let .Result_Ok(keyToDecode):
+                        switch valueDecoder.decode(JsonDecode_Value(value: entryToDecode.value)) {
                         case let .Result_Err(error):
                             return .Result_Err(.JsonDecode_Field(keyToDecode, error))
                         case let .Result_Ok(decodedValue):
                             decodedDictionary[keyToDecode] = decodedValue
                         }
-                    case _:
+                    case .Result_Err(_):
                         return .Result_Err(
-                            .JsonDecode_Field(
-                                keyToDecode,
-                                .JsonDecode_Failure(
-                                    "Expecting an OBJECT with valid JSON values",
-                                    toDecode
-                                )
+                            .JsonDecode_Failure(
+                                "Expecting an OBJECT with STRING keys",
+                                toDecode
                             )
                         )
                     }
@@ -3885,22 +3912,12 @@ public enum Elm {
             case let arrayToDecode as NSArray:
                 var decodedArray: [a] = []
                 decodedArray.reserveCapacity(arrayToDecode.count)
-                for (index, elementToDecodeAny) in arrayToDecode.enumerated() {
-                    switch elementToDecodeAny {
-                    case let elementToDecode as any Equatable:
-                        switch elementDecoder.decode(JsonDecode_Value(value: elementToDecode)) {
-                        case let .Result_Err(error):
-                            return .Result_Err(.JsonDecode_Index(Double(index), error))
-                        case let .Result_Ok(elementDecoded):
-                            decodedArray.append(elementDecoded)
-                        }
-                    case _:
-                        return .Result_Err(
-                            .JsonDecode_Index(
-                                Double(index),
-                                .JsonDecode_Failure("an ARRAY with valid JSON elements", toDecode)
-                            )
-                        )
+                for (index, elementToDecode) in arrayToDecode.enumerated() {
+                    switch elementDecoder.decode(JsonDecode_Value(value: elementToDecode)) {
+                    case let .Result_Err(error):
+                        return .Result_Err(.JsonDecode_Index(Double(index), error))
+                    case let .Result_Ok(elementDecoded):
+                        decodedArray.append(elementDecoded)
                     }
                 }
                 return .Result_Ok(decodedArray)
@@ -3922,25 +3939,11 @@ public enum Elm {
             case let arrayToDecode as NSArray:
                 let index: Int = Int(indexAsDouble)
                 return if index >= 0 && index < arrayToDecode.count {
-                    switch arrayToDecode[index] {
-                    case let elementToDecode as any Equatable:
-                        switch elementDecoder.decode(JsonDecode_Value(value: elementToDecode))
-                        {
-                        case let .Result_Err(error):
-                            .Result_Err(.JsonDecode_Index(indexAsDouble, error))
-                        case let .Result_Ok(elementDecoded):
-                            .Result_Ok(elementDecoded)
-                        }
-                    case _:
-                        .Result_Err(
-                            .JsonDecode_Index(
-                                indexAsDouble,
-                                .JsonDecode_Failure(
-                                    "Expecting an ARRAY with with valid JSON elements",
-                                    toDecode
-                                )
-                            )
-                        )
+                    switch elementDecoder.decode(JsonDecode_Value(value: arrayToDecode[index])) {
+                    case let .Result_Err(error):
+                        .Result_Err(.JsonDecode_Index(indexAsDouble, error))
+                    case let .Result_Ok(elementDecoded):
+                        .Result_Ok(elementDecoded)
                     }
                 } else {
                     .Result_Err(
@@ -3966,22 +3969,12 @@ public enum Elm {
             switch toDecode.value {
             case let arrayToDecode as NSArray:
                 var decodedList: List_List<a> = .List_Empty
-                for (index, elementToDecodeAny) in arrayToDecode.enumerated().reversed() {
-                    switch elementToDecodeAny {
-                    case let elementToDecode as any Equatable:
-                        switch elementDecoder.decode(JsonDecode_Value(value: elementToDecode)) {
-                        case let .Result_Err(error):
-                            return .Result_Err(.JsonDecode_Index(Double(index), error))
-                        case let .Result_Ok(elementDecoded):
-                            decodedList = .List_Cons(elementDecoded, decodedList)
-                        }
-                    case _:
-                        return .Result_Err(
-                            .JsonDecode_Index(
-                                Double(index),
-                                .JsonDecode_Failure("an ARRAY with valid JSON elements", toDecode)
-                            )
-                        )
+                for (index, elementToDecode) in arrayToDecode.enumerated().reversed() {
+                    switch elementDecoder.decode(JsonDecode_Value(value: elementToDecode)) {
+                    case let .Result_Err(error):
+                        return .Result_Err(.JsonDecode_Index(Double(index), error))
+                    case let .Result_Ok(elementDecoded):
+                        decodedList = .List_Cons(elementDecoded, decodedList)
                     }
                 }
                 return .Result_Ok(decodedList)
