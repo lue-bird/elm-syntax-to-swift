@@ -54,7 +54,7 @@ public enum Elm {
         In the non-allowed cases listed above, we assume that you intended to use a regular record type with only the extension fields which can lead to swift compile errors if you actually pass in additional fields.
 -   dependencies cannot internally use the same module names as the transpiled project
 -   the resulting code might not be readable or even conventionally formatted and comments are not preserved
--  on every web search you need to ignore -app -swiftui -ios -apple -xcode -taylor
+-  web search is abysmal; literally the worst part of the language. Even querying excluding `-app -swiftui -ios -apple -xcode -taylor -ai -popular -ArgumentParser` etc, prepare for a lot of shallowness, irrelevance, pain and disappointment. Swift's source code itself is also riddled with indirections etc so... best of luck :)
 
 Please [report any issues](https://github.com/lue-bird/elm-syntax-to-swift/issues/new) you notice <3
 
