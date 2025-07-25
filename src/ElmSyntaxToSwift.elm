@@ -29385,6 +29385,7 @@ elmRegexTypes =
 
 defaultDeclarations : String
 defaultDeclarations =
+    -- update with `node src/updateDefaultDeclarations.js`
     """
 public enum Unit: Sendable, Equatable { case Unit }
 public enum Tuple<first: Sendable, second: Sendable>: Sendable {
