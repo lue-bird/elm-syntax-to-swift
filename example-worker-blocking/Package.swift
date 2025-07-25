@@ -4,11 +4,11 @@
 import PackageDescription
 
 let package = Package(
-    name: "example-worker",
+    name: "example-worker-blocking",
     targets: [
         .executableTarget(
-            name: "example-worker",
-            resources: [ .copy("Main.elm") ]
+            name: "example-worker-blocking",
+            resources: [.copy("Main.elm")]
         )
     ]
 )

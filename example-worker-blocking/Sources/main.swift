@@ -64,6 +64,6 @@ while !elmCurrentSubscriptions.isEmpty {
                 print("unknown port incoming name \(name)")
             }
         }
-        elmCurrentSubscriptions = Elm.Main_main.subscriptions(elmCurrentState)
     }
+    elmCurrentSubscriptions = Elm.Main_main.subscriptions(elmCurrentState)
 }
