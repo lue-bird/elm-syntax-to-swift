@@ -1683,9 +1683,6 @@ singleDoubleQuotedStringCharToEscaped character =
         '\n' ->
             "\\n"
 
-        '$' ->
-            "\\$"
-
         '\u{000D}' ->
             "\\r"
 
