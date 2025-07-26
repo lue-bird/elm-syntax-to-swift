@@ -88,9 +88,25 @@ public enum Elm {
 
     // somewhat needed because
     // swift array does not support pattern matching
-    public indirect enum List_List<a: Sendable>: Sendable {
+    public indirect enum List_List<a: Sendable>: Sendable, Sequence {
         case List_Empty
         case List_Cons(_ head: a, _ tail: List_List<a>)
+
+        public func makeIterator() -> List_Iterator<a> {
+            List_Iterator(remainingList: self)
+        }
+    }
+    public struct List_Iterator<a: Sendable>: IteratorProtocol {
+        var remainingList: List_List<a>
+        public mutating func next() -> a? {
+            switch self.remainingList {
+            case .List_Empty:
+                return .none
+            case let .List_Cons(head, tail):
+                self.remainingList = tail
+                return .some(head)
+            }
+        }
     }
 
     @Sendable public static func Debug_toString<a>(_ data: a) -> String {
@@ -445,11 +461,9 @@ public enum Elm {
     }
 
     @Sendable public static func String_fromList(_ chars: List_List<UnicodeScalar>) -> String {
-        var remainingChars: List_List<UnicodeScalar> = chars
         var stringBuffer: String = String()
-        while case .List_Cons(let head, let tail) = remainingChars {
-            stringBuffer.append(Character(head))
-            remainingChars = tail
+        for char in chars {
+            stringBuffer.append(Character(char))
         }
         return stringBuffer
     }
@@ -485,11 +499,9 @@ public enum Elm {
     }
 
     @Sendable public static func String_concat(_ segments: List_List<String>) -> String {
-        var remainingSegments: List_List<String> = segments
         var stringBuffer: String = String()
-        while case .List_Cons(let head, let tail) = remainingSegments {
-            stringBuffer.append(contentsOf: head)
-            remainingSegments = tail
+        for segment in segments {
+            stringBuffer.append(contentsOf: segment)
         }
         return stringBuffer
     }
@@ -497,20 +509,7 @@ public enum Elm {
     @Sendable public static func String_join(_ inBetween: String, _ segments: List_List<String>)
         -> String
     {
-        switch segments {
-        case .List_Empty:
-            return ""
-        case .List_Cons(let headSegment, let tailSegments):
-            var remainingSegments = tailSegments
-            var stringBuffer: String = String()
-            stringBuffer.append(contentsOf: headSegment)
-            while case .List_Cons(let head, let tail) = remainingSegments {
-                stringBuffer.append(contentsOf: inBetween)
-                stringBuffer.append(contentsOf: head)
-                remainingSegments = tail
-            }
-            return stringBuffer
-        }
+        segments.joined(separator: inBetween)
     }
 
     @Sendable public static func String_reverse(_ string: String) -> String {
@@ -1175,24 +1174,10 @@ public enum Elm {
         return soFar
     }
 
-    static func Array_mapFromList<a, b>(_ elementChange: (a) -> b, _ fullList: List_List<a>)
-        -> [b]
-    {
-        var soFar: [b] = []
-        var remainingList: List_List<a> = fullList
-        while case let .List_Cons(remainingHead, remainingTail) = remainingList {
-            soFar.append(elementChange(remainingHead))
-            remainingList = remainingTail
-        }
-        return soFar
-    }
-
     @Sendable public static func Array_fromList<a>(_ fullList: List_List<a>) -> [a] {
         var soFar: [a] = []
-        var remainingList: List_List<a> = fullList
-        while case let .List_Cons(remainingHead, remainingTail) = remainingList {
-            soFar.append(remainingHead)
-            remainingList = remainingTail
+        for element in fullList {
+            soFar.append(element)
         }
         return soFar
     }
@@ -1372,92 +1357,55 @@ public enum Elm {
 
     @Sendable public static func List_length<a>(_ list: List_List<a>) -> Double {
         var lengthSoFar: Int = 0
-        var remainingList: List_List<a> = list
-        while case let .List_Cons(_, tail) = remainingList {
-            remainingList = tail
+        for _ in list {
             lengthSoFar = lengthSoFar + 1
         }
         return Double(lengthSoFar)
     }
 
-    private static func List_foldl<a, state>(
-        _ reduce: (a, state) -> state,
-        _ initialState: state,
-        _ list: List_List<a>
-    ) -> state {
-        var currentState: state = initialState
-        var remainingList: List_List<a> = list
-        while case let .List_Cons(head, tail) = remainingList {
-            remainingList = tail
-            currentState = reduce(head, currentState)
-        }
-        return currentState
-    }
     @Sendable public static func List_foldl<a, state>(
         _ reduce: (a) -> (state) -> state,
         _ initialState: state,
         _ list: List_List<a>
     ) -> state {
-        var currentState: state = initialState
-        var remainingList: List_List<a> = list
-        while case let .List_Cons(head, tail) = remainingList {
-            remainingList = tail
-            currentState = reduce(head)(currentState)
-        }
-        return currentState
+        list.reduce(initialState, { soFar, element in reduce(element)(soFar) })
     }
 
-    private static func List_foldr<a, state>(
-        _ reduce: (a, state) -> state,
-        _ initialState: state,
-        _ list: List_List<a>
-    ) -> state {
-        Array_foldr(reduce, initialState, Array_fromList(list))
-    }
     @Sendable public static func List_foldr<a, state>(
         _ reduce: (a) -> (state) -> state,
         _ initialState: state,
         _ list: List_List<a>
     ) -> state {
-        Array_foldr(reduce, initialState, Array_fromList(list))
+        // alternative: Array_foldr(reduce, initialState, Array_fromList(list))
+        list.reversed().reduce(initialState, { soFar, element in reduce(element)(soFar) })
     }
 
     @Sendable public static func List_reverse<a>(_ list: List_List<a>) -> List_List<a> {
-        List_foldl(List_List.List_Cons, .List_Empty, list)
+        list.reduce(
+            .List_Empty,
+            { soFar, element in .List_Cons(element, soFar) }
+        )
     }
 
     @Sendable public static func List_all<a>(_ isExpected: (a) -> Bool, _ list: List_List<a>)
         -> Bool
     {
-        var remainingList = list
-        while case let .List_Cons(head, tail) = remainingList {
-            if !isExpected(head) {
-                return false
-            }
-            remainingList = tail
-        }
-        return true
+        list.allSatisfy(isExpected)
     }
 
-    @Sendable public static func List_any<a>(_ isOdd: (a) -> Bool, _ list: List_List<a>) -> Bool {
-        var remainingList: List_List<a> = list
-        while case let .List_Cons(head, tail) = remainingList {
-            if isOdd(head) {
-                return true
-            }
-            remainingList = tail
-        }
-        return false
+    @Sendable public static func List_any<a>(_ isNeedle: (a) -> Bool, _ list: List_List<a>) -> Bool
+    {
+        list.contains(where: isNeedle)
     }
 
     // necessary because elm type variables do not have information about being equatable
     @Sendable public static func List_member<a: Equatable>(_ needle: (a), _ list: List_List<a>)
         -> Bool
     {
-        List_any({ element in Basics_eq(element, needle) }, list)
+        list.contains(needle)
     }
     @Sendable public static func List_member<a>(_ needle: (a), _ list: List_List<a>) -> Bool {
-        List_any({ element in Basics_eq(element, needle) }, list)
+        list.contains(where: { element in Basics_eq(element, needle) })
     }
 
     @Sendable public static func List_drop<a>(_ countToSkip: Double, _ list: List_List<a>)
@@ -1504,12 +1452,10 @@ public enum Elm {
         case .List_Empty:
             return .List_Empty
         case let .List_Cons(head, tail):
-            var remainingList: List_List<a> = tail
             var interspersedSoFar: [a] = [head]
-            while case let .List_Cons(next, afterNext) = remainingList {
-                remainingList = afterNext
+            for tailElement in tail {
                 interspersedSoFar.append(inBetween)
-                interspersedSoFar.append(next)
+                interspersedSoFar.append(tailElement)
             }
             return Array_toList(interspersedSoFar)
         }
@@ -1518,28 +1464,18 @@ public enum Elm {
     @Sendable public static func List_map<a, b>(_ elementChange: (a) -> b, _ list: List_List<a>)
         -> List_List<b>
     {
-        var remainingList: List_List<a> = list
-        var mappedSoFar: [b] = []
-        while case let .List_Cons(head, tail) = remainingList {
-            remainingList = tail
-            mappedSoFar.append(elementChange(head))
-        }
-        return Array_toList(mappedSoFar)
+        Array_toList(list.map(elementChange))
     }
 
     @Sendable public static func List_indexedMap<a, b>(
         _ indexedElementChange: (Double) -> (a) -> b,
         _ list: List_List<a>
     ) -> List_List<b> {
-        var changedElementsSoFar: [b] = []
-        var indexSoFar: Int = 0
-        var remainingList: List_List<a> = list
-        while case let .List_Cons(head, tail) = remainingList {
-            remainingList = tail
-            changedElementsSoFar.append(indexedElementChange(Double(indexSoFar))(head))
-            indexSoFar = indexSoFar + 1
-        }
-        return Array_toList(changedElementsSoFar)
+        Array_toList(
+            list.enumerated().map({ (index, element) in
+                indexedElementChange(Double(index))(element)
+            })
+        )
     }
 
     @Sendable public static func List_map2<a, b, c>(
@@ -1667,13 +1603,12 @@ public enum Elm {
     )
         -> List_List<a>
     {
-        var remainingList: List_List<a> = list
+        // alternative: Array_toList(list.filter(keepElement))
         var filteredSoFar: [a] = []
         var allElementsKeptSoFar: Bool = true
-        while case let .List_Cons(head, tail) = remainingList {
-            remainingList = tail
-            if keepElement(head) {
-                filteredSoFar.append(head)
+        for element in list {
+            if keepElement(element) {
+                filteredSoFar.append(element)
             } else {
                 allElementsKeptSoFar = false
             }
@@ -1689,15 +1624,7 @@ public enum Elm {
         _ elementToMaybe: (a) -> Maybe_Maybe<b>,
         _ list: List_List<a>
     ) -> List_List<b> {
-        var remainingList: List_List<a> = list
-        var filterMappedSoFar: [b] = []
-        while case let .List_Cons(head, tail) = remainingList {
-            remainingList = tail
-            if case let .Maybe_Just(headValue) = elementToMaybe(head) {
-                filterMappedSoFar.append(headValue)
-            }
-        }
-        return Array_toList(filterMappedSoFar)
+        Array_toList(list.compactMap({ element in Maybe_toOptional(elementToMaybe(element)) }))
     }
 
     @Sendable public static func List_append<a>(
@@ -1705,12 +1632,11 @@ public enum Elm {
         _ later: List_List<a>
     ) -> List_List<a> {
         // can be optimized
-        List_foldr(
-            { (earlierElement, soFar) in
-                .List_Cons(earlierElement, soFar)
-            },
+        earlier.reversed().reduce(
             later,
-            earlier
+            { (soFar, earlierElement) in
+                .List_Cons(earlierElement, soFar)
+            }
         )
     }
 
@@ -1718,32 +1644,18 @@ public enum Elm {
         _ elementToList: (a) -> List_List<b>,
         _ list: List_List<a>
     ) -> List_List<b> {
-        // can be optimized
-        List_foldr(
-            { (element, soFar) in
-                List_append(elementToList(element), soFar)
-            },
-            .List_Empty,
-            list
-        )
+        Array_toList(list.flatMap(elementToList))
     }
 
     @Sendable public static func List_concat<a>(_ list: List_List<List_List<a>>) -> List_List<a> {
-        // can be optimized
-        List_foldr(
-            { (element, soFar) in
-                List_append(element, soFar)
-            },
-            .List_Empty,
-            list
-        )
+        Array_toList(list.flatMap({ element in element }))
     }
 
     @Sendable public static func List_repeat<a>(_ count: Double, _ element: a) -> List_List<a> {
         if count <= 0 {
             return .List_Empty
         } else {
-            var soFar: List_List<a> = List_List<a>.List_Empty
+            var soFar: List_List<a> = .List_Empty
             for _ in 1...Int(count) {
                 soFar = .List_Cons(element, soFar)
             }
@@ -1763,20 +1675,18 @@ public enum Elm {
         }
     }
     @Sendable public static func List_sum(_ list: List_List<Double>) -> Double {
+        // alternative: list.reduce(0, +)
         var sumSoFar: Double = 0.0
-        var remainingList: List_List<Double> = list
-        while case let .List_Cons(head, tail) = remainingList {
-            sumSoFar = sumSoFar + head
-            remainingList = tail
+        for element in list {
+            sumSoFar = sumSoFar + element
         }
         return sumSoFar
     }
     @Sendable public static func List_product(_ list: List_List<Double>) -> Double {
+        // alternative: list.reduce(1, *)
         var productSoFar: Double = 1.0
-        var remainingList: List_List<Double> = list
-        while case let .List_Cons(head, tail) = remainingList {
-            productSoFar = productSoFar * head
-            remainingList = tail
+        for element in list {
+            productSoFar = productSoFar * element
         }
         return productSoFar
     }
@@ -1787,7 +1697,7 @@ public enum Elm {
         case .List_Empty:
             .Maybe_Nothing
         case let .List_Cons(head, tail):
-            .Maybe_Just(List_foldl(max, head, tail))
+            .Maybe_Just(tail.reduce(head, max))
         }
     }
 
@@ -1797,7 +1707,7 @@ public enum Elm {
         case .List_Empty:
             .Maybe_Nothing
         case let .List_Cons(head, tail):
-            .Maybe_Just(List_foldl(min, head, tail))
+            .Maybe_Just(tail.reduce(head, min))
         }
     }
 
@@ -1805,26 +1715,24 @@ public enum Elm {
         _ elementCompare: (a) -> (a) -> Basics_Order,
         _ list: List_List<a>
     ) -> List_List<a> {
-        var asArray: [a] = Array_fromList(list)
-        asArray.sort(by: { (a, b) in elementCompare(a)(b) == .Basics_LT })
-        return Array_toList(asArray)
+        Array_toList(list.sorted(by: { (a, b) in elementCompare(a)(b) == .Basics_LT }))
     }
 
     @Sendable public static func List_sortBy<element, comparable: Comparable>(
         _ elementToComparable: (element) -> comparable,
         _ list: List_List<element>
     ) -> List_List<element> {
-        var asArray: [element] = Array_fromList(list)
-        asArray.sort(by: { (a, b) in elementToComparable(a) < elementToComparable(b) })
-        return Array_toList(asArray)
+        Array_toList(
+            list.sorted(
+                by: { (a, b) in elementToComparable(a) < elementToComparable(b) }
+            )
+        )
     }
 
     @Sendable public static func List_sort<comparable: Comparable>(_ list: List_List<comparable>)
         -> List_List<comparable>
     {
-        var asArray: [comparable] = Array_fromList(list)
-        asArray.sort(by: { (a, b) in a < b })  // mutate
-        return Array_toList(asArray)
+        Array_toList(list.sorted())
     }
 
     @Sendable public static func Set_size<a>(_ set: Set<a>) -> Double {
@@ -1838,9 +1746,7 @@ public enum Elm {
     }
     @Sendable public static func Set_fromList<a>(_ list: List_List<a>) -> Set<a> {
         var set: Set<a> = Set()
-        var remainingList: List_List<a> = list
-        while case let .List_Cons(element, afterElement) = remainingList {
-            remainingList = afterElement
+        for element in list {
             set.insert(element)
         }
         return set
@@ -1939,10 +1845,8 @@ public enum Elm {
         -> [key: value]
     {
         var dictionary: [key: value] = Dictionary()
-        var remainingList: List_List<Tuple<key, value>> = list
-        while case let .List_Cons(.Tuple(key, value), afterElement) = remainingList {
-            dictionary[key] = value
-            remainingList = afterElement
+        for case let entry in list {
+            dictionary[entry.first] = entry.second
         }
         return dictionary
     }
@@ -2481,12 +2385,9 @@ public enum Elm {
     {
         .Time_Zone(
             Int64(n),
-            Array_mapFromList(
-                { era in
-                    .Record(offset: Int64(era.offset), start: Int64(era.start))
-                },
-                eras
-            )
+            eras.map({ era in
+                .Record(offset: Int64(era.offset), start: Int64(era.start))
+            })
         )
     }
 
@@ -3367,9 +3268,7 @@ public enum Elm {
         _ elements: List_List<a>
     ) -> JsonEncode_Value {
         JsonDecode_Value(
-            value: NSArray(
-                array: Array_mapFromList(elementToJson, elements)
-            )
+            value: NSArray(array: elements.map(elementToJson))
         )
     }
     @Sendable public static func JsonEncode_array<a>(
@@ -3397,11 +3296,9 @@ public enum Elm {
     )
         -> JsonEncode_Value
     {
-        var fieldsRemaining: List_List<Tuple<String, JsonEncode_Value>> = fields
         var fieldsDictionary: [String: JsonEncode_Value] = Dictionary()
-        while case let .List_Cons(.Tuple(headFieldName, headFieldValue), tail) = fieldsRemaining {
-            fieldsDictionary[headFieldName] = headFieldValue
-            fieldsRemaining = tail
+        for field in fields {
+            fieldsDictionary[field.first] = field.second
         }
         return JsonDecode_Value(value: NSDictionary(dictionary: fieldsDictionary))
     }
@@ -3702,14 +3599,12 @@ public enum Elm {
         -> JsonDecode_Decoder<value>
     {
         JsonDecode_Decoder(decode: { toDecode in
-            var remainingOptions: List_List<JsonDecode_Decoder<value>> = options
             var optionDecodeErrors: [JsonDecode_Error] = []
-            while case let .List_Cons(nextOptionDecoder, afterNextOption) = remainingOptions {
+            for nextOptionDecoder in options {
                 switch nextOptionDecoder.decode(toDecode) {
                 case let .Result_Ok(value): return .Result_Ok(value)
                 case let .Result_Err(optionDecodeError):
                     optionDecodeErrors.append(optionDecodeError)
-                    remainingOptions = afterNextOption
                 }
             }
             return .Result_Err(.JsonDecode_OneOf(Array_toList(optionDecodeErrors)))
@@ -3836,13 +3731,11 @@ public enum Elm {
         _ valueDecoder: JsonDecode_Decoder<value>
     ) -> JsonDecode_Decoder<value> {
         JsonDecode_Decoder(decode: { toDecode in
-            var remainingFieldNames: List_List<String> = fieldNames
             var successfullyDecodedFieldNames: [String] = []
             var remainingToDecode: JsonDecode_Value = toDecode
-            while case let .List_Cons(nextFieldName, afterNextFieldName) = remainingFieldNames {
+            for nextFieldName in fieldNames {
                 switch JsonDecode_fieldValue(nextFieldName).decode(remainingToDecode) {
                 case let .Result_Ok(fieldValueJson):
-                    remainingFieldNames = afterNextFieldName
                     remainingToDecode = fieldValueJson
                     successfullyDecodedFieldNames.append(nextFieldName)
                 case let .Result_Err(fieldValueDecodeError):
