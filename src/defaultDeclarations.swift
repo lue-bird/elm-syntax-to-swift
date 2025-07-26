@@ -3787,7 +3787,7 @@ public enum Elm {
                 .Result_Ok(String(string))
             case _:
                 .Result_Err(
-                    .JsonDecode_Failure("Expecting a NUMBER", toDecode)
+                    .JsonDecode_Failure("Expecting a STRING", toDecode)
                 )
             }
         })
@@ -3869,8 +3869,7 @@ public enum Elm {
             case let dictToDecode as NSDictionary:
                 var decodedDictionary: [String: value] = Dictionary()
                 for entryToDecode in dictToDecode {
-                    switch JsonDecode_string.decode(JsonDecode_Value(value: entryToDecode.key))
-                    {
+                    switch JsonDecode_string.decode(JsonDecode_Value(value: entryToDecode.key)) {
                     case let .Result_Ok(keyToDecode):
                         switch valueDecoder.decode(JsonDecode_Value(value: entryToDecode.value)) {
                         case let .Result_Err(error):

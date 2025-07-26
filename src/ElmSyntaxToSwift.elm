@@ -33143,7 +33143,7 @@ public static let JsonDecode_string: JsonDecode_Decoder<String> =
             .Result_Ok(String(string))
         case _:
             .Result_Err(
-                .JsonDecode_Failure("Expecting a NUMBER", toDecode)
+                .JsonDecode_Failure("Expecting a STRING", toDecode)
             )
         }
     })
@@ -33225,8 +33225,7 @@ static func JsonDecode_fieldValue(_ fieldName: String)
         case let dictToDecode as NSDictionary:
             var decodedDictionary: [String: value] = Dictionary()
             for entryToDecode in dictToDecode {
-                switch JsonDecode_string.decode(JsonDecode_Value(value: entryToDecode.key))
-                {
+                switch JsonDecode_string.decode(JsonDecode_Value(value: entryToDecode.key)) {
                 case let .Result_Ok(keyToDecode):
                     switch valueDecoder.decode(JsonDecode_Value(value: entryToDecode.value)) {
                     case let .Result_Err(error):
