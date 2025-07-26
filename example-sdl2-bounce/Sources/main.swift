@@ -4,7 +4,7 @@ if SDL_Init(SDL_INIT_EVENTS | SDL_INIT_VIDEO) != 0 {
     fatalError("SDL could not initialize! SDL_Error: \(String(cString: SDL_GetError()))")
 }
 
-let elmInitialized = Elm.Run_initWindow
+let elmInitialized = Elm.Main_initWindow
 var window: OpaquePointer?
 var renderer: OpaquePointer?
 SDL_CreateWindowAndRenderer(
@@ -26,19 +26,19 @@ var event: SDL_Event = SDL_Event()
 var elmState = elmInitialized.state
 while !shouldQuit {
     var onQuit: () -> Void = {}
-    for command in Elm.Array_fromList(Elm.Run_stateToInterface(elmState)) {
+    for command in Elm.Main_stateToInterface(elmState) {
         switch command {
-        case let .Run_InterfaceOnQuit(constructNewState):
+        case let .Main_InterfaceOnQuit(constructNewState):
             onQuit = { elmState = constructNewState(.Unit) }
-        case .Run_InterfaceQuit:
+        case .Main_InterfaceQuit:
             shouldQuit = true
-        case let .Run_InterfaceOnSimulationTick(constructNewState):
+        case let .Main_InterfaceOnSimulationTick(constructNewState):
             elmState = constructNewState(.Unit)
-        case let .Run_InterfaceRender(toRender):
+        case let .Main_InterfaceRender(toRender):
             let clearColor = elmColorToRgba255(toRender.clearColor)
             SDL_SetRenderDrawColor(renderer, clearColor.r, clearColor.g, clearColor.b, clearColor.a)
             SDL_RenderClear(renderer)
-            for elementToRender in Elm.Array_fromList(toRender.elements) {
+            for elementToRender in toRender.elements {
                 renderElement(renderer, elementToRender)
             }
             SDL_RenderPresent(renderer)
@@ -56,16 +56,16 @@ while !shouldQuit {
 
 func renderElement(
     _ renderer: OpaquePointer?,
-    _ element: Elm.Run_ElementToRender
+    _ element: Elm.Main_ElementToRender
 ) {
     switch element {
-    case let .Run_FilledRectangleToRender(filledRectToRender):
+    case let .Main_FilledRectangleToRender(filledRectToRender):
         renderFilledRectangle(renderer, filledRectToRender)
     }
 }
 func renderFilledRectangle(
     _ renderer: OpaquePointer?,
-    _ filledRectToRender: Elm.Run_FilledRectangleToRender
+    _ filledRectToRender: Elm.Main_FilledRectangleToRender
 ) {
     let color = elmColorToRgba255(filledRectToRender.color)
     SDL_SetRenderDrawColor(renderer, color.r, color.g, color.b, color.a)

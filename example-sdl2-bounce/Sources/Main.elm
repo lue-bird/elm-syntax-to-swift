@@ -1,4 +1,4 @@
-module Run exposing (ElementToRender(..), Interface(..), State, initWindow, stateToInterface)
+module Main exposing (ElementToRender(..), Interface(..), State, initWindow, stateToInterface)
 
 import Color exposing (Color)
 

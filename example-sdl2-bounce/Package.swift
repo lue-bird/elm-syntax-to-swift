@@ -14,7 +14,7 @@ let package = Package(
             dependencies: [
                 .product(name: "SDL", package: "SwiftSDL2")
             ],
-            resources: [ .copy("Run.elm") ]
+            resources: [.copy("Main.elm")]
         )
     ]
 )
