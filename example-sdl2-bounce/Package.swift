@@ -4,13 +4,13 @@
 import PackageDescription
 
 let package = Package(
-    name: "example-sdl2",
+    name: "example-sdl2-bounce",
     dependencies: [
         .package(url: "https://github.com/ctreffs/SwiftSDL2.git", from: "1.4.0")
     ],
     targets: [
         .executableTarget(
-            name: "example-sdl2",
+            name: "example-sdl2-bounce",
             dependencies: [
                 .product(name: "SDL", package: "SwiftSDL2")
             ],
