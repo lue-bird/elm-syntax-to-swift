@@ -4029,7 +4029,7 @@ referenceToCoreSwift reference =
                     Just { moduleOrigin = Nothing, name = "Basics_isNaN" }
 
                 "isInfinite" ->
-                    Just { moduleOrigin = Nothing, name = "Basics_isInfinity" }
+                    Just { moduleOrigin = Nothing, name = "Basics_isInfinite" }
 
                 "remainderBy" ->
                     Just { moduleOrigin = Nothing, name = "Basics_remainderBy" }
