@@ -34,6 +34,9 @@ ElmjutsuDumMyM0DuL3.elm
 .vscode
 .editorconfig
 
+# not ready for release
+example-sdl2-game
+
 # throwaway
 contains-surrogates.js
 example-experiments
