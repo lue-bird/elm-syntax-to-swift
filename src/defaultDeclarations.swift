@@ -4479,7 +4479,7 @@ public enum Elm {
         var foundNonBase10: Bool = false
         while (offset < string.utf16.count) && !(foundNonBase10) {
             let code: Unicode.UTF16.CodeUnit = stringUtf16CodePointAt(string, offset)
-            foundNonBase10 = !(code < 0x30 || 0x39 < code)
+            foundNonBase10 = code < 0x30 || 0x39 < code
             offset = offset + 1
         }
         return Double(offset)
