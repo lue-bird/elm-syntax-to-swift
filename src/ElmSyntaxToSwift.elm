@@ -33742,7 +33742,7 @@ private static func surrogatePairToUnicodeScalar(
 
 @Sendable public static func ElmKernelParser_isSubString(
     _ smallString: String,
-    _ offsetOriginal: Double,
+    _ offset: Double,
     _ rowOriginal: Double,
     _ colOriginal: Double,
     _ bigString: String
@@ -33752,15 +33752,14 @@ private static func surrogatePairToUnicodeScalar(
     let smallLength: Int = smallString.utf16.count
     var row: Int = Int(rowOriginal)
     var col: Int = Int(colOriginal)
-    var offset: Int = Int(offsetOriginal)
-    var isGood: Bool = Int(offset) + smallLength <= bigString.utf16.count
+    let offsetInt: Int = Int(offset)
+    var isGood: Bool = offsetInt + smallLength <= bigString.utf16.count
     var i: Int = 0
     while isGood && i < smallLength {
         let code: Unicode.UTF16.CodeUnit =
-            stringUtf16CodePointAt(bigString, offset)
+            stringUtf16CodePointAt(bigString, offsetInt + i)
         isGood =
-            stringUtf16CodePointAt(smallString, i)
-            == stringUtf16CodePointAt(bigString, offset)
+            stringUtf16CodePointAt(smallString, i) == code
 
         if code == 0x000A /* \\n */ {
             i = i + 1
@@ -33772,16 +33771,15 @@ private static func surrogatePairToUnicodeScalar(
                 isGood =
                     isGood
                     && (stringUtf16CodePointAt(smallString, i + 1)
-                        == stringUtf16CodePointAt(bigString, offset + 1))
+                        == stringUtf16CodePointAt(bigString, offsetInt + i + 1))
                 i = i + 2
-                offset = offset + 2
             } else {
                 i = i + 1
             }
         }
     }
     return if isGood {
-        .Triple(Double(offset), Double(row), Double(col))
+        .Triple(Double(offsetInt + i), Double(row), Double(col))
     } else {
         .Triple(-1, Double(row), Double(col))
     }
