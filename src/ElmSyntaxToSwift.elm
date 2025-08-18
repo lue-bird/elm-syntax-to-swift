@@ -33239,9 +33239,14 @@ static func JsonDecode_fieldValue(_ fieldName: String)
 )
     -> JsonDecode_Decoder<combined>
 {
-    JsonDecode_map2(
-        combineHeadTail,
-        elementDecoder,
+    JsonDecode_andThen(
+        { list in
+            switch list {
+                case .List_Empty: JsonDecode_fail("an ARRAY with at least ONE element")
+                case let .List_Cons(head, tail):
+                    JsonDecode_succeed(combineHeadTail(head)(tail))
+            }
+        },
         JsonDecode_list(elementDecoder)
     )
 }
